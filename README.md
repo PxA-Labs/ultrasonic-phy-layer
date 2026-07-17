@@ -98,6 +98,12 @@ At this stage, the repository is focused on the project's physical-layer specifi
 
 Please review [CONTRIBUTING.md](./CONTRIBUTING.md) before opening issues or pull requests.
 
+## 👥 Core Developers & Maintainers
+
+This project is developed under the **[PxA Labs](https://github.com/PxA-Labs)** organization by:
+- **Archit Mittal**
+- **Purvansh Joshi**
+
 ## 📄 License
 
 This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
