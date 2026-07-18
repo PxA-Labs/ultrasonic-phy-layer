@@ -55,7 +55,9 @@ set(SW_SOURCES
 
 add_library(soundwave SHARED ${SW_SOURCES})
 target_link_libraries(soundwave PRIVATE kissfft)
-if(NOT WIN32)
+if(WIN32)
+    target_compile_definitions(soundwave PRIVATE SW_BUILD_DLL)
+else()
     target_link_libraries(soundwave PRIVATE m)
 endif()
 set_target_properties(soundwave PROPERTIES
