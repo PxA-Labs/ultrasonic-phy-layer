@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.x'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart code
+        run: flutter analyze --fatal-infos
+
+      - name: Check formatting
+        run: dart format --set-exit-if-changed .
+
+      - name: Run Flutter tests
+        run: flutter test --coverage
+
+      - name: Upload coverage to Codecov
+        if: github.event_name == 'push'
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage/lcov.info
+
+      - name: Build DSP core (C/C++)
+        run: |
+          cd native
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - name: Run DSP core tests
+        run: |
+          cd native/build
+          ctest --output-on-failure
