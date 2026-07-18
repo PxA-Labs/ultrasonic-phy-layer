@@ -24,6 +24,11 @@ All notable changes to this project will be documented in this file.
 - Add core developers and project organization
 - Add production documents (PRD, tech stack, CI/CD, roadmap)
 - Move MATHEMATICAL_MODEL.md to docs/ and update README links
+- Update CHANGELOG.md [skip ci]
+
+### Features
+
+- Add project skeleton for native C DSP library and Flutter app
 
 ### Maintenance
 
