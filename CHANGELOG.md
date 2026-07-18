@@ -12,11 +12,22 @@ All notable changes to this project will be documented in this file.
 - **ci:** Resolve git-cliff URL via GitHub API instead of pinned action
 - **ci:** Remove invalid sort_commits value in cliff.toml
 - **ci:** Replace job-level hashFiles with step-level checks to fix CI parsing
+- Macos missing stdlib.h, msvc __attribute__ guard, lint-pr permissions, remove dep-review
+- Ci triggers and workflow stability
+- Conditional -lm for non-Windows, missing stdlib.h in test_css_demodulate
+- Add missing stdlib.h in test_cfo/ofdm_modulate/ofdm_demodulate, pass --config Release for MSVC multi-config generator
+- Export DLL symbols on Windows via SW_BUILD_DLL compile definition
+- Build static lib on Windows to avoid DLL symbol export issues
+- Lcov coverage — use --ignore-errors for missing gcda files, fix path
+- Remove over-broad lcov exclude patterns that stripped all records
 
 ### CI
 
 - Add GitHub Actions workflows (CI, Build, Release, Dependabot)
 - Add auto-changelog with git-cliff
+- Add benchmarking, cross-platform matrix, coverage, static analysis, and PR linting
+- Retrigger workflows [skip ci]
+- Retrigger workflows
 - Add benchmarking, cross-platform matrix, coverage, static analysis, and PR linting
 
 ### Documentation
@@ -31,13 +42,16 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Add SECURITY.md (#45)
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
 - Add project skeleton for native C DSP library and Flutter app
+- Professional CI/CD pipeline with cross-platform matrix, benchmarks, coverage, and static analysis (#46)
 
 ### Maintenance
 
 - Change license from MIT to Apache 2.0
+- Merge main into feat/ci-benchmarking
 
 
