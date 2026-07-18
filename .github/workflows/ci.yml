@@ -9,52 +9,69 @@ on:
 jobs:
   flutter-quality-gate:
     runs-on: ubuntu-latest
-    if: hashFiles('pubspec.yaml') != ''
+    defaults:
+      run:
+        working-directory: soundwave_app
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check for Flutter project
+        id: check
+        run: echo "exists=$([ -f pubspec.yaml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - uses: subosito/flutter-action@v2
+        if: steps.check.outputs.exists == 'true'
         with:
           flutter-version: '3.41.x'
           channel: stable
           cache: true
 
       - name: Install dependencies
+        if: steps.check.outputs.exists == 'true'
         run: flutter pub get
 
       - name: Analyze Dart code
+        if: steps.check.outputs.exists == 'true'
         run: flutter analyze --fatal-infos
 
       - name: Check formatting
+        if: steps.check.outputs.exists == 'true'
         run: dart format --set-exit-if-changed .
 
       - name: Run Flutter tests
+        if: steps.check.outputs.exists == 'true'
         run: flutter test --coverage
 
       - name: Upload coverage to Codecov
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && steps.check.outputs.exists == 'true'
         uses: codecov/codecov-action@v4
         with:
-          files: coverage/lcov.info
+          files: soundwave_app/coverage/lcov.info
 
   dsp-core:
     runs-on: ubuntu-latest
-    if: hashFiles('native/CMakeLists.txt') != ''
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check for native CMakeLists
+        id: check
+        run: echo "exists=$([ -f native/CMakeLists.txt ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Install build dependencies
+        if: steps.check.outputs.exists == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake gcc g++ make
 
       - name: Build DSP core
+        if: steps.check.outputs.exists == 'true'
         run: |
           cd native
           cmake -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build
 
       - name: Run DSP core tests
+        if: steps.check.outputs.exists == 'true'
         run: |
           cd native/build
           ctest --output-on-failure
