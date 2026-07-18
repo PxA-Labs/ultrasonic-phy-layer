@@ -1,0 +1,22 @@
+dsp-core:
+  - changed-files:
+      - any-glob-to-any-file: native/src/**/*
+      - any-glob-to-any-file: native/include/**/*
+      - any-glob-to-any-file: native/tests/**/*
+      - any-glob-to-any-file: native/benchmarks/**/*
+      - any-glob-to-any-file: native/CMakeLists.txt
+
+flutter-ui:
+  - changed-files:
+      - any-glob-to-any-file: soundwave_app/lib/**/*
+      - any-glob-to-any-file: soundwave_app/test/**/*
+      - any-glob-to-any-file: soundwave_app/pubspec.yaml
+
+ci-cd:
+  - changed-files:
+      - any-glob-to-any-file: .github/**/*
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: docs/**/*
+      - any-glob-to-any-file: '**/*.md'
