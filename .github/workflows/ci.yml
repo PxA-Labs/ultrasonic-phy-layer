@@ -113,14 +113,14 @@ jobs:
 
       - name: Build DSP core
         if: steps.check.outputs.exists == 'true'
-        run: cmake --build native/build
+        run: cmake --build native/build --config Release
         shell: bash
 
       - name: Run DSP core tests
         if: steps.check.outputs.exists == 'true'
         run: |
           cd native/build
-          ctest --output-on-failure
+          ctest --output-on-failure --build-config Release
         shell: bash
 
       - name: Show ccache stats
