@@ -16,11 +16,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install git-cliff
+        run: |
+          ASSET_URL=$(curl -s https://api.github.com/repos/orhun/git-cliff/releases/latest \
+            | jq -r '.assets[] | select(.name | test("x86_64-unknown-linux-gnu\\.tar\\.gz$")) | .browser_download_url')
+          curl -LsS "$ASSET_URL" -o /tmp/git-cliff.tar.gz
+          tar -xzf /tmp/git-cliff.tar.gz -C /tmp/
+          sudo mv /tmp/git-cliff-*/git-cliff /usr/local/bin/
+          git-cliff --version
+
       - name: Generate changelog
-        uses: orhun/git-cliff-action@v3
-        with:
-          config: cliff.toml
-          args: --unreleased -o CHANGELOG.md
+        run: git-cliff --unreleased -o CHANGELOG.md
 
       - name: Commit updated changelog
         run: |
