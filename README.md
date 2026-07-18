@@ -46,7 +46,7 @@ Soundwave supports two main PHY layer modulation formats. The following table pr
 
 ## 🧮 Physical Layer Mathematical Model Summary
 
-For the complete, mathematically rigorous equations of the physical layer, refer to the [MATHEMATICAL_MODEL.md](./MATHEMATICAL_MODEL.md) file. Below is a high-level summary of the core equations.
+For the complete, mathematically rigorous equations of the physical layer, refer to the [MATHEMATICAL_MODEL.md](./docs/MATHEMATICAL_MODEL.md) file. Below is a high-level summary of the core equations.
 
 ```mermaid
 graph TD
@@ -86,7 +86,12 @@ At this stage, the repository is focused on the project's physical-layer specifi
 ├── LICENSE
 ├── CONTRIBUTING.md
 ├── README.md
-├── MATHEMATICAL_MODEL.md         <-- Mathematical formulations
+├── docs/
+│   ├── MATHEMATICAL_MODEL.md     <-- Mathematical formulations
+│   ├── PRD.md                    <-- Product Requirements Document
+│   ├── TECH_STACK.md             <-- Technology Stack Specification
+│   ├── CI_CD.md                  <-- CI/CD Pipeline Specification
+│   └── ROADMAP.md                <-- Implementation Roadmap
 ├── src/                          <-- (Future implementation)
 │   ├── encoder/                  <-- RS coding & CRC insertion
 │   ├── modulator/                <-- CSS & OFDM signal generation
