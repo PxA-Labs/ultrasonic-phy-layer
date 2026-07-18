@@ -1,6 +1,8 @@
 name: Lint PR
 
 on:
+  pull_request:
+    types: [opened, edited, synchronize]
   pull_request_target:
     types: [opened, edited, synchronize]
 
@@ -13,25 +15,23 @@ jobs:
     name: Conventional Commit title
     runs-on: ubuntu-latest
     steps:
-      - uses: amannn/action-semantic-pull-request@v5
+      - name: Validate PR title
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          types: |
-            feat
-            fix
-            docs
-            style
-            refactor
-            perf
-            test
-            build
-            ci
-            chore
-            revert
-          requireScope: false
-          subjectPattern: ^(?![A-Z]).+$
-          subjectPatternError: |
-            The subject "{subject}" must start with a lowercase letter.
-          wip: true
-          validateSingleCommit: false
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          VALID_TYPES="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)"
+          SCOPE="(\([a-z0-9._-]+\))?"
+          SUBJECT=": [a-z].+"
+          PATTERN="^(${VALID_TYPES}${SCOPE}${SUBJECT}|(WIP|wip)[\[\]:])"
+
+          if echo "$TITLE" | grep -qE "$PATTERN"; then
+            echo "PR title '$TITLE' is valid."
+          else
+            echo "Invalid PR title: '$TITLE'"
+            echo ""
+            echo "Expected format: type(scope): subject"
+            echo "  type: feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert"
+            echo "  scope: optional lowercase identifier"
+            echo "  subject: must start with a lowercase letter"
+            exit 1
+          fi
