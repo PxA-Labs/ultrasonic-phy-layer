@@ -16,18 +16,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install git-cliff
-        run: |
-          curl -LsS "https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-x86_64-unknown-linux-gnu.tar.gz" \
-            -o /tmp/git-cliff.tar.gz
-          tar -xzf /tmp/git-cliff.tar.gz -C /tmp/
-          BIN=$(find /tmp -name "git-cliff" -type f 2>/dev/null | head -1)
-          sudo mv "$BIN" /usr/local/bin/git-cliff
-          sudo chmod +x /usr/local/bin/git-cliff
-          git-cliff --version
-
       - name: Generate changelog
-        run: git-cliff --unreleased -o CHANGELOG.md
+        uses: orhun/git-cliff-action@v3
+        with:
+          config: cliff.toml
+          args: --unreleased -o CHANGELOG.md
 
       - name: Commit updated changelog
         run: |
