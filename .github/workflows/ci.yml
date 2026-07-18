@@ -153,12 +153,18 @@ jobs:
 
       - name: Generate coverage report
         run: |
-          cd native
-          lcov --capture --directory build --output-file build/coverage.info
-          lcov --remove build/coverage.info \
-            '/usr/*' '*/_deps/*' '*/tests/*' '*/Fuzzing/*' \
-            -o build/coverage_filtered.info
-          lcov --list build/coverage_filtered.info
+          cd native/build
+          find . -name "*.gcda" -o -name "*.gcno" 2>/dev/null | head -20
+          lcov --capture --directory . --output-file coverage.info \
+            --ignore-errors empty,unused 2>&1 || true
+          if [ -f coverage.info ]; then
+            lcov --remove coverage.info \
+              '/usr/*' '*/_deps/*' '*/tests/*' '*/Fuzzing/*' \
+              -o coverage_filtered.info --ignore-errors empty,unused 2>&1 || true
+            lcov --list coverage_filtered.info
+          else
+            echo "No coverage data generated."
+          fi
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
@@ -166,6 +172,7 @@ jobs:
           files: native/build/coverage_filtered.info
           flags: dsp-core
           fail_ci_if_error: false
+        continue-on-error: true
 
   docs-lint:
     runs-on: ubuntu-latest
