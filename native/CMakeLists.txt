@@ -12,20 +12,23 @@ add_compile_definitions(SW_VERSION="${SW_VERSION_STRING}")
 
 # Include paths
 include_directories(include)
-include_directories(${CMAKE_BINARY_DIR}/_deps/kissfft-src)
 
-# Fetch kissfft from GitHub
+# Fetch kissfft from GitHub (populate manually, define our own target)
 include(FetchContent)
 FetchContent_Declare(
     kissfft
     GIT_REPOSITORY https://github.com/mborgerding/kissfft.git
     GIT_TAG        v131
-    SOURCE_DIR     ${CMAKE_BINARY_DIR}/_deps/kissfft-src
 )
-set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-set(KISSFFT_SHARED OFF CACHE BOOL "" FORCE)
-set(KISSFFT_STATIC ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(kissfft)
+FetchContent_GetProperties(kissfft)
+if(NOT kissfft_POPULATED)
+    FetchContent_Populate(kissfft)
+    add_library(kissfft STATIC
+        ${kissfft_SOURCE_DIR}/kiss_fft.c
+        ${kissfft_SOURCE_DIR}/tools/kiss_fftr.c
+    )
+    target_include_directories(kissfft PUBLIC ${kissfft_SOURCE_DIR})
+endif()
 
 # Public API library
 set(SW_SOURCES
