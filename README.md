@@ -9,7 +9,7 @@ Soundwave is an experimental physical layer (PHY) communication platform designe
 
 ---
 
-## 📊 Acoustic Data Insights & Channel Limits
+## Acoustic Data Insights & Channel Limits
 
 Acoustic communication channels are constrained by the physical properties of air and sound propagation. Below are key parameters and empirical performance insights.
 
@@ -44,7 +44,7 @@ Soundwave supports two main PHY layer modulation formats. The following table pr
 
 ---
 
-## 🧮 Physical Layer Mathematical Model Summary
+## Physical Layer Mathematical Model Summary
 
 For the complete, mathematically rigorous equations of the physical layer, refer to the [MATHEMATICAL_MODEL.md](./docs/MATHEMATICAL_MODEL.md) file. Below is a high-level summary of the core equations.
 
@@ -78,7 +78,7 @@ $$\Delta \hat{f}_c = \frac{f_s}{2\pi N} \angle \left( \sum_{n=0}^{N-1} y^*[n] y[
 
 ---
 
-## 🚀 Getting Started & Architecture
+## Getting Started & Architecture
 
 At this stage, the repository is focused on the project's physical-layer specifications and design parameters. The codebase will be expanded according to the following architecture:
 
@@ -108,20 +108,20 @@ At this stage, the repository is focused on the project's physical-layer specifi
 │   └── receiver/               <-- Frame sync, FFT, equalization
 ```
 
-## 📋 Changelog
+## Changelog
 
 See [CHANGELOG.md](./CHANGELOG.md) for a detailed history of all changes.
 
-## 🛠️ Contributing
+## Contributing
 
 Please review [CONTRIBUTING.md](./CONTRIBUTING.md) before opening issues or pull requests.
 
-## 👥 Core Developers & Maintainers
+## Core Developers & Maintainers
 
 This project is developed under the **[PxA Labs](https://github.com/PxA-Labs)** organization by:
 - **Archit Mittal**
 - **Purvansh Joshi**
 
-## 📄 License
+## License
 
 This project is licensed under the Apache License 2.0. See [LICENSE](./LICENSE) for details.
