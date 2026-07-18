@@ -56,6 +56,6 @@ filter_commits = false
 # regex to match git tags
 tag_pattern = "v[0-9].*"
 # sort commits inside a group by scope
-sort_commits = "scope"
+sort_commits = "oldest"
 # sort commits by column
 sort_commits_col = 0
