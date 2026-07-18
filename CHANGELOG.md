@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - Build static lib on Windows to avoid DLL symbol export issues
 - Lcov coverage — use --ignore-errors for missing gcda files, fix path
 - Remove over-broad lcov exclude patterns that stripped all records
+- Replace broken action-semantic-pull-request with inline validation script
 
 ### CI
 
@@ -41,6 +42,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Add SECURITY.md (#45)
+- Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 
