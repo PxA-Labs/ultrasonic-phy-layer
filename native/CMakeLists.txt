@@ -19,7 +19,7 @@ include(FetchContent)
 FetchContent_Declare(
     kissfft
     GIT_REPOSITORY https://github.com/mborgerding/kissfft.git
-    GIT_TAG        v131.1.0
+    GIT_TAG        v131
     SOURCE_DIR     ${CMAKE_BINARY_DIR}/_deps/kissfft-src
 )
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
