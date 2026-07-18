@@ -29,6 +29,7 @@ if(NOT kissfft_POPULATED)
     )
     target_include_directories(kissfft PUBLIC ${kissfft_SOURCE_DIR})
 endif()
+include_directories(${kissfft_SOURCE_DIR})
 
 # Public API library
 set(SW_SOURCES
