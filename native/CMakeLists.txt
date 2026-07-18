@@ -53,13 +53,18 @@ set(SW_SOURCES
     src/sync/sync_frame.c
 )
 
-add_library(soundwave SHARED ${SW_SOURCES})
-target_link_libraries(soundwave PRIVATE kissfft m)
-set_target_properties(soundwave PROPERTIES
-    PUBLIC_HEADER "include/soundwave_api.h"
-    SOVERSION 1
-    VERSION ${PROJECT_VERSION}
-)
+if(WIN32)
+    add_library(soundwave STATIC ${SW_SOURCES})
+else()
+    add_library(soundwave SHARED ${SW_SOURCES})
+    target_link_libraries(soundwave PRIVATE m)
+    set_target_properties(soundwave PROPERTIES
+        PUBLIC_HEADER "include/soundwave_api.h"
+        SOVERSION 1
+        VERSION ${PROJECT_VERSION}
+    )
+endif()
+target_link_libraries(soundwave PRIVATE kissfft)
 
 if(SW_USE_SANITIZER)
     target_compile_options(soundwave PRIVATE -fsanitize=address,undefined -g)

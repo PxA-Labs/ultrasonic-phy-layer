@@ -15,6 +15,8 @@ extern "C" {
 
 #if defined(_WIN32) && defined(SW_BUILD_DLL)
     #define SW_API __declspec(dllexport)
+#elif defined(_MSC_VER)
+    #define SW_API
 #else
     #define SW_API __attribute__((visibility("default")))
 #endif

@@ -2,6 +2,7 @@
 
 #include "soundwave/css.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <string.h>
 

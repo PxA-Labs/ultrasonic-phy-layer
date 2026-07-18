@@ -5,6 +5,7 @@
 #include "soundwave/equalizer.h"
 #include "kiss_fft.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <string.h>
 
