@@ -1,6 +1,7 @@
 // Audio I/O using miniaudio: capture, playback, ring buffer, device enumeration.
 
 #include "soundwave/audio.h"
+#include "soundwave_api.h"
 #include <stdlib.h>
 #include <string.h>
 
