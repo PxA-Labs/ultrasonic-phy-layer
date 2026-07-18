@@ -27,6 +27,8 @@ All notable changes to this project will be documented in this file.
 - Move MATHEMATICAL_MODEL.md to docs/ and update README links
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
+- Add SECURITY.md (#45)
 
 ### Features
 
