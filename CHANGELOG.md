@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 
 - Add GitHub Actions workflows (CI, Build, Release, Dependabot)
 - Add auto-changelog with git-cliff
+- Add benchmarking, cross-platform matrix, coverage, static analysis, and PR linting
 
 ### Documentation
 
@@ -29,6 +30,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Add SECURITY.md (#45)
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
