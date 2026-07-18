@@ -3,17 +3,14 @@ name: Changelog
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
-    types: [closed]
 
 permissions:
   contents: write
 
 jobs:
   update-changelog:
+    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,14 +18,16 @@ jobs:
 
       - name: Install git-cliff
         run: |
-          sudo wget -qO /usr/local/bin/git-cliff.tar.gz \
-            "https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-x86_64-unknown-linux-gnu.tar.gz"
-          sudo tar -xzf /usr/local/bin/git-cliff.tar.gz -C /usr/local/bin/
+          curl -LsS "https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-x86_64-unknown-linux-gnu.tar.gz" \
+            -o /tmp/git-cliff.tar.gz
+          tar -xzf /tmp/git-cliff.tar.gz -C /tmp/
+          BIN=$(find /tmp -name "git-cliff" -type f 2>/dev/null | head -1)
+          sudo mv "$BIN" /usr/local/bin/git-cliff
           sudo chmod +x /usr/local/bin/git-cliff
           git-cliff --version
 
       - name: Generate changelog
-        run: git-cliff --unreleased --tag "$(date +%Y-%m-%d)" -o CHANGELOG.md
+        run: git-cliff --unreleased -o CHANGELOG.md
 
       - name: Commit updated changelog
         run: |
