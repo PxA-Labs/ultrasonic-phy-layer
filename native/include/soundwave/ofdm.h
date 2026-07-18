@@ -11,6 +11,7 @@ typedef struct {
     int cp_length;        // Cyclic prefix length
     int num_pilots;       // Number of pilot subcarriers
     int pilot_spacing;    // Pilot insertion spacing
+    float pilot_boost;    // Pilot amplitude boost factor
     int modulation;       // 0=BPSK, 1=QPSK, 2=16QAM
 } ofdm_config_t;
 

@@ -55,7 +55,4 @@ void rs_forney(const uint8_t* omega, const uint8_t* lambda,
     (void)omega; (void)lambda; (void)positions; (void)count; (void)magnitudes;
 }
 
-int rs_decode(uint8_t* r, size_t n) {
-    (void)r; (void)n;
-    return -1; // TODO
-}
+

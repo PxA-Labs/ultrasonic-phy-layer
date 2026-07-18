@@ -12,10 +12,24 @@ add_compile_definitions(SW_VERSION="${SW_VERSION_STRING}")
 
 # Include paths
 include_directories(include)
-include_directories(third_party)
 
-# Vendored libraries
-add_subdirectory(third_party/kiss_fft)
+# Fetch kissfft from GitHub (populate manually, define our own target)
+include(FetchContent)
+FetchContent_Declare(
+    kissfft
+    GIT_REPOSITORY https://github.com/mborgerding/kissfft.git
+    GIT_TAG        v131
+)
+FetchContent_GetProperties(kissfft)
+if(NOT kissfft_POPULATED)
+    FetchContent_Populate(kissfft)
+    add_library(kissfft STATIC
+        ${kissfft_SOURCE_DIR}/kiss_fft.c
+        ${kissfft_SOURCE_DIR}/tools/kiss_fftr.c
+    )
+    target_include_directories(kissfft PUBLIC ${kissfft_SOURCE_DIR})
+endif()
+include_directories(${kissfft_SOURCE_DIR})
 
 # Public API library
 set(SW_SOURCES
@@ -38,7 +52,7 @@ set(SW_SOURCES
 )
 
 add_library(soundwave SHARED ${SW_SOURCES})
-target_link_libraries(soundwave PRIVATE kiss_fft)
+target_link_libraries(soundwave PRIVATE kissfft m)
 set_target_properties(soundwave PROPERTIES
     PUBLIC_HEADER "include/soundwave_api.h"
     SOVERSION 1
