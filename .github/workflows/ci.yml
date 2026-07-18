@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+
 jobs:
   flutter-quality-gate:
     runs-on: ubuntu-latest
@@ -49,50 +56,133 @@ jobs:
           files: soundwave_app/coverage/lcov.info
 
   dsp-core:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Check for native CMakeLists
         id: check
         run: echo "exists=$([ -f native/CMakeLists.txt ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+        shell: bash
 
-      - name: Install build dependencies
-        if: steps.check.outputs.exists == 'true'
+      - name: Install Linux dependencies
+        if: steps.check.outputs.exists == 'true' && matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake gcc g++ make
+          sudo apt-get install -y cmake gcc g++ make ccache
+        shell: bash
 
-      - name: Build DSP core
+      - name: Install macOS dependencies
+        if: steps.check.outputs.exists == 'true' && matrix.os == 'macos-latest'
+        run: |
+          brew install ccache
+        shell: bash
+
+      - name: Install Windows dependencies
+        if: steps.check.outputs.exists == 'true' && matrix.os == 'windows-latest'
+        run: choco install ccache --no-progress
+        shell: pwsh
+
+      - name: Setup ccache
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          ccache --max-size=200M
+          ccache --zero-stats
+        shell: bash
+
+      - name: Cache ccache
+        if: steps.check.outputs.exists == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ matrix.os }}-dsp-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ matrix.os }}-dsp-
+
+      - name: Configure CMake
         if: steps.check.outputs.exists == 'true'
         run: |
           cd native
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build
+          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+            ${{ matrix.os == 'ubuntu-latest' && '-DSW_BUILD_COVERAGE=ON' || '' }}
+        shell: bash
+
+      - name: Build DSP core
+        if: steps.check.outputs.exists == 'true'
+        run: cmake --build native/build
+        shell: bash
 
       - name: Run DSP core tests
         if: steps.check.outputs.exists == 'true'
         run: |
           cd native/build
           ctest --output-on-failure
+        shell: bash
+
+      - name: Show ccache stats
+        if: steps.check.outputs.exists == 'true'
+        run: ccache --show-stats
+        shell: bash
+
+  dsp-coverage:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcc g++ make lcov
+
+      - name: Configure with coverage
+        run: |
+          cd native
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DSW_BUILD_COVERAGE=ON
+
+      - name: Build and run tests
+        run: |
+          cd native
+          cmake --build build
+          cd build
+          ctest --output-on-failure
+
+      - name: Generate coverage report
+        run: |
+          cd native
+          lcov --capture --directory build --output-file build/coverage.info
+          lcov --remove build/coverage.info \
+            '/usr/*' '*/_deps/*' '*/tests/*' '*/Fuzzing/*' \
+            -o build/coverage_filtered.info
+          lcov --list build/coverage_filtered.info
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: native/build/coverage_filtered.info
+          flags: dsp-core
+          fail_ci_if_error: false
 
   docs-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check for broken markdown links
-        run: |
-          echo "Checking markdown files..."
-          find . -name "*.md" -not -path "./.git/*" | while read f; do
-            echo "Found: $f"
-          done
-
-      - name: Validate markdown structure
+      - name: Validate headings
         run: |
           for file in docs/*.md README.md; do
             if [ -f "$file" ]; then
               echo "Validating: $file"
               head -1 "$file" | grep -q "^#" || echo "WARNING: $file may be missing heading"
             fi
+          done
+
+      - name: Check markdown files exist
+        run: |
+          find . -name "*.md" -not -path "./.git/*" -not -path "./_deps/*" | while read f; do
+            echo "Found: $f"
           done

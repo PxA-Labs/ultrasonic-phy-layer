@@ -1,0 +1,59 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  dsp-benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcc g++ make
+
+      - name: Configure with benchmarks
+        run: |
+          cd native
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DSW_BUILD_BENCHMARKS=ON
+
+      - name: Build
+        run: cmake --build native/build
+
+      - name: Run CRC benchmarks
+        run: native/build/benchmarks/bench_crc > native/build/benchmarks/crc_results.json
+
+      - name: Run FFT benchmarks
+        run: native/build/benchmarks/bench_fft > native/build/benchmarks/fft_results.json
+
+      - name: Run OFDM benchmarks
+        run: native/build/benchmarks/bench_ofdm > native/build/benchmarks/ofdm_results.json
+
+      - name: Run CSS benchmarks
+        run: native/build/benchmarks/bench_css > native/build/benchmarks/css_results.json
+
+      - name: Run RS benchmarks
+        run: native/build/benchmarks/bench_rs > native/build/benchmarks/rs_results.json
+
+      - name: Merge benchmark results
+        run: |
+          jq -s 'add' native/build/benchmarks/*_results.json > native/build/benchmarks/merged_results.json
+
+      - name: Publish benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'customSmallerIsBetter'
+          output-file-path: native/build/benchmarks/merged_results.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          alert-threshold: '200%'
+          comment-on-alert: true
+          fail-on-alert: false

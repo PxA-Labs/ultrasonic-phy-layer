@@ -2,9 +2,11 @@ cmake_minimum_required(VERSION 3.16)
 project(soundwave VERSION 1.0.0 LANGUAGES C)
 
 # Options
-option(SW_BUILD_TESTS   "Build C tests"    ON)
-option(SW_BUILD_FUZZ    "Build fuzz harnesses" OFF)
-option(SW_USE_SANITIZER "Enable ASan+UBSan" OFF)
+option(SW_BUILD_TESTS      "Build C tests"           ON)
+option(SW_BUILD_BENCHMARKS "Build C benchmarks"      OFF)
+option(SW_BUILD_FUZZ       "Build fuzz harnesses"    OFF)
+option(SW_USE_SANITIZER    "Enable ASan+UBSan"       OFF)
+option(SW_BUILD_COVERAGE   "Enable code coverage"    OFF)
 
 # Configuration
 set(SW_VERSION_STRING "${PROJECT_VERSION}")
@@ -64,9 +66,19 @@ if(SW_USE_SANITIZER)
     target_link_options(soundwave PRIVATE -fsanitize=address,undefined)
 endif()
 
+if(SW_BUILD_COVERAGE AND (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang"))
+    target_compile_options(soundwave PRIVATE -fprofile-arcs -ftest-coverage -g)
+    target_link_options(soundwave PRIVATE -fprofile-arcs -ftest-coverage)
+endif()
+
 # Tests
 if(SW_BUILD_TESTS)
     add_subdirectory(tests)
+endif()
+
+# Benchmarks
+if(SW_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
 endif()
 
 # Fuzzing
