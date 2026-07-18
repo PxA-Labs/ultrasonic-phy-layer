@@ -51,7 +51,7 @@ set(SW_SOURCES
 )
 
 add_library(soundwave SHARED ${SW_SOURCES})
-target_link_libraries(soundwave PRIVATE kissfft)
+target_link_libraries(soundwave PRIVATE kissfft m)
 set_target_properties(soundwave PROPERTIES
     PUBLIC_HEADER "include/soundwave_api.h"
     SOVERSION 1
