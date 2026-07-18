@@ -3,12 +3,11 @@ name: Build
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['v**']
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    if: hashFiles('pubspec.yaml') != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +36,6 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    if: hashFiles('pubspec.yaml') != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -56,7 +54,6 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
-    if: hashFiles('pubspec.yaml') != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -75,7 +72,6 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
-    if: hashFiles('pubspec.yaml') != ''
     steps:
       - uses: actions/checkout@v4
 
