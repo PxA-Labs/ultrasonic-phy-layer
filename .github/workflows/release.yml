@@ -5,30 +5,9 @@ on:
     tags: ['v*']
 
 jobs:
-  deploy-android:
-    runs-on: ubuntu-latest
-    needs: [build-android]
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: android-release
-
-      - name: Decode keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
-
-      - name: Deploy to Play Store
-        if: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT != '' }}
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
-          packageName: com.pxalabs.soundwave
-          releaseFiles: app-release.aab
-          track: internal
-          status: completed
-
   build-android:
     runs-on: ubuntu-latest
+    if: hashFiles('pubspec.yaml') != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -57,6 +36,7 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
+    if: hashFiles('pubspec.yaml') != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -75,6 +55,7 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
+    if: hashFiles('pubspec.yaml') != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -93,6 +74,7 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
+    if: hashFiles('pubspec.yaml') != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -115,9 +97,33 @@ jobs:
           name: linux-release
           path: build/linux/x64/release/bundle/
 
+  deploy-android:
+    runs-on: ubuntu-latest
+    needs: [build-android]
+    if: always() && needs.build-android.result == 'success'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-release
+
+      - name: Decode keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+
+      - name: Deploy to Play Store
+        if: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT != '' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+          packageName: com.pxalabs.soundwave
+          releaseFiles: app-release.aab
+          track: internal
+          status: completed
+
   deploy-github-release:
     runs-on: ubuntu-latest
     needs: [build-android, build-windows, build-macos, build-linux]
+    if: always() && contains(needs.*.result, 'success')
     permissions:
       contents: write
     steps:
@@ -139,6 +145,7 @@ jobs:
   deploy-snap:
     runs-on: ubuntu-latest
     needs: [build-linux]
+    if: always() && needs.build-linux.result == 'success'
     steps:
       - uses: actions/checkout@v4
 

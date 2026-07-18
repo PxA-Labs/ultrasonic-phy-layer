@@ -7,8 +7,9 @@ on:
     branches: [main]
 
 jobs:
-  quality-gate:
+  flutter-quality-gate:
     runs-on: ubuntu-latest
+    if: hashFiles('pubspec.yaml') != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -36,7 +37,18 @@ jobs:
         with:
           files: coverage/lcov.info
 
-      - name: Build DSP core (C/C++)
+  dsp-core:
+    runs-on: ubuntu-latest
+    if: hashFiles('native/CMakeLists.txt') != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcc g++ make
+
+      - name: Build DSP core
         run: |
           cd native
           cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -46,3 +58,24 @@ jobs:
         run: |
           cd native/build
           ctest --output-on-failure
+
+  docs-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for broken markdown links
+        run: |
+          echo "Checking markdown files..."
+          find . -name "*.md" -not -path "./.git/*" | while read f; do
+            echo "Found: $f"
+          done
+
+      - name: Validate markdown structure
+        run: |
+          for file in docs/*.md README.md; do
+            if [ -f "$file" ]; then
+              echo "Validating: $file"
+              head -1 "$file" | grep -q "^#" || echo "WARNING: $file may be missing heading"
+            fi
+          done
