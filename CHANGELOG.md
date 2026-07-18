@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - **ci:** Replace manual download with official git-cliff action
 - **ci:** Resolve git-cliff URL via GitHub API instead of pinned action
 - **ci:** Remove invalid sort_commits value in cliff.toml
+- **ci:** Replace job-level hashFiles with step-level checks to fix CI parsing
 
 ### CI
 
@@ -24,6 +25,7 @@ All notable changes to this project will be documented in this file.
 - Add core developers and project organization
 - Add production documents (PRD, tech stack, CI/CD, roadmap)
 - Move MATHEMATICAL_MODEL.md to docs/ and update README links
+- Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 
 ### Features
