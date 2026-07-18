@@ -86,18 +86,31 @@ At this stage, the repository is focused on the project's physical-layer specifi
 ├── LICENSE
 ├── CONTRIBUTING.md
 ├── README.md
+├── CHANGELOG.md                <-- Auto-generated changelog
+├── cliff.toml                  <-- git-cliff configuration
 ├── docs/
-│   ├── MATHEMATICAL_MODEL.md     <-- Mathematical formulations
-│   ├── PRD.md                    <-- Product Requirements Document
-│   ├── TECH_STACK.md             <-- Technology Stack Specification
-│   ├── CI_CD.md                  <-- CI/CD Pipeline Specification
-│   └── ROADMAP.md                <-- Implementation Roadmap
-├── src/                          <-- (Future implementation)
-│   ├── encoder/                  <-- RS coding & CRC insertion
-│   ├── modulator/                <-- CSS & OFDM signal generation
-│   ├── channel/                  <-- Acoustic simulation models
-│   └── receiver/                 <-- Frame sync, FFT, equalization
+│   ├── MATHEMATICAL_MODEL.md   <-- Mathematical formulations
+│   ├── PRD.md                  <-- Product Requirements Document
+│   ├── TECH_STACK.md           <-- Technology Stack Specification
+│   ├── CI_CD.md                <-- CI/CD Pipeline Specification
+│   └── ROADMAP.md              <-- Implementation Roadmap
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml              <-- Quality gate
+│   │   ├── build.yml           <-- Build matrix
+│   │   ├── release.yml         <-- Sign & deploy
+│   │   └── changelog.yml       <-- Auto changelog
+│   └── dependabot.yml          <-- Dependency updates
+├── src/                        <-- (Future implementation)
+│   ├── encoder/                <-- RS coding & CRC insertion
+│   ├── modulator/              <-- CSS & OFDM signal generation
+│   ├── channel/                <-- Acoustic simulation models
+│   └── receiver/               <-- Frame sync, FFT, equalization
 ```
+
+## 📋 Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for a detailed history of all changes.
 
 ## 🛠️ Contributing
 

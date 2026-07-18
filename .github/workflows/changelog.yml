@@ -1,0 +1,39 @@
+name: Changelog
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  update-changelog:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        run: |
+          sudo wget -qO /usr/local/bin/git-cliff.tar.gz \
+            "https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-x86_64-unknown-linux-gnu.tar.gz"
+          sudo tar -xzf /usr/local/bin/git-cliff.tar.gz -C /usr/local/bin/
+          sudo chmod +x /usr/local/bin/git-cliff
+          git-cliff --version
+
+      - name: Generate changelog
+        run: git-cliff --unreleased --tag "$(date +%Y-%m-%d)" -o CHANGELOG.md
+
+      - name: Commit updated changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --cached --quiet || git commit -m "docs: update CHANGELOG.md [skip ci]"
+          git push
