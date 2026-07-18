@@ -1,6 +1,6 @@
 # Soundwave: Ultrasonic Physical Layer
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Acoustic Band](https://img.shields.io/badge/Acoustic_Band-18kHz--22kHz-orange.svg)](#1-acoustic-channel-profile)
 [![Modulation](https://img.shields.io/badge/Modulation-CSS_%2F_OFDM-brightgreen.svg)](#2-modulation-scheme-comparison)
 [![Phase](https://img.shields.io/badge/Phase-Design_%26_Modeling-blueviolet.svg)](#project-roadmap)
@@ -111,4 +111,4 @@ This project is developed under the **[PxA Labs](https://github.com/PxA-Labs)** 
 
 ## 📄 License
 
-This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
+This project is licensed under the Apache License 2.0. See [LICENSE](./LICENSE) for details.
