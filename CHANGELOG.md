@@ -23,6 +23,10 @@ All notable changes to this project will be documented in this file.
 - Replace broken action-semantic-pull-request with inline validation script
 - **tests:** Handle SW_ERR_NOT_IMPLEMENTED gracefully in test_e2e
 
+### Build
+
+- Ignore AGENTS.md for local agent configuration
+
 ### CI
 
 - Add GitHub Actions workflows (CI, Build, Release, Dependabot)
@@ -52,12 +56,15 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
+- Add AGENTS.md workflow guidelines (#17)
 
 ### Features
 
 - Add project skeleton for native C DSP library and Flutter app
 - Professional CI/CD pipeline with cross-platform matrix, benchmarks, coverage, and static analysis (#46)
 - **crc:** Implement CRC-32 IEEE 802.3 append, verify, and comprehensive unit tests (#16)
+- **rs:** Implement GF(2^8) arithmetic and Reed-Solomon systematic encoder (#17)
 
 ### Maintenance
 
