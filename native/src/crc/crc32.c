@@ -23,7 +23,7 @@ uint32_t crc32_compute(const uint8_t* data, size_t len) {
 }
 
 uint32_t crc32_compute_fast(const uint8_t* data, size_t len) {
-    if (len == 0 || data == NULL) {
+    if (len == 0) {
         return 0x00000000u;
     }
     uint32_t crc = 0xFFFFFFFFu;
