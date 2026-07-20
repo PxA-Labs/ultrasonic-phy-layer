@@ -21,3 +21,7 @@ build/
 node_modules/
 venv/
 .venv/
+
+# Local agent workflow rules
+AGENTS.md
+
