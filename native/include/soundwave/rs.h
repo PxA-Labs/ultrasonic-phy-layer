@@ -10,8 +10,16 @@
 // GF(256) arithmetic
 uint8_t gf_mul(uint8_t a, uint8_t b);
 uint8_t gf_add(uint8_t a, uint8_t b);
+uint8_t gf_sub(uint8_t a, uint8_t b);
+uint8_t gf_div(uint8_t a, uint8_t b);
 uint8_t gf_inv(uint8_t a);
 uint8_t gf_pow(uint8_t a, int exp);
+
+// Evaluate polynomial poly[0..len-1] at x in GF(256)
+uint8_t gf_poly_eval(const uint8_t* poly, size_t len, uint8_t x);
+
+// Compute generator polynomial for RS(n, k)
+void    rs_compute_generator_poly(size_t n, size_t k, uint8_t* g);
 
 // Initialize generator polynomial (called once).
 void    rs_init_generator(void);
