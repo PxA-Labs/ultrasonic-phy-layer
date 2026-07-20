@@ -21,7 +21,7 @@ uint32_t crc32_compute_fast(const uint8_t* data, size_t len);
 void     crc32_append(uint8_t* buffer, size_t data_len);
 
 // Verify CRC-32 trailer on a data buffer of total length len (includes 4-byte CRC).
-// Returns 1 if valid, 0 if invalid or len < 4.
+// Returns 1 if valid, 0 if invalid, data == NULL, or len < 4.
 int      crc32_verify(const uint8_t* data, size_t len);
 
 #endif // SOUNDWAVE_CRC_H
