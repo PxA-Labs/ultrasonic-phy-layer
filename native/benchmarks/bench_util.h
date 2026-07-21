@@ -29,7 +29,7 @@
         return t;
     }
     static double bench_elapsed_us(bench_timer* t) {
-        clock_gettime(CLOCK_MONOTONIC, &t.end);
+        clock_gettime(CLOCK_MONOTONIC, &t->end);
         return (t->end.tv_sec - t->start.tv_sec) * 1e6 +
                (t->end.tv_nsec - t->start.tv_nsec) / 1e3;
     }
