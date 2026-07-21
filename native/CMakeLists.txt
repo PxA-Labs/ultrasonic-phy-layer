@@ -74,8 +74,8 @@ target_link_libraries(soundwave_shared PRIVATE kiss_fft miniaudio)
 
 # Platform-specific audio system libraries
 if(WIN32)
-    target_link_libraries(soundwave PRIVATE wsapi32 ole32)
-    target_link_libraries(soundwave_shared PRIVATE wsapi32 ole32)
+    target_link_libraries(soundwave PRIVATE ole32 user32)
+    target_link_libraries(soundwave_shared PRIVATE ole32 user32)
 elseif(APPLE)
     find_library(AUDIO_TOOLBOX AudioToolbox)
     find_library(CORE_AUDIO CoreAudio)
@@ -96,16 +96,14 @@ endif()
 
 # Sanitizers
 if(SW_USE_SANITIZER)
-    target_compile_options(soundwave PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g)
-    target_link_options(soundwave PRIVATE -fsanitize=address,undefined)
-    target_compile_options(soundwave_shared PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g)
-    target_link_options(soundwave_shared PRIVATE -fsanitize=address,undefined)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=address,undefined)
 endif()
 
 # Code coverage
 if(SW_BUILD_COVERAGE AND (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang"))
-    target_compile_options(soundwave PRIVATE -fprofile-arcs -ftest-coverage -g)
-    target_link_options(soundwave PRIVATE -fprofile-arcs -ftest-coverage)
+    add_compile_options(-fprofile-arcs -ftest-coverage -g)
+    add_link_options(-fprofile-arcs -ftest-coverage)
 endif()
 
 # Subdirectories
