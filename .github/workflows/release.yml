@@ -10,23 +10,38 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check for Flutter project
+        id: check
+        run: |
+          if [ ! -f pubspec.yaml ]; then
+            echo "::notice::No pubspec.yaml found at root. Skipping Flutter build."
+            echo "has_pubspec=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_pubspec=true" >> $GITHUB_OUTPUT
+          fi
+
       - uses: subosito/flutter-action@v2
+        if: steps.check.outputs.has_pubspec == 'true'
         with:
           flutter-version: '3.41.x'
           cache: true
 
       - uses: actions/setup-java@v4
+        if: steps.check.outputs.has_pubspec == 'true'
         with:
           distribution: 'zulu'
           java-version: '17'
 
       - name: Build APK
+        if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build apk --release
 
       - name: Build AAB
+        if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build appbundle --release
 
       - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: android-release
           path: |
@@ -38,15 +53,29 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check for Flutter project
+        id: check
+        shell: bash
+        run: |
+          if [ ! -f pubspec.yaml ]; then
+            echo "::notice::No pubspec.yaml found at root. Skipping Flutter build."
+            echo "has_pubspec=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_pubspec=true" >> $GITHUB_OUTPUT
+          fi
+
       - uses: subosito/flutter-action@v2
+        if: steps.check.outputs.has_pubspec == 'true'
         with:
           flutter-version: '3.41.x'
           cache: true
 
       - name: Build Windows
+        if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build windows --release
 
       - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: windows-release
           path: build/windows/x64/runner/Release/
@@ -56,15 +85,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check for Flutter project
+        id: check
+        run: |
+          if [ ! -f pubspec.yaml ]; then
+            echo "::notice::No pubspec.yaml found at root. Skipping Flutter build."
+            echo "has_pubspec=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_pubspec=true" >> $GITHUB_OUTPUT
+          fi
+
       - uses: subosito/flutter-action@v2
+        if: steps.check.outputs.has_pubspec == 'true'
         with:
           flutter-version: '3.41.x'
           cache: true
 
       - name: Build macOS
+        if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build macos --release
 
       - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: macos-release
           path: build/macos/Build/Products/Release/
@@ -74,21 +116,35 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check for Flutter project
+        id: check
+        run: |
+          if [ ! -f pubspec.yaml ]; then
+            echo "::notice::No pubspec.yaml found at root. Skipping Flutter build."
+            echo "has_pubspec=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_pubspec=true" >> $GITHUB_OUTPUT
+          fi
+
       - uses: subosito/flutter-action@v2
+        if: steps.check.outputs.has_pubspec == 'true'
         with:
           flutter-version: '3.41.x'
           cache: true
 
       - name: Install Linux dependencies
+        if: steps.check.outputs.has_pubspec == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev
 
       - name: Build Linux
+        if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build linux --release
 
       - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: linux-release
           path: build/linux/x64/release/bundle/
@@ -98,7 +154,7 @@ jobs:
     needs: [build-android]
     if: always() && needs.build-android.result == 'success'
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
         with:
           name: android-release
 
@@ -125,7 +181,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -145,7 +201,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
         with:
           name: linux-release
           path: snap/gui/

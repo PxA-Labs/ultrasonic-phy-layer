@@ -2,7 +2,7 @@
 
 function(sw_add_benchmark BENCH_NAME BENCH_SOURCE)
     add_executable(${BENCH_NAME} ${BENCH_SOURCE})
-    target_link_libraries(${BENCH_NAME} PRIVATE soundwave)
+    target_link_libraries(${BENCH_NAME} PRIVATE soundwave kiss_fft)
     if(NOT WIN32)
         target_link_libraries(${BENCH_NAME} PRIVATE m)
     endif()
