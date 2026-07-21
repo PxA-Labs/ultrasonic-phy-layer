@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - Remove over-broad lcov exclude patterns that stripped all records
 - Replace broken action-semantic-pull-request with inline validation script
 - **tests:** Handle SW_ERR_NOT_IMPLEMENTED gracefully in test_e2e
+- **ci:** Fix benchmark timer dereference and guard build workflow
 
 ### Build
 
@@ -58,6 +59,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Add AGENTS.md workflow guidelines (#17)
+- Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 
 ### Features
