@@ -1,40 +1,43 @@
-cmake_minimum_required(VERSION 3.16)
-project(soundwave VERSION 1.0.0 LANGUAGES C)
+cmake_minimum_required(VERSION 3.22)
+project(soundwave VERSION 1.0.0 LANGUAGES C CXX)
+
+set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Options
-option(SW_BUILD_TESTS      "Build C tests"           ON)
+option(SW_BUILD_TESTS      "Build C/C++ tests"       ON)
 option(SW_BUILD_BENCHMARKS "Build C benchmarks"      OFF)
 option(SW_BUILD_FUZZ       "Build fuzz harnesses"    OFF)
 option(SW_USE_SANITIZER    "Enable ASan+UBSan"       OFF)
 option(SW_BUILD_COVERAGE   "Enable code coverage"    OFF)
 
-# Configuration
+# Version definitions
 set(SW_VERSION_STRING "${PROJECT_VERSION}")
 add_compile_definitions(SW_VERSION="${SW_VERSION_STRING}")
 
-# Include paths
+# Public include directory
 include_directories(include)
 
-# Fetch kissfft from GitHub (populate manually, define our own target)
-include(FetchContent)
-FetchContent_Declare(
-    kissfft
-    GIT_REPOSITORY https://github.com/mborgerding/kissfft.git
-    GIT_TAG        v131
+# Vendored KissFFT static library
+add_library(kiss_fft STATIC
+    vendor/kissfft/kiss_fft.c
+    vendor/kissfft/kiss_fftr.c
 )
-FetchContent_GetProperties(kissfft)
-if(NOT kissfft_POPULATED)
-    FetchContent_Populate(kissfft)
-    add_library(kissfft STATIC
-        ${kissfft_SOURCE_DIR}/kiss_fft.c
-        ${kissfft_SOURCE_DIR}/tools/kiss_fftr.c
-    )
-    target_include_directories(kissfft PUBLIC ${kissfft_SOURCE_DIR})
-endif()
-include_directories(${kissfft_SOURCE_DIR})
+target_include_directories(kiss_fft PUBLIC vendor/kissfft)
 
-# Public API library
+# Vendored miniaudio interface library
+add_library(miniaudio INTERFACE)
+target_include_directories(miniaudio INTERFACE vendor/miniaudio)
+
+# Source files for libsoundwave
 set(SW_SOURCES
+    src/encoder.c
+    src/modulator.c
+    src/synchronizer.c
+    src/demodulator.c
     src/api/soundwave_api.c
     src/api/ffi_helpers.c
     src/audio/audio_io.c
@@ -53,41 +56,68 @@ set(SW_SOURCES
     src/sync/sync_frame.c
 )
 
+# Static library target
+add_library(soundwave STATIC ${SW_SOURCES})
+target_include_directories(soundwave PUBLIC include)
+target_link_libraries(soundwave PRIVATE kiss_fft miniaudio)
+
+# Shared library target
+add_library(soundwave_shared SHARED $<TARGET_OBJECTS:soundwave>)
+set_target_properties(soundwave_shared PROPERTIES
+    OUTPUT_NAME "soundwave"
+    PREFIX "lib"
+    SOVERSION 1
+    VERSION ${PROJECT_VERSION}
+    PUBLIC_HEADER "include/soundwave_api.h"
+)
+target_link_libraries(soundwave_shared PRIVATE kiss_fft miniaudio)
+
+# Platform-specific audio system libraries
 if(WIN32)
-    add_library(soundwave STATIC ${SW_SOURCES})
-else()
-    add_library(soundwave SHARED ${SW_SOURCES})
+    target_link_libraries(soundwave PRIVATE wsapi32 ole32)
+    target_link_libraries(soundwave_shared PRIVATE wsapi32 ole32)
+elseif(APPLE)
+    find_library(AUDIO_TOOLBOX AudioToolbox)
+    find_library(CORE_AUDIO CoreAudio)
+    if(AUDIO_TOOLBOX)
+        target_link_libraries(soundwave PRIVATE ${AUDIO_TOOLBOX})
+        target_link_libraries(soundwave_shared PRIVATE ${AUDIO_TOOLBOX})
+    endif()
+    if(CORE_AUDIO)
+        target_link_libraries(soundwave PRIVATE ${CORE_AUDIO})
+        target_link_libraries(soundwave_shared PRIVATE ${CORE_AUDIO})
+    endif()
     target_link_libraries(soundwave PRIVATE m)
-    set_target_properties(soundwave PROPERTIES
-        PUBLIC_HEADER "include/soundwave_api.h"
-        SOVERSION 1
-        VERSION ${PROJECT_VERSION}
-    )
+    target_link_libraries(soundwave_shared PRIVATE m)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(soundwave PRIVATE m pthread dl)
+    target_link_libraries(soundwave_shared PRIVATE m pthread dl)
 endif()
-target_link_libraries(soundwave PRIVATE kissfft)
 
+# Sanitizers
 if(SW_USE_SANITIZER)
-    target_compile_options(soundwave PRIVATE -fsanitize=address,undefined -g)
+    target_compile_options(soundwave PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g)
     target_link_options(soundwave PRIVATE -fsanitize=address,undefined)
+    target_compile_options(soundwave_shared PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    target_link_options(soundwave_shared PRIVATE -fsanitize=address,undefined)
 endif()
 
+# Code coverage
 if(SW_BUILD_COVERAGE AND (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang"))
     target_compile_options(soundwave PRIVATE -fprofile-arcs -ftest-coverage -g)
     target_link_options(soundwave PRIVATE -fprofile-arcs -ftest-coverage)
 endif()
 
-# Tests
+# Subdirectories
 if(SW_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
 
-# Benchmarks
 if(SW_BUILD_BENCHMARKS)
     add_subdirectory(benchmarks)
 endif()
 
-# Fuzzing
 if(SW_BUILD_FUZZ)
     add_subdirectory(Fuzzing)
 endif()
