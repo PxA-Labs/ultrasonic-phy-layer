@@ -30,6 +30,7 @@ All notable changes to this project will be documented in this file.
 - **ci:** Add skip-fetch-gh-pages to benchmark workflow
 - **ci:** Set save-data-file to false in benchmark workflow
 - **ci:** Add skip-fetch-gh-pages alongside save-data-file in benchmark workflow
+- **ci:** Add fetch-depth 0 to checkout in benchmark workflow
 
 ### Build
 
@@ -66,6 +67,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Add AGENTS.md workflow guidelines (#17)
+- Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
