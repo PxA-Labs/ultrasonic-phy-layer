@@ -58,6 +58,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Add AGENTS.md workflow guidelines (#17)
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -65,6 +66,7 @@ All notable changes to this project will be documented in this file.
 - Professional CI/CD pipeline with cross-platform matrix, benchmarks, coverage, and static analysis (#46)
 - **crc:** Implement CRC-32 IEEE 802.3 append, verify, and comprehensive unit tests (#16)
 - **rs:** Implement GF(2^8) arithmetic and Reed-Solomon systematic encoder (#17)
+- **repo:** Add CODEOWNERS file for @archittmittal and @purvanshjoshi
 
 ### Maintenance
 
