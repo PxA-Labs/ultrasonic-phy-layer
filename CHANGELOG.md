@@ -25,6 +25,7 @@ All notable changes to this project will be documented in this file.
 - **ci:** Fix benchmark timer dereference and guard build workflow
 - **ci:** Link kiss_fft in benchmarks, update release artifacts to v4, and add step guards
 - **ci:** Update benchmark link library target to kissfft
+- **ci:** Format benchmark JSON output with value and unit for github-action-benchmark
 
 ### Build
 
@@ -61,6 +62,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Add AGENTS.md workflow guidelines (#17)
+- Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
