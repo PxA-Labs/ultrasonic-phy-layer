@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - **ci:** Update benchmark link library target to kissfft
 - **ci:** Format benchmark JSON output with value and unit for github-action-benchmark
 - **ci:** Disable auto-push in benchmark workflow until gh-pages exists
+- **ci:** Add skip-fetch-gh-pages to benchmark workflow
 
 ### Build
 
@@ -63,6 +64,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Add AGENTS.md workflow guidelines (#17)
+- Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
