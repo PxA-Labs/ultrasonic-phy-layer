@@ -37,8 +37,8 @@
 
 static void bench_report(const char* name, double elapsed_us, int64_t iterations) {
     double per_op = elapsed_us / (double)iterations;
-    printf("{\"name\":\"%s\",\"real_time\":%.3f,\"cpu_time\":%.3f,\"time_unit\":\"us\",\"iterations\":%lld}\n",
-           name, per_op, per_op, (long long)iterations);
+    printf("{\"name\":\"%s\",\"value\":%.3f,\"unit\":\"us\"}\n",
+           name, per_op);
 }
 
 #define BENCH_BLOCK(NAME, ITERATIONS, BODY) do {                    \
