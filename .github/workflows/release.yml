@@ -40,7 +40,7 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build appbundle --release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: android-release
@@ -74,7 +74,7 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build windows --release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: windows-release
@@ -105,7 +105,7 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build macos --release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: macos-release
@@ -143,7 +143,7 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build linux --release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: linux-release
