@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: github.event_name == 'push' && steps.check.outputs.exists == 'true'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           files: soundwave_app/coverage/lcov.info
 
@@ -172,7 +172,7 @@ jobs:
           fi
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           files: native/build/coverage_filtered.info
           flags: dsp-core
