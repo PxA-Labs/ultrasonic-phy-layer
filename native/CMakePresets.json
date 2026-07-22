@@ -1,0 +1,49 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default Config",
+      "description": "Default configuration",
+      "binaryDir": "${sourceDir}/build",
+      "generator": "Unix Makefiles",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug Config",
+      "description": "Debug build with symbols",
+      "binaryDir": "${sourceDir}/build/debug",
+      "generator": "Unix Makefiles",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_FLAGS": "-O0 -g"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release Config",
+      "description": "Release build with optimizations",
+      "binaryDir": "${sourceDir}/build/release",
+      "generator": "Unix Makefiles",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_FLAGS": "-O2"
+      }
+    },
+    {
+      "name": "asan",
+      "displayName": "ASan Config",
+      "description": "Debug build with AddressSanitizer",
+      "binaryDir": "${sourceDir}/build/asan",
+      "generator": "Unix Makefiles",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SW_USE_SANITIZER": "ON",
+        "CMAKE_C_FLAGS": "-fsanitize=address -fno-omit-frame-pointer"
+      }
+    }
+  ]
+}
