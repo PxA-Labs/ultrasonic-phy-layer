@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 project(soundwave VERSION 1.0.0 LANGUAGES C CXX)
 
-set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -56,10 +56,17 @@ set(SW_SOURCES
     src/sync/sync_frame.c
 )
 
-# Static library target
-add_library(soundwave STATIC ${SW_SOURCES})
+# Object library target containing common compiled objects
+add_library(soundwave OBJECT ${SW_SOURCES})
 target_include_directories(soundwave PUBLIC include)
+target_compile_definitions(soundwave PRIVATE SW_BUILD_DLL)
 target_link_libraries(soundwave PRIVATE kiss_fft miniaudio)
+
+# Static library target
+add_library(soundwave_static STATIC $<TARGET_OBJECTS:soundwave>)
+set_target_properties(soundwave_static PROPERTIES OUTPUT_NAME "soundwave")
+target_include_directories(soundwave_static PUBLIC include)
+target_link_libraries(soundwave_static PRIVATE kiss_fft miniaudio)
 
 # Shared library target
 add_library(soundwave_shared SHARED $<TARGET_OBJECTS:soundwave>)
@@ -69,41 +76,53 @@ set_target_properties(soundwave_shared PROPERTIES
     SOVERSION 1
     VERSION ${PROJECT_VERSION}
     PUBLIC_HEADER "include/soundwave_api.h"
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
 )
+target_include_directories(soundwave_shared PUBLIC include)
+target_compile_definitions(soundwave_shared PRIVATE SW_BUILD_DLL)
 target_link_libraries(soundwave_shared PRIVATE kiss_fft miniaudio)
 
 # Platform-specific audio system libraries
 if(WIN32)
     target_link_libraries(soundwave PRIVATE ole32 user32)
+    target_link_libraries(soundwave_static PRIVATE ole32 user32)
     target_link_libraries(soundwave_shared PRIVATE ole32 user32)
 elseif(APPLE)
     find_library(AUDIO_TOOLBOX AudioToolbox)
     find_library(CORE_AUDIO CoreAudio)
     if(AUDIO_TOOLBOX)
         target_link_libraries(soundwave PRIVATE ${AUDIO_TOOLBOX})
+        target_link_libraries(soundwave_static PRIVATE ${AUDIO_TOOLBOX})
         target_link_libraries(soundwave_shared PRIVATE ${AUDIO_TOOLBOX})
     endif()
     if(CORE_AUDIO)
         target_link_libraries(soundwave PRIVATE ${CORE_AUDIO})
+        target_link_libraries(soundwave_static PRIVATE ${CORE_AUDIO})
         target_link_libraries(soundwave_shared PRIVATE ${CORE_AUDIO})
     endif()
     target_link_libraries(soundwave PRIVATE m)
+    target_link_libraries(soundwave_static PRIVATE m)
     target_link_libraries(soundwave_shared PRIVATE m)
 elseif(UNIX AND NOT APPLE)
     target_link_libraries(soundwave PRIVATE m pthread dl)
+    target_link_libraries(soundwave_static PRIVATE m pthread dl)
     target_link_libraries(soundwave_shared PRIVATE m pthread dl)
 endif()
 
 # Sanitizers
 if(SW_USE_SANITIZER)
-    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
-    add_link_options(-fsanitize=address,undefined)
+    target_compile_options(soundwave PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    target_link_options(soundwave PRIVATE -fsanitize=address,undefined)
+    target_compile_options(soundwave_shared PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    target_link_options(soundwave_shared PRIVATE -fsanitize=address,undefined)
 endif()
 
 # Code coverage
 if(SW_BUILD_COVERAGE AND (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang"))
-    add_compile_options(-fprofile-arcs -ftest-coverage -g)
-    add_link_options(-fprofile-arcs -ftest-coverage)
+    target_compile_options(soundwave PRIVATE -fprofile-arcs -ftest-coverage -g)
+    target_link_options(soundwave PRIVATE -fprofile-arcs -ftest-coverage)
+    target_compile_options(soundwave_shared PRIVATE -fprofile-arcs -ftest-coverage -g)
+    target_link_options(soundwave_shared PRIVATE -fprofile-arcs -ftest-coverage)
 endif()
 
 # Subdirectories

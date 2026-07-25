@@ -12,6 +12,6 @@
 #include "soundwave/audio_io.h"
 #include "soundwave/fec.h"
 #include "soundwave/packet.h"
-#include "../soundwave_api.h"
+#include "soundwave_api.h"
 
 #endif // SOUNDWAVE_MAIN_H

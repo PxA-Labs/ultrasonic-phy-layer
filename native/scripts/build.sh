@@ -7,8 +7,8 @@ NATIVE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 echo "==> Building libsoundwave in ${NATIVE_DIR}..."
 cd "${NATIVE_DIR}"
 
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
+cmake --preset release
+cmake --build build/release --parallel
+ctest --test-dir build/release -C Release --output-on-failure
 
 echo "==> Soundwave build and tests completed successfully!"
