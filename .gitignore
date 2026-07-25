@@ -18,6 +18,7 @@ Thumbs.db
 # Build and dependency directories
 dist/
 build/
+native/build/
 node_modules/
 venv/
 .venv/

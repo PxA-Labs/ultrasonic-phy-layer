@@ -23,29 +23,8 @@ extern "C" {
 
 #define SW_VERSION "1.0.0"
 
-// Modem configuration, mirrored in Dart as SwConfig struct
-typedef struct {
-    int    sample_rate;      // Hz (default 44100)
-    int    modulation;       // 0=CSS, 1=OFDM
-    int    sf;               // CSS spreading factor 7..12
-    int    num_subcarriers;  // OFDM FFT size (256, 512, 1024, 2048)
-    int    cp_length;        // OFDM cyclic prefix length
-    int    num_pilots;       // OFDM pilot subcarrier count
-    float  coding_rate;      // FEC coding rate (0.5, 0.75)
-    float  threshold;        // Preamble detection threshold theta
-    int    equalizer;        // 0=Zero-Forcing, 1=MMSE
-} sw_config_t;
+#include "soundwave/types.h"
 
-// Error codes
-typedef enum {
-    SW_OK                =  0,
-    SW_ERR_BAD_PARAM     = -1,
-    SW_ERR_MEMORY        = -2,
-    SW_ERR_DECODE        = -3,
-    SW_ERR_SYNC          = -4,
-    SW_ERR_AUDIO         = -5,
-    SW_ERR_NOT_IMPLEMENTED = -6,
-} sw_error_t;
 
 // --- Version ---
 SW_API const char* sw_version(void);
