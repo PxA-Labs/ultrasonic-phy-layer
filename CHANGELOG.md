@@ -31,6 +31,10 @@ All notable changes to this project will be documented in this file.
 - **ci:** Set save-data-file to false in benchmark workflow
 - **ci:** Add skip-fetch-gh-pages alongside save-data-file in benchmark workflow
 - **ci:** Add fetch-depth 0 to checkout in benchmark workflow
+- **cmake:** Resolve Windows library names and coverage linking flags (#15)
+- **ci:** Update artifact action version in release workflow (#15)
+- **native:** Address code review feedback for native scaffolding (#51)
+- **native:** Enable global compile and link options for coverage and sanitizers
 
 ### Build
 
@@ -80,6 +84,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -88,6 +93,7 @@ All notable changes to this project will be documented in this file.
 - **crc:** Implement CRC-32 IEEE 802.3 append, verify, and comprehensive unit tests (#16)
 - **rs:** Implement GF(2^8) arithmetic and Reed-Solomon systematic encoder (#17)
 - **repo:** Add CODEOWNERS file for @archittmittal and @purvanshjoshi
+- **dsp-core:** Setup native project scaffolding and CMake build system (#15)
 
 ### Maintenance
 
