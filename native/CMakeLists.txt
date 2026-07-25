@@ -111,18 +111,14 @@ endif()
 
 # Sanitizers
 if(SW_USE_SANITIZER)
-    target_compile_options(soundwave PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g)
-    target_link_options(soundwave PRIVATE -fsanitize=address,undefined)
-    target_compile_options(soundwave_shared PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g)
-    target_link_options(soundwave_shared PRIVATE -fsanitize=address,undefined)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=address,undefined)
 endif()
 
 # Code coverage
 if(SW_BUILD_COVERAGE AND (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang"))
-    target_compile_options(soundwave PRIVATE -fprofile-arcs -ftest-coverage -g)
-    target_link_options(soundwave PRIVATE -fprofile-arcs -ftest-coverage)
-    target_compile_options(soundwave_shared PRIVATE -fprofile-arcs -ftest-coverage -g)
-    target_link_options(soundwave_shared PRIVATE -fprofile-arcs -ftest-coverage)
+    add_compile_options(--coverage -g)
+    add_link_options(--coverage)
 endif()
 
 # Subdirectories
