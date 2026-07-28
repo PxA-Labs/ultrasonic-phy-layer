@@ -1,4 +1,10 @@
-// Shared data types for Soundwave PHY layer.
+/**
+ * @file types.h
+ * @brief Shared data structures, status codes, and configuration types for Soundwave PHY.
+ * 
+ * @copyright Copyright (c) 2026 PxA Labs (Archit Mittal, Purvansh Joshi)
+ * @license MIT License
+ */
 
 #ifndef SOUNDWAVE_TYPES_H
 #define SOUNDWAVE_TYPES_H
@@ -10,57 +16,67 @@
 extern "C" {
 #endif
 
-// Modem configuration structure
+/**
+ * @brief Soundwave Physical Layer Modem Configuration.
+ */
 typedef struct {
-    int    sample_rate;      // Hz (default 44100)
-    int    modulation;       // 0=CSS, 1=OFDM
-    int    sf;               // CSS spreading factor 7..12
-    int    num_subcarriers;  // OFDM FFT size (256, 512, 1024, 2048)
-    int    cp_length;        // OFDM cyclic prefix length
-    int    num_pilots;       // OFDM pilot subcarrier count
-    float  coding_rate;      // FEC coding rate (0.5, 0.75)
-    float  threshold;        // Preamble detection threshold theta
-    int    equalizer;        // 0=Zero-Forcing, 1=MMSE
+    int    sample_rate;      /**< Audio sampling rate in Hz (default 44100 Hz). */
+    int    modulation;       /**< Modulation scheme: 0 = CSS (Chirp Spread Spectrum), 1 = OFDM. */
+    int    sf;               /**< CSS Spreading Factor (7 to 12). */
+    int    num_subcarriers;  /**< OFDM FFT Size (256, 512, 1024, 2048). */
+    int    cp_length;        /**< OFDM Cyclic Prefix length in samples. */
+    int    num_pilots;       /**< OFDM Pilot subcarrier count for channel estimation. */
+    float  coding_rate;      /**< Forward Error Correction (FEC) coding rate (0.5, 0.75). */
+    float  threshold;        /**< Preamble detection threshold multiplier theta. */
+    int    equalizer;        /**< Equalizer algorithm: 0 = Zero-Forcing (ZF), 1 = MMSE. */
 } sw_config;
 
 typedef sw_config sw_config_t;
 
-// Audio / time-domain signal buffer
+/**
+ * @brief Audio time-domain float signal container.
+ */
 typedef struct {
-    float* data;
-    size_t length;
-    float  sample_rate;
+    float* data;            /**< Pointer to floating-point PCM audio samples. */
+    size_t length;          /**< Number of audio samples in data array. */
+    float  sample_rate;     /**< Sampling frequency in Hz. */
 } sw_signal;
 
 typedef sw_signal sw_signal_t;
 
-// Byte / bit buffer
+/**
+ * @brief Byte and bit buffer container.
+ */
 typedef struct {
-    uint8_t* data;
-    size_t   length;
+    uint8_t* data;          /**< Pointer to raw byte/bit array. */
+    size_t   length;        /**< Byte or bit count. */
 } sw_buffer;
 
 typedef sw_buffer sw_buffer_t;
 
-// Frequency-domain spectrum buffer
+/**
+ * @brief Frequency-domain magnitude spectrum container for UI visualizers.
+ */
 typedef struct {
-    float* magnitudes;
-    size_t num_bins;
-    float  min_freq;
-    float  max_freq;
+    float* magnitudes;     /**< Magnitude values per FFT frequency bin. */
+    size_t num_bins;       /**< Number of frequency bins (e.g. 256, 512). */
+    float  min_freq;       /**< Minimum frequency in Hz (e.g. 0.0 Hz). */
+    float  max_freq;       /**< Maximum frequency in Hz (e.g. 22050.0 Hz). */
 } sw_spectrum;
 
 typedef sw_spectrum sw_spectrum_t;
 
-// Soundwave error codes
+/**
+ * @brief Soundwave return status and error codes.
+ */
 typedef enum {
-    SW_OK                  =  0,
-    SW_ERR_BAD_PARAM       = -1,
-    SW_ERR_MEMORY          = -2,
-    SW_ERR_DECODE          = -3,
-    SW_ERR_SYNC            = -4,
-    SW_ERR_AUDIO           = -5,
-    SW_ERR_NOT_IMPLEMENTED   = -6,
+    SW_OK                  =  0,  /**< Operation completed successfully. */
+    SW_ERR_BAD_PARAM       = -1,  /**< Invalid argument or null pointer. */
+    SW_ERR_MEMORY          = -2,  /**< Out of memory allocation error. */
+    SW_ERR_DECODE          = -3,  /**< RS/FEC decode error (> t errors). */
+    SW_ERR_SYNC            = -4,  /**< Preamble detection or CFO sync failure. */
+    SW_ERR_AUDIO           = -5,  /**< miniaudio device I/O error. */
+    SW_ERR_NOT_IMPLEMENTED = -6   /**< Feature not implemented. */
 } sw_error;
 
 typedef sw_error sw_error_t;
