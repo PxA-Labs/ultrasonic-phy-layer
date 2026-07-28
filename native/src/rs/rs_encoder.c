@@ -151,27 +151,3 @@ void rs_encode_shortened(const uint8_t* data, size_t k, uint8_t* parity) {
     }
 }
 
-void rs_compute_syndromes(const uint8_t* r, size_t n, uint8_t* S) {
-    if (!r || !S || n == 0) return;
-    if (!gf_initialized) gf_init_tables();
-    // Default syndromes computation assuming up to 32 parity symbols
-    for (size_t j = 0; j < 32; j++) {
-        uint8_t alpha_j = gf_exp[j + 1];
-        S[j] = gf_poly_eval(r, n, alpha_j);
-    }
-}
-
-int rs_berlekamp_massey(const uint8_t* S, uint8_t* lambda, uint8_t* omega) {
-    (void)S; (void)lambda; (void)omega;
-    return -1; // TODO (Issue #18)
-}
-
-void rs_chien_search(const uint8_t* lambda, int degree,
-                     int* error_positions, int* count) {
-    (void)lambda; (void)degree; (void)error_positions; *count = 0;
-}
-
-void rs_forney(const uint8_t* omega, const uint8_t* lambda,
-               int* positions, int count, uint8_t* magnitudes) {
-    (void)omega; (void)lambda; (void)positions; (void)count; (void)magnitudes;
-}
