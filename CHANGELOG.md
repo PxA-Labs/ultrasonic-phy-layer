@@ -90,6 +90,8 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
+- **onboarding:** Add developer guide, API reference, PR template, and Doxygen headers (#73)
 
 ### Features
 
