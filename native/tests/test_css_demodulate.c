@@ -16,7 +16,7 @@ int main(void) {
     css_init(&cfg);
 
     float* downchirp = (float*)malloc(cfg.chirp_len * sizeof(float));
-    css_generate_downchirp(&cfg, downchirp);
+    css_generate_downchirp_raw(&cfg, downchirp);
     printf("PASS: downchirp generated, length=%d\n", cfg.chirp_len);
 
     float* dechirped = (float*)malloc(cfg.chirp_len * sizeof(float));
