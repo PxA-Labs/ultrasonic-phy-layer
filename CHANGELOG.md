@@ -92,6 +92,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - **onboarding:** Add developer guide, API reference, PR template, and Doxygen headers (#73)
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -101,6 +102,7 @@ All notable changes to this project will be documented in this file.
 - **rs:** Implement GF(2^8) arithmetic and Reed-Solomon systematic encoder (#17)
 - **repo:** Add CODEOWNERS file for @archittmittal and @purvanshjoshi
 - **dsp-core:** Setup native project scaffolding and CMake build system (#15)
+- **dsp-core:** Implement Reed-Solomon decoder (BMA, Chien, Forney) (#18) (#67)
 
 ### Maintenance
 
