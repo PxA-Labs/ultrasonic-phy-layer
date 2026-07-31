@@ -8,6 +8,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "soundwave/types.h"
+
 typedef struct {
     int    sf;              // Spreading factor 7..12
     float  bandwidth;       // Sweep bandwidth in Hz
@@ -16,8 +18,6 @@ typedef struct {
     int    chirp_len;       // Chirp length in samples (computed)
 } css_config_t;
 
-#include "soundwave/types.h"
-
 void css_init(css_config_t* cfg);
 
 // Generate base upchirp: s[n] = cos(2pi * (f0 * n/fs + (mu/2) * (n/fs)^2))
@@ -25,14 +25,6 @@ void css_generate_upchirp_raw(const css_config_t* cfg, float* chirp);
 
 // Modulate one symbol: shift chirp by (sym / 2^sf) * bandwidth.
 void css_modulate_symbol_raw(const css_config_t* cfg, int sym_value, float* symbol);
-
-// Modulate a sequence of bits into a CSS frame (with preamble).
-void css_modulate_raw(const css_config_t* cfg, const uint8_t* bits,
-                      size_t bit_len, float* samples, size_t* sample_len);
-
-// Generate CSS preamble (N_upchirp repeated upchirps at symbol=0).
-void css_generate_preamble_raw(const css_config_t* cfg, int num_chirps,
-                               float* preamble);
 
 // Generate downchirp (conjugate/negative-phase of upchirp).
 void css_generate_downchirp_raw(const css_config_t* cfg, float* downchirp);

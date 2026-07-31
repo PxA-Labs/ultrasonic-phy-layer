@@ -36,21 +36,10 @@ void css_modulate_symbol_raw(const css_config_t* cfg, int sym_value, float* symb
     }
 }
 
-void css_modulate_raw(const css_config_t* cfg, const uint8_t* bits,
-                      size_t bit_len, float* samples, size_t* sample_len) {
-    (void)cfg; (void)bits; (void)bit_len; (void)samples;
-    *sample_len = 0;
-}
-
-void css_generate_preamble_raw(const css_config_t* cfg, int num_chirps, float* preamble) {
-    for (int i = 0; i < num_chirps; i++)
-        css_generate_upchirp_raw(cfg, preamble + i * cfg->chirp_len);
-}
-
 // Issue 19 functions
 sw_signal css_generate_chirp(double f0, double B, double T, double A, double phi0, double fs) {
     sw_signal sig;
-    int N = (int)(T * fs);
+    int N = (int)(T * fs + 0.5);
     sig.data = (float*)malloc(N * sizeof(float));
     sig.length = N;
     sig.sample_rate = (float)fs;
@@ -86,12 +75,12 @@ sw_signal css_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg) {
     final_sig.length = 0;
     final_sig.sample_rate = (float)cfg.sample_rate;
 
-    // 1. Generate preamble (8 upchirps, 2 downchirps at f0 = 18kHz, B = 4kHz, T = 10ms)
-    sw_signal pre_up = css_generate_chirp(18000.0, 4000.0, 0.01, cfg.amplitude, 0.0, cfg.sample_rate);
-    sw_signal pre_down = css_generate_chirp(18000.0, -4000.0, 0.01, cfg.amplitude, 0.0, cfg.sample_rate);
+    // 1. Generate preamble (8 upchirps, 2 downchirps using cfg parameters)
+    sw_signal pre_up = css_generate_chirp(cfg.carrier_freq, cfg.bandwidth, cfg.symbol_duration, cfg.amplitude, 0.0, cfg.sample_rate);
+    sw_signal pre_down = css_generate_chirp(cfg.carrier_freq, -cfg.bandwidth, cfg.symbol_duration, cfg.amplitude, 0.0, cfg.sample_rate);
 
     int N_pre = pre_up.length;
-    int N_sym = (int)(cfg.symbol_duration * cfg.sample_rate);
+    int N_sym = (int)(cfg.symbol_duration * cfg.sample_rate + 0.5f);
 
     size_t total_samples = 8 * N_pre + 2 * N_pre + num_bits * N_sym;
     final_sig.data = (float*)malloc(total_samples * sizeof(float));

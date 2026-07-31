@@ -112,8 +112,9 @@ int main(void) {
     sw_signal mod_sig = css_modulate(bits, 4, sw_cfg);
     assert(mod_sig.data != NULL);
     
-    size_t expected_preamble_len = 10 * (size_t)(0.01 * 44100);
-    size_t expected_data_len = 4 * (size_t)(0.02 * 44100);
+    size_t expected_preamble_len = 10 * (size_t)(sw_cfg.symbol_duration * sw_cfg.sample_rate + 0.5f);
+    size_t expected_data_len = 4 * (size_t)(sw_cfg.symbol_duration * sw_cfg.sample_rate + 0.5f);
+    printf("mod_sig.length = %zu, expected = %zu\n", mod_sig.length, expected_preamble_len + expected_data_len);
     assert(mod_sig.length == expected_preamble_len + expected_data_len);
     printf("PASS: CSS full modulation and preamble length verified.\n");
 
