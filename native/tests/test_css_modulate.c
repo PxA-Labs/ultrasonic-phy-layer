@@ -16,11 +16,11 @@ int main(void) {
     css_init(&cfg);
 
     float* chirp = (float*)malloc(cfg.chirp_len * sizeof(float));
-    css_generate_upchirp(&cfg, chirp);
+    css_generate_upchirp_raw(&cfg, chirp);
     printf("PASS: upchirp generated, length=%d\n", cfg.chirp_len);
 
     float* sym = (float*)malloc(cfg.chirp_len * sizeof(float));
-    css_modulate_symbol(&cfg, 42, sym);
+    css_modulate_symbol_raw(&cfg, 42, sym);
     printf("PASS: symbol 42 modulated\n");
 
     free(chirp);

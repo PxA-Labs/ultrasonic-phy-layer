@@ -7,7 +7,7 @@
 #include <string.h>
 #include <math.h>
 
-void css_generate_downchirp(const css_config_t* cfg, float* downchirp) {
+void css_generate_downchirp_raw(const css_config_t* cfg, float* downchirp) {
     int N = cfg->chirp_len;
     float fs = cfg->sample_rate;
     float f0 = cfg->f0;

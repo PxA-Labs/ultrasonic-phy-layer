@@ -29,6 +29,10 @@ typedef struct {
     float  coding_rate;      /**< Forward Error Correction (FEC) coding rate (0.5, 0.75). */
     float  threshold;        /**< Preamble detection threshold multiplier theta. */
     int    equalizer;        /**< Equalizer algorithm: 0 = Zero-Forcing (ZF), 1 = MMSE. */
+    float  carrier_freq;     /**< Carrier center frequency f0 in Hz (default 19000.0). */
+    float  bandwidth;        /**< Sweep bandwidth B in Hz (default 2000.0). */
+    float  symbol_duration;  /**< Symbol duration T in seconds (default 0.02). */
+    float  amplitude;        /**< Amplitude A (0.0 to 1.0) (default 0.8). */
 } sw_config;
 
 typedef sw_config sw_config_t;

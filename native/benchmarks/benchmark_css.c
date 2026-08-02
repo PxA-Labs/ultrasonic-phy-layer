@@ -23,13 +23,13 @@ int main(void) {
         for (int trial = 0; trial < 3; trial++) {
             if (!first) printf(",\n"); first = 0;
             snprintf(name, sizeof(name), "CSS_upchirp_SF%d", cfg.sf);
-            BENCH_BLOCK(name, 1000, { css_generate_upchirp(&cfg, chirp); });
+            BENCH_BLOCK(name, 1000, { css_generate_upchirp_raw(&cfg, chirp); });
         }
 
         for (int trial = 0; trial < 3; trial++) {
             if (!first) printf(",\n"); first = 0;
             snprintf(name, sizeof(name), "CSS_modulate_SF%d", cfg.sf);
-            BENCH_BLOCK(name, 1000, { css_modulate_symbol(&cfg, 42, symbol); });
+            BENCH_BLOCK(name, 1000, { css_modulate_symbol_raw(&cfg, 42, symbol); });
         }
 
         free(chirp); free(symbol);
