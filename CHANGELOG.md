@@ -35,6 +35,7 @@ All notable changes to this project will be documented in this file.
 - **ci:** Update artifact action version in release workflow (#15)
 - **native:** Address code review feedback for native scaffolding (#51)
 - **native:** Enable global compile and link options for coverage and sanitizers
+- **dsp-core:** Rename kissfft to kiss_fft target in benchmark CMake (#76)
 
 ### Build
 
@@ -92,6 +93,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - **onboarding:** Add developer guide, API reference, PR template, and Doxygen headers (#73)
+- Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 
