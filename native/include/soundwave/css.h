@@ -41,11 +41,15 @@ int  css_extract_symbol(const float* samples, int N,
 uint8_t* css_demodulate_frame(const float* samples, size_t len,
                                const css_config_t* cfg, size_t* out_bytes);
 
-// New task-specific signatures (Issue 19)
+// New task-specific signatures (Issue 19 & 24)
 sw_signal css_generate_chirp(double f0, double B, double T, double A, double phi0, double fs);
 sw_signal css_generate_upchirp(sw_config cfg);
-sw_signal css_generate_downchirp(sw_config cfg);
+sw_signal css_generate_downchirp_signal(sw_config cfg);
 sw_signal css_modulate_symbol(int bit, sw_config cfg);
 sw_signal css_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg);
+
+uint8_t* css_demodulate(const float* samples, size_t len, sw_config cfg, size_t* out_bytes);
+int css_detect_and_sync(const float* samples, int len, int SF, int N, float* timing_offset);
+void css_generate_downchirp(int N, float fs, float f0, float B, float* out);
 
 #endif // SOUNDWAVE_CSS_H

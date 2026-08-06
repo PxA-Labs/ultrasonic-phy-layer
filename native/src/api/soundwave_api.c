@@ -47,9 +47,21 @@ SW_API int sw_css_modulate(const uint8_t* bits, size_t bit_len,
 
 SW_API int sw_css_demodulate(const float* samples, size_t sample_len,
                              sw_config_t cfg, uint8_t* bits, size_t* bit_len) {
-    (void)samples; (void)sample_len; (void)cfg; (void)bits;
-    *bit_len = 0;
-    return SW_ERR_NOT_IMPLEMENTED;
+    if (!samples || !bits || !bit_len) return SW_ERR_BAD_PARAM;
+
+    size_t out_bytes = 0;
+    uint8_t* decoded = css_demodulate(samples, sample_len, cfg, &out_bytes);
+    if (!decoded) {
+        *bit_len = 0;
+        return SW_ERR_SYNC;
+    }
+
+    size_t decoded_bits = out_bytes * 8;
+    memcpy(bits, decoded, out_bytes);
+    *bit_len = decoded_bits;
+
+    free(decoded);
+    return SW_OK;
 }
 
 SW_API int sw_ofdm_modulate(const uint8_t* bits, size_t bit_len,

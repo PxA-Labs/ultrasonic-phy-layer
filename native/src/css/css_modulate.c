@@ -57,7 +57,7 @@ sw_signal css_generate_upchirp(sw_config cfg) {
     return css_generate_chirp(cfg.carrier_freq, +cfg.bandwidth, cfg.symbol_duration, cfg.amplitude, 0.0, cfg.sample_rate);
 }
 
-sw_signal css_generate_downchirp(sw_config cfg) {
+sw_signal css_generate_downchirp_signal(sw_config cfg) {
     return css_generate_chirp(cfg.carrier_freq, -cfg.bandwidth, cfg.symbol_duration, cfg.amplitude, 0.0, cfg.sample_rate);
 }
 
@@ -65,11 +65,19 @@ sw_signal css_modulate_symbol(int bit, sw_config cfg) {
     if (bit == 0) {
         return css_generate_upchirp(cfg);
     } else {
-        return css_generate_downchirp(cfg);
+        return css_generate_downchirp_signal(cfg);
     }
 }
 
 sw_signal css_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg) {
+    // Apply defaults to cfg
+    if (cfg.sample_rate <= 0) cfg.sample_rate = 44100;
+    if (cfg.sf <= 0) cfg.sf = 8;
+    if (cfg.carrier_freq <= 0.0f) cfg.carrier_freq = 19000.0f;
+    if (cfg.bandwidth <= 0.0f) cfg.bandwidth = 2000.0f;
+    if (cfg.symbol_duration <= 0.0f) cfg.symbol_duration = 0.02f;
+    if (cfg.amplitude <= 0.0f) cfg.amplitude = 0.8f;
+
     sw_signal final_sig;
     final_sig.data = NULL;
     final_sig.length = 0;

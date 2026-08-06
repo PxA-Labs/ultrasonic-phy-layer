@@ -19,17 +19,20 @@ int main(void) {
     const char* message = "Soundwave PHY Loopback Test";
     size_t msg_len = strlen(message);
 
-    float samples[16384];
-    size_t sample_len = 0;
+    float* samples = (float*)malloc(1000000 * sizeof(float));
+    size_t sample_len = 1000000;
 
-    int res = sw_css_modulate((const uint8_t*)message, msg_len, cfg, samples, &sample_len);
+    int res = sw_css_modulate((const uint8_t*)message, msg_len * 8, cfg, samples, &sample_len);
     assert(res == SW_OK || res == SW_ERR_NOT_IMPLEMENTED);
 
     uint8_t rx_buf[256];
-    size_t rx_len = 0;
-    res = sw_css_demodulate(samples, sample_len, cfg, rx_buf, &rx_len);
-    assert(res == SW_OK || res == SW_ERR_NOT_IMPLEMENTED);
+    size_t rx_len = 256 * 8;
+    if (res == SW_OK) {
+        res = sw_css_demodulate(samples, sample_len, cfg, rx_buf, &rx_len);
+        assert(res == SW_OK);
+    }
 
+    free(samples);
     printf("PASS: Integration loopback test executed successfully.\n");
     return 0;
 }
