@@ -235,11 +235,11 @@ void ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
     int num_symbols = (int)((bit_len + bits_per_symbol - 1) / bits_per_symbol);
     if (bit_len == 0) num_symbols = 0;
 
-    size_t total_samples = (2 + num_symbols) * (N + cp);
+    size_t total_samples = ((size_t)(2 + num_symbols)) * ((size_t)(N + cp));
     if (total_samples > *sample_len) {
         num_symbols = (int)(*sample_len / (N + cp)) - 2;
         if (num_symbols < 0) num_symbols = 0;
-        total_samples = (2 + num_symbols) * (N + cp);
+        total_samples = ((size_t)(2 + num_symbols)) * ((size_t)(N + cp));
     }
 
     // 1. Generate preamble ZC-OFDM symbol
