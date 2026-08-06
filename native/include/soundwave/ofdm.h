@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "kiss_fft.h"
+#include "soundwave/types.h"
 
 typedef struct {
     int num_subcarriers;  // FFT size (256, 512, 1024, 2048)
@@ -16,6 +17,18 @@ typedef struct {
 } ofdm_config_t;
 
 void ofdm_init(ofdm_config_t* cfg);
+
+// BPSK Constellation mapping
+void bpsk_map(int bit, kiss_fft_cpx* out);
+int bpsk_demap(kiss_fft_cpx symbol);
+
+// QPSK Constellation mapping
+void qpsk_map(uint8_t dibit, kiss_fft_cpx* out);
+uint8_t qpsk_demap_hard(kiss_fft_cpx symbol);
+
+// Subcarrier allocation
+void ofdm_allocate_subcarriers(int N, int* data_indices, int* pilot_indices, int* null_indices,
+                               int* num_data, int* num_pilots, int* num_nulls);
 
 // Map bits to constellation symbols (BPSK/QPSK/16QAM).
 void ofdm_map_constellation(const ofdm_config_t* cfg, const uint8_t* bits,
@@ -31,6 +44,9 @@ void ofdm_modulate_symbol(const ofdm_config_t* cfg, const kiss_fft_cpx* X,
 // Full frame modulation (multiple OFDM symbols).
 void ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
                          size_t bit_len, float* samples, size_t* sample_len);
+
+// Full frame modulation returning sw_signal
+sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg);
 
 // DFT demodulation: remove CP, FFT, normalize.
 void ofdm_dft_demodulate(const float* y, int N, int cp_length, kiss_fft_cpx* Y);
