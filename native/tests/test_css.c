@@ -26,7 +26,7 @@ static void add_awgn(float* samples, size_t len, double snr_db) {
     // 1. Calculate signal power
     double sig_power = 0.0;
     for (size_t i = 0; i < len; i++) {
-        sig_power += samples[i] * samples[i];
+        sig_power += (double)samples[i] * (double)samples[i];
     }
     sig_power /= len;
 
