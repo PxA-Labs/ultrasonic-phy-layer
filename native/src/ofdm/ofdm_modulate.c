@@ -322,7 +322,7 @@ sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg) {
     int num_symbols = (int)((num_bits + bits_per_symbol - 1) / bits_per_symbol);
     if (num_bits == 0) num_symbols = 0;
 
-    size_t total_samples = (2 + num_symbols) * (N + cp);
+    size_t total_samples = ((size_t)2 + (size_t)num_symbols) * ((size_t)N + (size_t)cp);
     sig.data = (float*)malloc(total_samples * sizeof(float));
     if (!sig.data) return sig;
 
