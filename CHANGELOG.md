@@ -96,6 +96,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -107,6 +108,7 @@ All notable changes to this project will be documented in this file.
 - **dsp-core:** Setup native project scaffolding and CMake build system (#15)
 - **dsp-core:** Implement Reed-Solomon decoder (BMA, Chien, Forney) (#18) (#67)
 - **dsp-core:** Implement LFM chirp generation & CSS modulation (#19) (#75)
+- **css:** Implement CSS demodulator and sync pipelines (#24)
 
 ### Maintenance
 
