@@ -17,27 +17,30 @@ static void test_sw_loopback_css(void) {
     cfg.modulation = 0;
     cfg.sf = 8;
 
-    float samples[44100 * 2]; // 2 seconds max
-    size_t sample_len = 0;
+    float* samples = (float*)malloc(1000000 * sizeof(float));
+    size_t sample_len = 1000000;
     int ret = sw_css_modulate(payload, 64 * 8, cfg, samples, &sample_len);
     if (ret == SW_ERR_NOT_IMPLEMENTED) {
         printf("SKIP: CSS modulation not implemented yet (sub-issue #27 pending)\n");
+        free(samples);
         return;
     }
     assert(ret == SW_OK);
     printf("PASS: CSS modulated %zu samples\n", sample_len);
 
     uint8_t decoded[64];
-    size_t bit_len = 0;
+    size_t bit_len = 64 * 8;
     ret = sw_css_demodulate(samples, sample_len, cfg, decoded, &bit_len);
     if (ret == SW_ERR_NOT_IMPLEMENTED) {
         printf("SKIP: CSS demodulation not implemented yet (sub-issue #27 pending)\n");
+        free(samples);
         return;
     }
     assert(ret == SW_OK);
     assert(bit_len == 64 * 8);
     assert(memcmp(payload, decoded, 64) == 0);
     printf("PASS: CSS loopback 64 bytes, 100%% match\n");
+    free(samples);
 }
 
 int main(void) {
