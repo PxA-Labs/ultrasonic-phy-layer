@@ -39,6 +39,12 @@ SW_API int sw_css_modulate(const uint8_t* bits, size_t bit_len,
     sw_signal sig = css_modulate(bits, bit_len, cfg);
     if (!sig.data) return SW_ERR_MEMORY;
 
+    if (sig.length > *sample_len) {
+        *sample_len = sig.length;
+        free(sig.data);
+        return SW_ERR_OVERFLOW;
+    }
+
     memcpy(samples, sig.data, sig.length * sizeof(float));
     *sample_len = sig.length;
     free(sig.data);
@@ -57,6 +63,12 @@ SW_API int sw_css_demodulate(const float* samples, size_t sample_len,
     }
 
     size_t decoded_bits = out_bytes * 8;
+    if (decoded_bits > *bit_len) {
+        *bit_len = decoded_bits;
+        free(decoded);
+        return SW_ERR_OVERFLOW;
+    }
+
     memcpy(bits, decoded, out_bytes);
     *bit_len = decoded_bits;
 
@@ -72,7 +84,9 @@ SW_API int sw_ofdm_modulate(const uint8_t* bits, size_t bit_len,
     if (!sig.data) return SW_ERR_MEMORY;
 
     if (sig.length > *sample_len) {
-        sig.length = *sample_len;
+        *sample_len = sig.length;
+        free(sig.data);
+        return SW_ERR_OVERFLOW;
     }
 
     memcpy(samples, sig.data, sig.length * sizeof(float));
@@ -95,7 +109,9 @@ SW_API int sw_ofdm_demodulate(const float* samples, size_t sample_len,
 
     size_t decoded_bits = out_bits_count;
     if (decoded_bits > *bit_len) {
-        decoded_bits = *bit_len;
+        *bit_len = decoded_bits;
+        free(decoded);
+        return SW_ERR_OVERFLOW;
     }
 
     size_t decoded_bytes = (decoded_bits + 7) / 8;

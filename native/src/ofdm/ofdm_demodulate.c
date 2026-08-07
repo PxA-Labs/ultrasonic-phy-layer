@@ -45,12 +45,17 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
     int N = cfg.num_subcarriers;
     int cp = cfg.cp_length;
     float fs = (float)cfg.sample_rate;
-    int modulation = (cfg.sf == 1) ? 0 : 1; // 0 = BPSK, 1 = QPSK
+    int modulation = cfg.ofdm_modulation; // 0 = BPSK, 1 = QPSK
 
     // Subcarrier allocation
     int* data_indices = (int*)malloc(N * sizeof(int));
     int* pilot_indices = (int*)malloc(N * sizeof(int));
     int* null_indices = (int*)malloc(N * sizeof(int));
+    if (!data_indices || !pilot_indices || !null_indices) {
+        free(data_indices); free(pilot_indices); free(null_indices);
+        *out_len = 0;
+        return NULL;
+    }
     int num_data, num_pilots, num_nulls;
     ofdm_allocate_subcarriers(N, data_indices, pilot_indices, null_indices,
                                &num_data, &num_pilots, &num_nulls);
@@ -62,9 +67,17 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
     // 1. Generate preamble ZC-OFDM frequency-domain template X_pre
     float* zc_real = (float*)malloc(N_active * sizeof(float));
     float* zc_imag = (float*)malloc(N_active * sizeof(float));
-    sync_zc_generate(1, N_active, zc_real, zc_imag);
-
     kiss_fft_cpx* X_pre = (kiss_fft_cpx*)calloc(N, sizeof(kiss_fft_cpx));
+    float* pre_symbol = (float*)malloc((N + cp) * sizeof(float));
+
+    if (!zc_real || !zc_imag || !X_pre || !pre_symbol) {
+        free(zc_real); free(zc_imag); free(X_pre); free(pre_symbol);
+        free(data_indices); free(pilot_indices); free(null_indices);
+        *out_len = 0;
+        return NULL;
+    }
+
+    sync_zc_generate(1, N_active, zc_real, zc_imag);
     for (int i = 0; i < N_active; i++) {
         int idx = active_start + i;
         X_pre[idx].r = zc_real[i];
@@ -80,7 +93,6 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
     ofdm_cfg.pilot_boost = 1.0f;
     ofdm_cfg.modulation = modulation;
 
-    float* pre_symbol = (float*)malloc((N + cp) * sizeof(float));
     ofdm_modulate_symbol(&ofdm_cfg, X_pre, pre_symbol);
 
     // 3. Timing synchronization / Preamble detection
@@ -129,9 +141,15 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
 
     float* analytic_real = (float*)malloc(payload_len * sizeof(float));
     float* analytic_imag = (float*)malloc(payload_len * sizeof(float));
-    sync_real_to_analytic(samples + frame_start, payload_len, analytic_real, analytic_imag);
-
     float* corrected = (float*)malloc(payload_len * sizeof(float));
+    if (!analytic_real || !analytic_imag || !corrected) {
+        free(analytic_real); free(analytic_imag); free(corrected);
+        free(data_indices); free(pilot_indices); free(null_indices);
+        free(zc_real); free(zc_imag); free(X_pre);
+        *out_len = 0;
+        return NULL;
+    }
+    sync_real_to_analytic(samples + frame_start, payload_len, analytic_real, analytic_imag);
     sync_apply_cfo_correction(analytic_real, analytic_imag, payload_len, cfo, fs, corrected);
 
     free(analytic_real);
@@ -140,19 +158,33 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
     // 5. Channel Estimation using preamble
     kiss_fft_cpx* Y_pre1 = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
     kiss_fft_cpx* Y_pre2 = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    kiss_fft_cpx* Y_pre = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    int* active_indices = (int*)malloc(N_active * sizeof(int));
+    kiss_fft_cpx* X_active = (kiss_fft_cpx*)malloc(N_active * sizeof(kiss_fft_cpx));
+    kiss_fft_cpx* H_active = (kiss_fft_cpx*)malloc(N_active * sizeof(kiss_fft_cpx));
+    kiss_fft_cpx* H = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    kiss_fft_cpx* Y_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
+    kiss_fft_cpx* X_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
+    kiss_fft_cpx* H_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
+
+    if (!Y_pre1 || !Y_pre2 || !Y_pre || !active_indices || !X_active || !H_active || !H || !Y_p || !X_p || !H_p) {
+        free(Y_pre1); free(Y_pre2); free(Y_pre);
+        free(active_indices); free(X_active); free(H_active);
+        free(H); free(Y_p); free(X_p); free(H_p);
+        free(data_indices); free(pilot_indices); free(null_indices);
+        free(zc_real); free(zc_imag); free(X_pre);
+        free(corrected);
+        *out_len = 0;
+        return NULL;
+    }
+
     ofdm_dft_demodulate(corrected, N, cp, Y_pre1);
     ofdm_dft_demodulate(corrected + (N + cp), N, cp, Y_pre2);
 
-    kiss_fft_cpx* Y_pre = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
     for (int k = 0; k < N; k++) {
         Y_pre[k].r = 0.5f * (Y_pre1[k].r + Y_pre2[k].r);
         Y_pre[k].i = 0.5f * (Y_pre1[k].i + Y_pre2[k].i);
     }
-
-    // We estimate the channel at active positions (X_pre is known ZC sequence at active positions)
-    int* active_indices = (int*)malloc(N_active * sizeof(int));
-    kiss_fft_cpx* X_active = (kiss_fft_cpx*)malloc(N_active * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* H_active = (kiss_fft_cpx*)malloc(N_active * sizeof(kiss_fft_cpx));
 
     for (int i = 0; i < N_active; i++) {
         active_indices[i] = active_start + i;
@@ -163,14 +195,8 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
     chanest_ls(Y_pre, X_active, active_indices, N_active, H_active);
 
     // Interpolate channel across all subcarriers (size N)
-    kiss_fft_cpx* H = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
     chanest_linear_interp(H_active, active_indices, N_active, N, H);
 
-    // Estimate SNR from pilot subcarriers
-    // Extract received pilot values Y_p and expected pilot values X_p at pilot indices
-    kiss_fft_cpx* Y_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* X_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* H_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
     for (int p = 0; p < num_pilots; p++) {
         int idx = pilot_indices[p];
         Y_p[p] = Y_pre[idx];
@@ -203,6 +229,15 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
     kiss_fft_cpx* Y_sym = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
     kiss_fft_cpx* X_hat = (kiss_fft_cpx*)malloc(num_data * sizeof(kiss_fft_cpx));
     uint8_t* temp_bits = (uint8_t*)malloc(((bits_per_symbol + 7) / 8) * sizeof(uint8_t));
+
+    if (!decoded || !Y_sym || !X_hat || !temp_bits) {
+        free(decoded); free(Y_sym); free(X_hat); free(temp_bits);
+        free(data_indices); free(pilot_indices); free(null_indices);
+        free(zc_real); free(zc_imag); free(X_pre);
+        free(corrected); free(H);
+        *out_len = 0;
+        return NULL;
+    }
 
     size_t total_bits_demodulated = 0;
 
@@ -257,12 +292,19 @@ uint8_t* ofdm_demodulate_frame(const float* samples, size_t len,
     }
     sw_config_t sw_cfg;
     sw_cfg.sample_rate = 44100;
+    sw_cfg.modulation = 1; // OFDM
+    sw_cfg.sf = 8;
     sw_cfg.num_subcarriers = cfg->num_subcarriers;
     sw_cfg.cp_length = cfg->cp_length;
     sw_cfg.num_pilots = cfg->num_pilots;
-    sw_cfg.sf = (cfg->modulation == 0) ? 1 : 8; // 1 = BPSK, 8 = QPSK
-    sw_cfg.equalizer = 0;
+    sw_cfg.coding_rate = 0.5f;
     sw_cfg.threshold = 3.0f;
+    sw_cfg.equalizer = 0;
+    sw_cfg.carrier_freq = 19000.0f;
+    sw_cfg.bandwidth = 2000.0f;
+    sw_cfg.symbol_duration = 0.02f;
+    sw_cfg.amplitude = 0.8f;
+    sw_cfg.ofdm_modulation = cfg->modulation;
 
     size_t out_bits = 0;
     uint8_t* decoded = ofdm_demodulate(samples, len, sw_cfg, &out_bits);

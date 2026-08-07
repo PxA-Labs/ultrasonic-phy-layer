@@ -26,11 +26,26 @@ final class SwConfig extends Struct {
   @Float()
   external double codingRate;
 
-  @Int32()
-  external int threshold;
+  @Float()
+  external double threshold;
 
   @Int32()
   external int equalizer;
+
+  @Float()
+  external double carrierFreq;
+
+  @Float()
+  external double bandwidth;
+
+  @Float()
+  external double symbolDuration;
+
+  @Float()
+  external double amplitude;
+
+  @Int32()
+  external int ofdmModulation;
 
   static SwConfig fromMap(Map<String, dynamic> m) {
     final c = calloc<SwConfig>();
@@ -40,9 +55,14 @@ final class SwConfig extends Struct {
     c.numSubcarriers = (m['num_subcarriers'] ?? 256) as int;
     c.cpLength = (m['cp_length'] ?? 64) as int;
     c.numPilots = (m['num_pilots'] ?? 8) as int;
-    c.codingRate = (m['coding_rate'] ?? 0.5) as double;
-    c.threshold = (m['threshold'] ?? 3) as int;
+    c.codingRate = ((m['coding_rate'] ?? 0.5) as num).toDouble();
+    c.threshold = ((m['threshold'] ?? 3.0) as num).toDouble();
     c.equalizer = (m['equalizer'] ?? 0) as int;
+    c.carrierFreq = ((m['carrier_freq'] ?? 19000.0) as num).toDouble();
+    c.bandwidth = ((m['bandwidth'] ?? 2000.0) as num).toDouble();
+    c.symbolDuration = ((m['symbol_duration'] ?? 0.02) as num).toDouble();
+    c.amplitude = ((m['amplitude'] ?? 0.8) as num).toDouble();
+    c.ofdmModulation = (m['ofdm_modulation'] ?? 1) as int; // Default 1 = QPSK
     return c;
   }
 }

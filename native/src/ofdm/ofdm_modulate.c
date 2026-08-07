@@ -126,6 +126,11 @@ void ofdm_map_constellation(const ofdm_config_t* cfg, const uint8_t* bits,
     int* data_indices = (int*)malloc(N * sizeof(int));
     int* pilot_indices = (int*)malloc(N * sizeof(int));
     int* null_indices = (int*)malloc(N * sizeof(int));
+    if (!data_indices || !pilot_indices || !null_indices) {
+        free(data_indices); free(pilot_indices); free(null_indices);
+        return;
+    }
+
     int num_data, num_pilots, num_nulls;
 
     ofdm_allocate_subcarriers(N, data_indices, pilot_indices, null_indices,
@@ -160,6 +165,10 @@ void ofdm_insert_pilots(const ofdm_config_t* cfg, kiss_fft_cpx* X) {
     int* data_indices = (int*)malloc(N * sizeof(int));
     int* pilot_indices = (int*)malloc(N * sizeof(int));
     int* null_indices = (int*)malloc(N * sizeof(int));
+    if (!data_indices || !pilot_indices || !null_indices) {
+        free(data_indices); free(pilot_indices); free(null_indices);
+        return;
+    }
     int num_data, num_pilots, num_nulls;
 
     ofdm_allocate_subcarriers(N, data_indices, pilot_indices, null_indices,
@@ -217,16 +226,27 @@ void ofdm_modulate_symbol(const ofdm_config_t* cfg, const kiss_fft_cpx* X,
     free(fft_cfg);
 }
 
-void ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
+int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
                          size_t bit_len, float* samples, size_t* sample_len) {
-    if (!cfg || !bits || !samples || !sample_len) return;
+    if (!cfg || !bits || !samples || !sample_len) return SW_ERR_BAD_PARAM;
 
     int N = cfg->num_subcarriers;
     int cp = cfg->cp_length;
 
+    // Check if the capacity can hold at least the 2 preamble symbols
+    if (*sample_len < (size_t)(2 * (N + cp))) {
+        *sample_len = 0;
+        return SW_ERR_OVERFLOW;
+    }
+
     int* data_indices = (int*)malloc(N * sizeof(int));
     int* pilot_indices = (int*)malloc(N * sizeof(int));
     int* null_indices = (int*)malloc(N * sizeof(int));
+    if (!data_indices || !pilot_indices || !null_indices) {
+        free(data_indices); free(pilot_indices); free(null_indices);
+        return SW_ERR_MEMORY;
+    }
+
     int num_data, num_pilots, num_nulls;
     ofdm_allocate_subcarriers(N, data_indices, pilot_indices, null_indices,
                                &num_data, &num_pilots, &num_nulls);
@@ -237,9 +257,9 @@ void ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
 
     size_t total_samples = (2 + num_symbols) * (N + cp);
     if (total_samples > *sample_len) {
-        num_symbols = (int)(*sample_len / (N + cp)) - 2;
-        if (num_symbols < 0) num_symbols = 0;
-        total_samples = (2 + num_symbols) * (N + cp);
+        *sample_len = total_samples;
+        free(data_indices); free(pilot_indices); free(null_indices);
+        return SW_ERR_OVERFLOW;
     }
 
     // 1. Generate preamble ZC-OFDM symbol
@@ -248,9 +268,19 @@ void ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
     int active_start = N_guard + 1;
     float* zc_real = (float*)malloc(N_active * sizeof(float));
     float* zc_imag = (float*)malloc(N_active * sizeof(float));
+    if (!zc_real || !zc_imag) {
+        free(zc_real); free(zc_imag);
+        free(data_indices); free(pilot_indices); free(null_indices);
+        return SW_ERR_MEMORY;
+    }
     sync_zc_generate(1, N_active, zc_real, zc_imag);
 
     kiss_fft_cpx* X = (kiss_fft_cpx*)calloc(N, sizeof(kiss_fft_cpx));
+    if (!X) {
+        free(zc_real); free(zc_imag);
+        free(data_indices); free(pilot_indices); free(null_indices);
+        return SW_ERR_MEMORY;
+    }
     for (int i = 0; i < N_active; i++) {
         int idx = active_start + i;
         X[idx].r = zc_real[i];
@@ -293,6 +323,7 @@ void ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
     free(null_indices);
 
     *sample_len = total_samples;
+    return SW_OK;
 }
 
 sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg) {
@@ -307,7 +338,7 @@ sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg) {
     ofdm_cfg.num_pilots = cfg.num_pilots;
     ofdm_cfg.pilot_spacing = 8;
     ofdm_cfg.pilot_boost = 1.0f;
-    ofdm_cfg.modulation = (cfg.sf == 1) ? 0 : 1; // 0 = BPSK, 1 = QPSK
+    ofdm_cfg.modulation = cfg.ofdm_modulation; // 0 = BPSK, 1 = QPSK
 
     ofdm_init(&ofdm_cfg);
 
@@ -328,23 +359,5 @@ sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg) {
 
     sig.length = total_samples;
     ofdm_modulate_frame(&ofdm_cfg, bits, num_bits, sig.data, &sig.length);
-    return sig;
-}
-
-sw_signal ofdm_idft_modulate(const kiss_fft_cpx* X, int N, int cp_length, float* temp_buffer) {
-    (void)temp_buffer;
-    sw_signal sig;
-    sig.data = (float*)malloc((N + cp_length) * sizeof(float));
-    sig.length = N + cp_length;
-    sig.sample_rate = 44100.0f;
-
-    ofdm_config_t cfg;
-    cfg.num_subcarriers = N;
-    cfg.cp_length = cp_length;
-    cfg.pilot_spacing = 8;
-    cfg.pilot_boost = 1.0f;
-    cfg.modulation = 1;
-
-    ofdm_modulate_symbol(&cfg, X, sig.data);
     return sig;
 }

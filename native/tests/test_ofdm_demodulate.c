@@ -134,6 +134,7 @@ int main(void) {
     sw_cfg.equalizer = 0; // ZF
     sw_cfg.sf = 8; // QPSK
     sw_cfg.threshold = 3.0f;
+    sw_cfg.ofdm_modulation = 1; // QPSK
 
     uint8_t payload[16] = { 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0,
                             0x0D, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE };
