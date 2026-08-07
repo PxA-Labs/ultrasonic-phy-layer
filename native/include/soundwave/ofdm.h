@@ -55,4 +55,7 @@ void ofdm_dft_demodulate(const float* y, int N, int cp_length, kiss_fft_cpx* Y);
 uint8_t* ofdm_demodulate_frame(const float* samples, size_t len,
                                 const ofdm_config_t* cfg, size_t* out_len);
 
+// Top-level demodulation returning uint8_t*
+uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t* out_len);
+
 #endif

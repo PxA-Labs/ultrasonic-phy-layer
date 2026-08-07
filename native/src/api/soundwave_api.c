@@ -84,9 +84,26 @@ SW_API int sw_ofdm_modulate(const uint8_t* bits, size_t bit_len,
 
 SW_API int sw_ofdm_demodulate(const float* samples, size_t sample_len,
                               sw_config_t cfg, uint8_t* bits, size_t* bit_len) {
-    (void)samples; (void)sample_len; (void)cfg; (void)bits;
-    *bit_len = 0;
-    return SW_ERR_NOT_IMPLEMENTED;
+    if (!samples || !bits || !bit_len) return SW_ERR_BAD_PARAM;
+
+    size_t out_bits_count = 0;
+    uint8_t* decoded = ofdm_demodulate(samples, sample_len, cfg, &out_bits_count);
+    if (!decoded) {
+        *bit_len = 0;
+        return SW_ERR_SYNC;
+    }
+
+    size_t decoded_bits = out_bits_count;
+    if (decoded_bits > *bit_len) {
+        decoded_bits = *bit_len;
+    }
+
+    size_t decoded_bytes = (decoded_bits + 7) / 8;
+    memcpy(bits, decoded, decoded_bytes);
+    *bit_len = decoded_bits;
+
+    free(decoded);
+    return SW_OK;
 }
 
 SW_API int sw_detect_frame(const float* samples, size_t len,
