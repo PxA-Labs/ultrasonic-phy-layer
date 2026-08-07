@@ -27,6 +27,15 @@ void qpsk_map(uint8_t dibit, kiss_fft_cpx* out);
 uint8_t qpsk_demap_hard(kiss_fft_cpx symbol);
 
 // Subcarrier allocation
+/**
+ * @brief Allocates subcarriers for OFDM.
+ * 
+ * Note: The third parameter null_indices contains both true nulls (DC, guard bands, middle null)
+ * and the dependent/conjugate symmetric subcarriers in the negative frequencies. The positive
+ * active data and pilot symbols are mirrored into these conjugate bins to ensure a real-valued
+ * time-domain signal. Demodulators/equalizers should only process the positive frequencies
+ * returned in data_indices and pilot_indices.
+ */
 void ofdm_allocate_subcarriers(int N, int* data_indices, int* pilot_indices, int* null_indices,
                                int* num_data, int* num_pilots, int* num_nulls);
 
@@ -41,8 +50,8 @@ void ofdm_insert_pilots(const ofdm_config_t* cfg, kiss_fft_cpx* X);
 void ofdm_modulate_symbol(const ofdm_config_t* cfg, const kiss_fft_cpx* X,
                           float* time);
 
-// Full frame modulation (multiple OFDM symbols).
-void ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
+// Full frame modulation (multiple OFDM symbols). Returns SW_OK or error.
+int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
                          size_t bit_len, float* samples, size_t* sample_len);
 
 // Full frame modulation returning sw_signal
@@ -54,5 +63,8 @@ void ofdm_dft_demodulate(const float* y, int N, int cp_length, kiss_fft_cpx* Y);
 // Full frame demodulation (detect, FFT, equalize, demap).
 uint8_t* ofdm_demodulate_frame(const float* samples, size_t len,
                                 const ofdm_config_t* cfg, size_t* out_len);
+
+// Top-level demodulation returning uint8_t*
+uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t* out_len);
 
 #endif
