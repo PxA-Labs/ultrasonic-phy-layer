@@ -130,6 +130,7 @@ int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** d
     sync_cfg.threshold = cfg.threshold;
     sync_cfg.zc_root = 1;
     sync_cfg.zc_length = N_active;
+    sync_cfg.matched_filter_len = N + cp;
 
     int sync_ok = sync_detect_frame(samples, len, &sync_cfg, &frame_start, &detected_snr);
     if (!sync_ok) {
