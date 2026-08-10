@@ -145,7 +145,9 @@ int main(void) {
 
     // Demodulate
     size_t rx_bits = 0;
-    uint8_t* rx_payload = ofdm_demodulate(tx_sig.data, tx_sig.length, sw_cfg, &rx_bits);
+    uint8_t* rx_payload = NULL;
+    int ret = ofdm_demodulate(tx_sig.data, tx_sig.length, sw_cfg, &rx_payload, &rx_bits);
+    assert(ret == SW_OK);
     assert(rx_payload != NULL);
     assert(rx_bits >= 16 * 8);
 

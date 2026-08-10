@@ -255,7 +255,7 @@ int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
     int num_symbols = (int)((bit_len + bits_per_symbol - 1) / bits_per_symbol);
     if (bit_len == 0) num_symbols = 0;
 
-    size_t total_samples = (2 + num_symbols) * (N + cp);
+    size_t total_samples = ((size_t)2 + (size_t)num_symbols) * ((size_t)N + (size_t)cp);
     if (total_samples > *sample_len) {
         *sample_len = total_samples;
         free(data_indices); free(pilot_indices); free(null_indices);
@@ -353,7 +353,7 @@ sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg) {
     int num_symbols = (int)((num_bits + bits_per_symbol - 1) / bits_per_symbol);
     if (num_bits == 0) num_symbols = 0;
 
-    size_t total_samples = (2 + num_symbols) * (N + cp);
+    size_t total_samples = ((size_t)2 + (size_t)num_symbols) * ((size_t)N + (size_t)cp);
     sig.data = (float*)malloc(total_samples * sizeof(float));
     if (!sig.data) return sig;
 

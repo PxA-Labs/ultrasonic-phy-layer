@@ -101,10 +101,11 @@ SW_API int sw_ofdm_demodulate(const float* samples, size_t sample_len,
     if (!samples || !bits || !bit_len) return SW_ERR_BAD_PARAM;
 
     size_t out_bits_count = 0;
-    uint8_t* decoded = ofdm_demodulate(samples, sample_len, cfg, &out_bits_count);
-    if (!decoded) {
+    uint8_t* decoded = NULL;
+    int ret = ofdm_demodulate(samples, sample_len, cfg, &decoded, &out_bits_count);
+    if (ret != SW_OK) {
         *bit_len = 0;
-        return SW_ERR_SYNC;
+        return ret;
     }
 
     size_t decoded_bits = out_bits_count;

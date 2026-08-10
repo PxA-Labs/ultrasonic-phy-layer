@@ -60,11 +60,11 @@ sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg);
 // DFT demodulation: remove CP, FFT, normalize.
 void ofdm_dft_demodulate(const float* y, int N, int cp_length, kiss_fft_cpx* Y);
 
-// Full frame demodulation (detect, FFT, equalize, demap).
-uint8_t* ofdm_demodulate_frame(const float* samples, size_t len,
-                                const ofdm_config_t* cfg, size_t* out_len);
+// Full frame demodulation (detect, FFT, equalize, demap). Returns SW_OK or error.
+int ofdm_demodulate_frame(const float* samples, size_t len,
+                          const ofdm_config_t* cfg, uint8_t** decoded, size_t* out_len);
 
-// Top-level demodulation returning uint8_t*
-uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t* out_len);
+// Top-level demodulation. Returns SW_OK or error.
+int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** decoded, size_t* out_len);
 
 #endif

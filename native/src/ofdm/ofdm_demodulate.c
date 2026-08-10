@@ -29,11 +29,15 @@ void ofdm_dft_demodulate(const float* y, int N, int cp_length, kiss_fft_cpx* Y) 
     free(fft_cfg);
 }
 
-uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t* out_len) {
-    if (!samples || !out_len) {
+int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** decoded, size_t* out_len) {
+    if (!samples || !decoded || !out_len) {
         if (out_len) *out_len = 0;
-        return NULL;
+        return SW_ERR_BAD_PARAM;
     }
+    *decoded = NULL;
+    *out_len = 0;
+
+    int ret_code = SW_OK;
 
     // Apply defaults to cfg
     if (cfg.sample_rate <= 0) cfg.sample_rate = 44100;
@@ -47,14 +51,39 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
     float fs = (float)cfg.sample_rate;
     int modulation = cfg.ofdm_modulation; // 0 = BPSK, 1 = QPSK
 
+    // Allocate pointers to NULL for safe single-label cleanup
+    int* data_indices = NULL;
+    int* pilot_indices = NULL;
+    int* null_indices = NULL;
+    float* zc_real = NULL;
+    float* zc_imag = NULL;
+    kiss_fft_cpx* X_pre = NULL;
+    float* pre_symbol = NULL;
+    float* analytic_real = NULL;
+    float* analytic_imag = NULL;
+    float* corrected = NULL;
+    kiss_fft_cpx* Y_pre1 = NULL;
+    kiss_fft_cpx* Y_pre2 = NULL;
+    kiss_fft_cpx* Y_pre = NULL;
+    int* active_indices = NULL;
+    kiss_fft_cpx* X_active = NULL;
+    kiss_fft_cpx* H_active = NULL;
+    kiss_fft_cpx* H = NULL;
+    kiss_fft_cpx* Y_p = NULL;
+    kiss_fft_cpx* X_p = NULL;
+    kiss_fft_cpx* H_p = NULL;
+    kiss_fft_cpx* Y_sym = NULL;
+    kiss_fft_cpx* X_hat = NULL;
+    uint8_t* temp_bits = NULL;
+    uint8_t* decoded_buf = NULL;
+
     // Subcarrier allocation
-    int* data_indices = (int*)malloc(N * sizeof(int));
-    int* pilot_indices = (int*)malloc(N * sizeof(int));
-    int* null_indices = (int*)malloc(N * sizeof(int));
+    data_indices = (int*)malloc(N * sizeof(int));
+    pilot_indices = (int*)malloc(N * sizeof(int));
+    null_indices = (int*)malloc(N * sizeof(int));
     if (!data_indices || !pilot_indices || !null_indices) {
-        free(data_indices); free(pilot_indices); free(null_indices);
-        *out_len = 0;
-        return NULL;
+        ret_code = SW_ERR_MEMORY;
+        goto cleanup;
     }
     int num_data, num_pilots, num_nulls;
     ofdm_allocate_subcarriers(N, data_indices, pilot_indices, null_indices,
@@ -65,16 +94,14 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
     int active_start = N_guard + 1;
 
     // 1. Generate preamble ZC-OFDM frequency-domain template X_pre
-    float* zc_real = (float*)malloc(N_active * sizeof(float));
-    float* zc_imag = (float*)malloc(N_active * sizeof(float));
-    kiss_fft_cpx* X_pre = (kiss_fft_cpx*)calloc(N, sizeof(kiss_fft_cpx));
-    float* pre_symbol = (float*)malloc((N + cp) * sizeof(float));
+    zc_real = (float*)malloc(N_active * sizeof(float));
+    zc_imag = (float*)malloc(N_active * sizeof(float));
+    X_pre = (kiss_fft_cpx*)calloc(N, sizeof(kiss_fft_cpx));
+    pre_symbol = (float*)malloc(((size_t)N + (size_t)cp) * sizeof(float));
 
     if (!zc_real || !zc_imag || !X_pre || !pre_symbol) {
-        free(zc_real); free(zc_imag); free(X_pre); free(pre_symbol);
-        free(data_indices); free(pilot_indices); free(null_indices);
-        *out_len = 0;
-        return NULL;
+        ret_code = SW_ERR_MEMORY;
+        goto cleanup;
     }
 
     sync_zc_generate(1, N_active, zc_real, zc_imag);
@@ -107,13 +134,13 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
     int sync_ok = sync_detect_frame(samples, len, &sync_cfg, &frame_start, &detected_snr);
     if (!sync_ok) {
         // Fallback matched-filter timing detector
-        int max_search = (int)len - 2 * (N + cp);
+        int max_search = (int)len - (int)(2 * ((size_t)N + (size_t)cp));
         float max_corr = -1e9f;
         int best_m = -1;
         for (int m = 0; m < max_search; m++) {
             float corr = 0.0f;
-            for (int n = 0; n < N + cp; n++) {
-                corr += samples[m + n] * pre_symbol[n];
+            for (size_t n = 0; n < ((size_t)N + (size_t)cp); n++) {
+                corr += samples[(size_t)m + n] * pre_symbol[n];
             }
             if (corr > max_corr) {
                 max_corr = corr;
@@ -126,60 +153,48 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
         }
     }
 
-    free(pre_symbol);
-
     if (!sync_ok) {
-        free(data_indices); free(pilot_indices); free(null_indices);
-        free(zc_real); free(zc_imag); free(X_pre);
-        *out_len = 0;
-        return NULL;
+        ret_code = SW_ERR_SYNC;
+        goto cleanup;
     }
 
     // 4. CFO Schmidl-Cox Estimation & Correction
     size_t payload_len = len - frame_start;
-    float cfo = sync_schmidl_cox_cfo(samples + frame_start, 2 * (N + cp), N + cp, fs);
+    float cfo = sync_schmidl_cox_cfo(samples + frame_start, 2 * ((size_t)N + (size_t)cp), N + cp, fs);
 
-    float* analytic_real = (float*)malloc(payload_len * sizeof(float));
-    float* analytic_imag = (float*)malloc(payload_len * sizeof(float));
-    float* corrected = (float*)malloc(payload_len * sizeof(float));
+    analytic_real = (float*)malloc(payload_len * sizeof(float));
+    analytic_imag = (float*)malloc(payload_len * sizeof(float));
+    corrected = (float*)malloc(payload_len * sizeof(float));
     if (!analytic_real || !analytic_imag || !corrected) {
-        free(analytic_real); free(analytic_imag); free(corrected);
-        free(data_indices); free(pilot_indices); free(null_indices);
-        free(zc_real); free(zc_imag); free(X_pre);
-        *out_len = 0;
-        return NULL;
+        ret_code = SW_ERR_MEMORY;
+        goto cleanup;
     }
     sync_real_to_analytic(samples + frame_start, payload_len, analytic_real, analytic_imag);
     sync_apply_cfo_correction(analytic_real, analytic_imag, payload_len, cfo, fs, corrected);
 
-    free(analytic_real);
-    free(analytic_imag);
+    // Free analytic buffers early as they are no longer needed
+    free(analytic_real); analytic_real = NULL;
+    free(analytic_imag); analytic_imag = NULL;
 
     // 5. Channel Estimation using preamble
-    kiss_fft_cpx* Y_pre1 = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* Y_pre2 = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* Y_pre = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
-    int* active_indices = (int*)malloc(N_active * sizeof(int));
-    kiss_fft_cpx* X_active = (kiss_fft_cpx*)malloc(N_active * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* H_active = (kiss_fft_cpx*)malloc(N_active * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* H = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* Y_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* X_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* H_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
+    Y_pre1 = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    Y_pre2 = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    Y_pre = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    active_indices = (int*)malloc(N_active * sizeof(int));
+    X_active = (kiss_fft_cpx*)malloc(N_active * sizeof(kiss_fft_cpx));
+    H_active = (kiss_fft_cpx*)malloc(N_active * sizeof(kiss_fft_cpx));
+    H = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    Y_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
+    X_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
+    H_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
 
     if (!Y_pre1 || !Y_pre2 || !Y_pre || !active_indices || !X_active || !H_active || !H || !Y_p || !X_p || !H_p) {
-        free(Y_pre1); free(Y_pre2); free(Y_pre);
-        free(active_indices); free(X_active); free(H_active);
-        free(H); free(Y_p); free(X_p); free(H_p);
-        free(data_indices); free(pilot_indices); free(null_indices);
-        free(zc_real); free(zc_imag); free(X_pre);
-        free(corrected);
-        *out_len = 0;
-        return NULL;
+        ret_code = SW_ERR_MEMORY;
+        goto cleanup;
     }
 
     ofdm_dft_demodulate(corrected, N, cp, Y_pre1);
-    ofdm_dft_demodulate(corrected + (N + cp), N, cp, Y_pre2);
+    ofdm_dft_demodulate(corrected + ((size_t)N + (size_t)cp), N, cp, Y_pre2);
 
     for (int k = 0; k < N; k++) {
         Y_pre[k].r = 0.5f * (Y_pre1[k].r + Y_pre2[k].r);
@@ -208,42 +223,31 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
     float inv_snr = 1.0f / powf(10.0f, snr_db / 10.0f);
     if (inv_snr > 10.0f) inv_snr = 10.0f;
 
-    free(Y_p); free(X_p); free(H_p);
-    free(Y_pre1); free(Y_pre2); free(Y_pre);
-    free(active_indices); free(X_active); free(H_active);
-
     // 6. Demodulate, Equalize & Demap each data symbol
-    int num_symbols = (int)((payload_len - 2 * (N + cp)) / (N + cp));
+    int num_symbols = (int)((payload_len - (size_t)2 * ((size_t)N + (size_t)cp)) / ((size_t)N + (size_t)cp));
     if (num_symbols <= 0) {
-        free(data_indices); free(pilot_indices); free(null_indices);
-        free(zc_real); free(zc_imag); free(X_pre);
-        free(corrected); free(H);
-        *out_len = 0;
-        return NULL;
+        ret_code = SW_ERR_SYNC;
+        goto cleanup;
     }
 
     int bits_per_symbol = num_data * (modulation == 0 ? 1 : 2);
-    int total_allocated_bytes = (num_symbols * bits_per_symbol + 7) / 8;
-    uint8_t* decoded = (uint8_t*)calloc(total_allocated_bytes, sizeof(uint8_t));
+    size_t total_allocated_bytes = ((size_t)num_symbols * (size_t)bits_per_symbol + 7) / 8;
+    decoded_buf = (uint8_t*)calloc(total_allocated_bytes, sizeof(uint8_t));
 
-    kiss_fft_cpx* Y_sym = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* X_hat = (kiss_fft_cpx*)malloc(num_data * sizeof(kiss_fft_cpx));
-    uint8_t* temp_bits = (uint8_t*)malloc(((bits_per_symbol + 7) / 8) * sizeof(uint8_t));
+    Y_sym = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    X_hat = (kiss_fft_cpx*)malloc(num_data * sizeof(kiss_fft_cpx));
+    temp_bits = (uint8_t*)malloc(((bits_per_symbol + 7) / 8) * sizeof(uint8_t));
 
-    if (!decoded || !Y_sym || !X_hat || !temp_bits) {
-        free(decoded); free(Y_sym); free(X_hat); free(temp_bits);
-        free(data_indices); free(pilot_indices); free(null_indices);
-        free(zc_real); free(zc_imag); free(X_pre);
-        free(corrected); free(H);
-        *out_len = 0;
-        return NULL;
+    if (!decoded_buf || !Y_sym || !X_hat || !temp_bits) {
+        ret_code = SW_ERR_MEMORY;
+        goto cleanup;
     }
 
     size_t total_bits_demodulated = 0;
 
     for (int s = 0; s < num_symbols; s++) {
         // DFT Demodulation
-        float* sym_src = corrected + (2 + s) * (N + cp);
+        float* sym_src = corrected + ((size_t)2 + (size_t)s) * ((size_t)N + (size_t)cp);
         ofdm_dft_demodulate(sym_src, N, cp, Y_sym);
 
         // Equalization
@@ -261,35 +265,56 @@ uint8_t* ofdm_demodulate(const float* samples, size_t len, sw_config cfg, size_t
         for (size_t b = 0; b < bits_decoded; b++) {
             int bit_val = (temp_bits[b / 8] >> (7 - (b % 8))) & 1;
             if (total_bits_demodulated % 8 == 0) {
-                decoded[total_bits_demodulated / 8] = 0;
+                decoded_buf[total_bits_demodulated / 8] = 0;
             }
-            decoded[total_bits_demodulated / 8] |= (bit_val << (7 - (total_bits_demodulated % 8)));
+            decoded_buf[total_bits_demodulated / 8] |= (bit_val << (7 - (total_bits_demodulated % 8)));
             total_bits_demodulated++;
         }
     }
 
-    free(Y_sym);
-    free(X_hat);
-    free(temp_bits);
+    *decoded = decoded_buf;
+    *out_len = total_bits_demodulated;
+    ret_code = SW_OK;
+
+cleanup:
     free(data_indices);
     free(pilot_indices);
     free(null_indices);
     free(zc_real);
     free(zc_imag);
     free(X_pre);
+    free(pre_symbol);
+    free(analytic_real);
+    free(analytic_imag);
     free(corrected);
+    free(Y_pre1);
+    free(Y_pre2);
+    free(Y_pre);
+    free(active_indices);
+    free(X_active);
+    free(H_active);
     free(H);
-
-    *out_len = total_bits_demodulated;
-    return decoded;
+    free(Y_p);
+    free(X_p);
+    free(H_p);
+    free(Y_sym);
+    free(X_hat);
+    free(temp_bits);
+    if (ret_code != SW_OK) {
+        free(decoded_buf);
+    }
+    return ret_code;
 }
 
-uint8_t* ofdm_demodulate_frame(const float* samples, size_t len,
-                                const ofdm_config_t* cfg, size_t* out_len) {
-    if (!samples || !cfg || !out_len) {
+int ofdm_demodulate_frame(const float* samples, size_t len,
+                          const ofdm_config_t* cfg, uint8_t** decoded, size_t* out_len) {
+    if (!samples || !cfg || !decoded || !out_len) {
         if (out_len) *out_len = 0;
-        return NULL;
+        return SW_ERR_BAD_PARAM;
     }
+    *decoded = NULL;
+    *out_len = 0;
+
     sw_config_t sw_cfg;
     sw_cfg.sample_rate = 44100;
     sw_cfg.modulation = 1; // OFDM
@@ -307,7 +332,12 @@ uint8_t* ofdm_demodulate_frame(const float* samples, size_t len,
     sw_cfg.ofdm_modulation = cfg->modulation;
 
     size_t out_bits = 0;
-    uint8_t* decoded = ofdm_demodulate(samples, len, sw_cfg, &out_bits);
-    *out_len = (out_bits + 7) / 8; // return byte count
-    return decoded;
+    uint8_t* decoded_bits = NULL;
+    int ret = ofdm_demodulate(samples, len, sw_cfg, &decoded_bits, &out_bits);
+    if (ret != SW_OK) {
+        return ret;
+    }
+    *decoded = decoded_bits;
+    *out_len = out_bits; // return bit count consistently!
+    return SW_OK;
 }
