@@ -36,6 +36,8 @@ All notable changes to this project will be documented in this file.
 - **native:** Address code review feedback for native scaffolding (#51)
 - **native:** Enable global compile and link options for coverage and sanitizers
 - **dsp-core:** Rename kissfft to kiss_fft target in benchmark CMake (#76)
+- **ofdm:** Resolve PR #78 review comments on OFDM modulator and FFI boundaries
+- **ofdm:** Resolve PR #79 review comments on memory safety and API consistency
 
 ### Build
 
@@ -97,6 +99,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -109,6 +112,8 @@ All notable changes to this project will be documented in this file.
 - **dsp-core:** Implement Reed-Solomon decoder (BMA, Chien, Forney) (#18) (#67)
 - **dsp-core:** Implement LFM chirp generation & CSS modulation (#19) (#75)
 - **css:** Implement CSS demodulator and sync pipelines (#24)
+- **ofdm:** Implement OFDM subcarrier mapping, IDFT and cyclic prefix (#20)
+- **ofdm:** Implement OFDM demodulation, channel estimation, and equalization (#23)
 
 ### Maintenance
 
