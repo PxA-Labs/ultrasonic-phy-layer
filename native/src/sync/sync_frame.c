@@ -209,7 +209,7 @@ int sync_detect_frame(const float* samples, size_t len,
         free(M); free(ar); free(ai);
         
         // Threshold check (timing metric > 0.5 indicates presence of matching symbols)
-        if (peak_val > 0.5f) {
+        if (peak_val > 0.2f) {
             *frame_start = peak_idx;
             *detected_snr = 10.0f * log10f(peak_val / (1.0f - peak_val + 1e-10f));
             return 1;

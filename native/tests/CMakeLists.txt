@@ -33,6 +33,7 @@ sw_add_test(test_api                 test_api.c)
 sw_add_test(test_fft                 test_fft.c)
 sw_add_test(test_e2e                 test_e2e.c)
 sw_add_test(integration_loopback     integration_loopback.c)
+sw_add_test(test_ber                 test_ber.c)
 
 # Catch2 C++ Test Runner Target
 add_executable(catch_tests main.cpp)
