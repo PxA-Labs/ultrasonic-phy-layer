@@ -2,6 +2,7 @@
 // References: MATHEMATICAL_MODEL.md equations 21-22.
 
 #include "soundwave/equalizer.h"
+#include "soundwave/ofdm.h"
 #include <math.h>
 
 void equalize_zf(const kiss_fft_cpx* Y, const kiss_fft_cpx* H,
@@ -37,14 +38,29 @@ void equalize_mmse(const kiss_fft_cpx* Y, const kiss_fft_cpx* H,
 
 int demap_data(const kiss_fft_cpx* X_hat, int num_data, int modulation,
                uint8_t* bits, size_t* num_bits) {
+    if (!X_hat || !bits || !num_bits) return -1;
     size_t bit_pos = 0;
     for (int i = 0; i < num_data; i++) {
-        float r = X_hat[i].r;
         if (modulation == 0) { // BPSK
-            bits[bit_pos / 8] |= (r > 0.0f) ? (1 << (bit_pos % 8)) : 0;
+            int bit = (X_hat[i].r > 0.0f) ? 1 : 0;
+            if (bit_pos % 8 == 0) {
+                bits[bit_pos / 8] = 0;
+            }
+            bits[bit_pos / 8] |= (bit << (7 - (bit_pos % 8)));
+            bit_pos++;
+        } else if (modulation == 1) { // QPSK
+            uint8_t dibit = qpsk_demap_hard(X_hat[i]);
+            int bit1 = (dibit >> 1) & 1;
+            int bit2 = dibit & 1;
+
+            if (bit_pos % 8 == 0) bits[bit_pos / 8] = 0;
+            bits[bit_pos / 8] |= (bit1 << (7 - (bit_pos % 8)));
+            bit_pos++;
+
+            if (bit_pos % 8 == 0) bits[bit_pos / 8] = 0;
+            bits[bit_pos / 8] |= (bit2 << (7 - (bit_pos % 8)));
             bit_pos++;
         }
-        // QPSK and 16QAM: TODO
     }
     *num_bits = bit_pos;
     return 0;

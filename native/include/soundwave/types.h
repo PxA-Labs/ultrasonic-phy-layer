@@ -33,6 +33,7 @@ typedef struct {
     float  bandwidth;        /**< Sweep bandwidth B in Hz (default 2000.0). */
     float  symbol_duration;  /**< Symbol duration T in seconds (default 0.02). */
     float  amplitude;        /**< Amplitude A (0.0 to 1.0) (default 0.8). */
+    int    ofdm_modulation;  /**< OFDM constellation mapping: 0 = BPSK, 1 = QPSK. */
 } sw_config;
 
 typedef sw_config sw_config_t;
@@ -80,7 +81,8 @@ typedef enum {
     SW_ERR_DECODE          = -3,  /**< RS/FEC decode error (> t errors). */
     SW_ERR_SYNC            = -4,  /**< Preamble detection or CFO sync failure. */
     SW_ERR_AUDIO           = -5,  /**< miniaudio device I/O error. */
-    SW_ERR_NOT_IMPLEMENTED = -6   /**< Feature not implemented. */
+    SW_ERR_NOT_IMPLEMENTED = -6,  /**< Feature not implemented. */
+    SW_ERR_OVERFLOW        = -7   /**< Output buffer overflow/too small. */
 } sw_error;
 
 typedef sw_error sw_error_t;

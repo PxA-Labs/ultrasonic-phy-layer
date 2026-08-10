@@ -22,8 +22,11 @@ int LLVMFuzzerTestOneInput(const uint8_t* Data, size_t Size) {
     memcpy(samples, Data, float_count * 4);
 
     size_t out_len = 0;
-    uint8_t* bits = ofdm_demodulate_frame(samples, float_count, &cfg, &out_len);
-    free(bits);
+    uint8_t* bits = NULL;
+    int ret = ofdm_demodulate_frame(samples, float_count, &cfg, &bits, &out_len);
+    if (ret == SW_OK) {
+        free(bits);
+    }
     free(samples);
     return 0;
 }
