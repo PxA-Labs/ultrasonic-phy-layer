@@ -102,6 +102,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -117,6 +118,7 @@ All notable changes to this project will be documented in this file.
 - **ofdm:** Implement OFDM subcarrier mapping, IDFT and cyclic prefix (#20)
 - **ofdm:** Implement OFDM demodulation, channel estimation, and equalization (#23)
 - **sync:** Implement CSS and OFDM timing synchronization and noise estimation (#21)
+- **api:** Implement miniaudio I/O ring buffers and FFI API bindings (#25, #26)
 
 ### Maintenance
 
