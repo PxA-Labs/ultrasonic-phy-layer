@@ -6,7 +6,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 # Helper: create a C test executable and register it
 function(sw_add_test TEST_NAME TEST_SOURCE)
     add_executable(${TEST_NAME} ${TEST_SOURCE})
-    target_link_libraries(${TEST_NAME} PRIVATE soundwave kiss_fft)
+    target_link_libraries(${TEST_NAME} PRIVATE soundwave kiss_fft miniaudio)
     if(NOT WIN32)
         target_link_libraries(${TEST_NAME} PRIVATE m)
     else()
@@ -37,7 +37,7 @@ sw_add_test(test_ber                 test_ber.c)
 
 # Catch2 C++ Test Runner Target
 add_executable(catch_tests main.cpp)
-target_link_libraries(catch_tests PRIVATE soundwave kiss_fft)
+target_link_libraries(catch_tests PRIVATE soundwave kiss_fft miniaudio)
 if(NOT WIN32)
     target_link_libraries(catch_tests PRIVATE m)
 else()
