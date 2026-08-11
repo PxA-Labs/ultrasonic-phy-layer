@@ -101,6 +101,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -121,5 +122,9 @@ All notable changes to this project will be documented in this file.
 
 - Change license from MIT to Apache 2.0
 - Merge main into feat/ci-benchmarking
+
+### Testing
+
+- **qa:** Implement AWGN channel simulator and BER benchmarking harness (#72)
 
 
