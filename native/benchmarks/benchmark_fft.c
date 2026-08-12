@@ -1,6 +1,6 @@
 #include "bench_util.h"
 #include "kiss_fft.h"
-#include "tools/kiss_fftr.h"
+#include "kiss_fftr.h"
 
 int main(void) {
     printf("[\n");

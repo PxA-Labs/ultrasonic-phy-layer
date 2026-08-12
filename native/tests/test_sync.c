@@ -3,6 +3,7 @@
 #include "soundwave/sync.h"
 #include "soundwave/css.h"
 #include "soundwave/ofdm.h"
+#include "soundwave/simd_util.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
@@ -134,6 +135,34 @@ int main(void) {
     printf("PASS: Noise-only input correctly rejected (no false alarm detections)\n");
 
     free(noise_samples);
+
+    // 6. SIMD numerical parity tests
+    float simd_test_a[97];
+    float simd_test_b[97];
+    float simd_test_a_i[97];
+    float simd_test_b_i[97];
+    for (int i = 0; i < 97; i++) {
+        simd_test_a[i] = (float)i * 0.123f;
+        simd_test_b[i] = (float)(97 - i) * 0.456f;
+        simd_test_a_i[i] = (float)i * -0.079f;
+        simd_test_b_i[i] = (float)(97 - i) * 0.135f;
+    }
+
+    float scalar_dot = simd_dot_product_scalar(simd_test_a, simd_test_b, 97);
+    float simd_dot = simd_dot_product(simd_test_a, simd_test_b, 97);
+    printf("DEBUG SIMD CHECK: scalar_dot = %.6f, simd_dot = %.6f, diff = %.6f\n", scalar_dot, simd_dot, fabsf(scalar_dot - simd_dot));
+    assert(fabsf(scalar_dot - simd_dot) < 1e-3f);
+    printf("PASS: SIMD dot product numerical parity check passed: %.6f vs %.6f\n", scalar_dot, simd_dot);
+
+    double scalar_cr = 0.0, scalar_ci = 0.0;
+    double simd_cr = 0.0, simd_ci = 0.0;
+    simd_complex_dot_product_scalar(simd_test_a, simd_test_a_i, simd_test_b, simd_test_b_i, 97, &scalar_cr, &scalar_ci);
+    simd_complex_dot_product(simd_test_a, simd_test_a_i, simd_test_b, simd_test_b_i, 97, &simd_cr, &simd_ci);
+    printf("DEBUG SIMD COMPLEX CHECK: scalar_cr = %.6f, simd_cr = %.6f, diff_r = %.6f\n", scalar_cr, simd_cr, fabs(scalar_cr - simd_cr));
+    printf("DEBUG SIMD COMPLEX CHECK: scalar_ci = %.6f, simd_ci = %.6f, diff_i = %.6f\n", scalar_ci, simd_ci, fabs(scalar_ci - simd_ci));
+    assert(fabs(scalar_cr - simd_cr) < 1e-2);
+    assert(fabs(scalar_ci - simd_ci) < 1e-2);
+    printf("PASS: SIMD complex dot product parity check passed\n");
 
     printf("All sync tests passed.\n");
     return 0;
