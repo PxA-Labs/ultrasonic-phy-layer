@@ -5,6 +5,7 @@
 #include "soundwave/common.h"
 #include "soundwave/css.h"
 #include "soundwave/cfo.h"
+#include "soundwave/simd_util.h"
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
@@ -12,10 +13,7 @@
 void sync_matched_filter(const float* y, size_t y_len,
                          const float* s, size_t s_len, float* R) {
     for (size_t m = 0; m <= y_len - s_len; m++) {
-        double sum = 0.0;
-        for (size_t n = 0; n < s_len; n++)
-            sum += (double)y[m + n] * (double)s[n];
-        R[m] = (float)sum;
+        R[m] = simd_dot_product(y + m, s, s_len);
     }
 }
 
@@ -57,12 +55,7 @@ void sync_zc_correlate(const float* y_real, const float* y_imag, size_t len,
                        float* R) {
     for (size_t m = 0; m <= len - zc_len; m++) {
         double sum_real = 0.0, sum_imag = 0.0;
-        for (size_t n = 0; n < zc_len; n++) {
-            sum_real += (double)y_real[m + n] * (double)zc_real[n]
-                      + (double)y_imag[m + n] * (double)zc_imag[n];
-            sum_imag += (double)y_imag[m + n] * (double)zc_real[n]
-                      - (double)y_real[m + n] * (double)zc_imag[n];
-        }
+        simd_complex_dot_product(y_real + m, y_imag + m, zc_real, zc_imag, zc_len, &sum_real, &sum_imag);
         R[m] = (float)(sum_real * sum_real + sum_imag * sum_imag);
     }
 }

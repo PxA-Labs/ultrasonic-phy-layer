@@ -14,6 +14,26 @@ option(SW_BUILD_FUZZ       "Build fuzz harnesses"    OFF)
 option(SW_USE_SANITIZER    "Enable ASan+UBSan"       OFF)
 option(SW_BUILD_COVERAGE   "Enable code coverage"    OFF)
 
+# Sanitizers (Must be before any add_library or add_executable)
+if(SW_USE_SANITIZER)
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=address)
+endif()
+
+# Code coverage (Must be before any add_library or add_executable)
+if(SW_BUILD_COVERAGE AND (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang"))
+    add_compile_options(--coverage -g)
+    add_link_options(--coverage)
+endif()
+
+# SIMD architecture options
+if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
+    add_compile_options(/arch:AVX2)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+    add_compile_options(-mavx2 -mfma)
+endif()
+
+
 # Version definitions
 set(SW_VERSION_STRING "${PROJECT_VERSION}")
 add_compile_definitions(SW_VERSION="${SW_VERSION_STRING}")
@@ -109,17 +129,7 @@ elseif(UNIX AND NOT APPLE)
     target_link_libraries(soundwave_shared PRIVATE m pthread dl)
 endif()
 
-# Sanitizers
-if(SW_USE_SANITIZER)
-    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
-    add_link_options(-fsanitize=address,undefined)
-endif()
 
-# Code coverage
-if(SW_BUILD_COVERAGE AND (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang"))
-    add_compile_options(--coverage -g)
-    add_link_options(--coverage)
-endif()
 
 # Subdirectories
 if(SW_BUILD_TESTS)
