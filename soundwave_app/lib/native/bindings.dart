@@ -51,21 +51,21 @@ final class SwConfig extends Struct {
 
   static Pointer<SwConfig> fromMap(Map<String, dynamic> m) {
     final c = calloc<SwConfig>();
-    c.ref.sampleRate = (m['sample_rate'] ?? 44100) as int;
-    c.ref.modulation = (m['modulation'] ?? 0) as int;
-    c.ref.sf = (m['sf'] ?? 8) as int;
-    c.ref.numSubcarriers = (m['num_subcarriers'] ?? 256) as int;
-    c.ref.cpLength = (m['cp_length'] ?? 64) as int;
-    c.ref.numPilots = (m['num_pilots'] ?? 8) as int;
+    c.ref.sampleRate = ((m['sample_rate'] ?? 44100) as num).toInt();
+    c.ref.modulation = ((m['modulation'] ?? 0) as num).toInt();
+    c.ref.sf = ((m['sf'] ?? 8) as num).toInt();
+    c.ref.numSubcarriers = ((m['num_subcarriers'] ?? 256) as num).toInt();
+    c.ref.cpLength = ((m['cp_length'] ?? 64) as num).toInt();
+    c.ref.numPilots = ((m['num_pilots'] ?? 8) as num).toInt();
     c.ref.codingRate = ((m['coding_rate'] ?? 0.5) as num).toDouble();
     c.ref.threshold = ((m['threshold'] ?? 3.0) as num).toDouble();
-    c.ref.equalizer = (m['equalizer'] ?? 0) as int;
+    c.ref.equalizer = ((m['equalizer'] ?? 0) as num).toInt();
     c.ref.carrierFreq = ((m['carrier_freq'] ?? 19000.0) as num).toDouble();
     c.ref.bandwidth = ((m['bandwidth'] ?? 2000.0) as num).toDouble();
     c.ref.symbolDuration = ((m['symbol_duration'] ?? 0.02) as num).toDouble();
     c.ref.amplitude = ((m['amplitude'] ?? 0.8) as num).toDouble();
     c.ref.ofdmModulation =
-        (m['ofdm_modulation'] ?? 1) as int; // Default 1 = QPSK
+        ((m['ofdm_modulation'] ?? 1) as num).toInt(); // Default 1 = QPSK
     return c;
   }
 }
