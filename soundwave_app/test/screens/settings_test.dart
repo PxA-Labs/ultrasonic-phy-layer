@@ -7,9 +7,9 @@ import 'package:soundwave/screens/settings.dart';
 import 'package:soundwave/state/app_state.dart';
 
 Widget createApp() => ChangeNotifierProvider(
-  create: (_) => AppState(),
-  child: const MaterialApp(home: SettingsScreen()),
-);
+      create: (_) => AppState(),
+      child: const MaterialApp(home: SettingsScreen()),
+    );
 
 void main() {
   group('SettingsScreen', () {

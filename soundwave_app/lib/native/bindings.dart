@@ -3,6 +3,8 @@
 
 import 'dart:ffi';
 
+import 'package:ffi/ffi.dart';
+
 // Mirrors native/sw_config_t
 final class SwConfig extends Struct {
   @Int32()
@@ -47,33 +49,53 @@ final class SwConfig extends Struct {
   @Int32()
   external int ofdmModulation;
 
-  static SwConfig fromMap(Map<String, dynamic> m) {
+  static Pointer<SwConfig> fromMap(Map<String, dynamic> m) {
     final c = calloc<SwConfig>();
-    c.sampleRate = (m['sample_rate'] ?? 44100) as int;
-    c.modulation = (m['modulation'] ?? 0) as int;
-    c.sf = (m['sf'] ?? 8) as int;
-    c.numSubcarriers = (m['num_subcarriers'] ?? 256) as int;
-    c.cpLength = (m['cp_length'] ?? 64) as int;
-    c.numPilots = (m['num_pilots'] ?? 8) as int;
-    c.codingRate = ((m['coding_rate'] ?? 0.5) as num).toDouble();
-    c.threshold = ((m['threshold'] ?? 3.0) as num).toDouble();
-    c.equalizer = (m['equalizer'] ?? 0) as int;
-    c.carrierFreq = ((m['carrier_freq'] ?? 19000.0) as num).toDouble();
-    c.bandwidth = ((m['bandwidth'] ?? 2000.0) as num).toDouble();
-    c.symbolDuration = ((m['symbol_duration'] ?? 0.02) as num).toDouble();
-    c.amplitude = ((m['amplitude'] ?? 0.8) as num).toDouble();
-    c.ofdmModulation = (m['ofdm_modulation'] ?? 1) as int; // Default 1 = QPSK
+    c.ref.sampleRate = (m['sample_rate'] ?? 44100) as int;
+    c.ref.modulation = (m['modulation'] ?? 0) as int;
+    c.ref.sf = (m['sf'] ?? 8) as int;
+    c.ref.numSubcarriers = (m['num_subcarriers'] ?? 256) as int;
+    c.ref.cpLength = (m['cp_length'] ?? 64) as int;
+    c.ref.numPilots = (m['num_pilots'] ?? 8) as int;
+    c.ref.codingRate = ((m['coding_rate'] ?? 0.5) as num).toDouble();
+    c.ref.threshold = ((m['threshold'] ?? 3.0) as num).toDouble();
+    c.ref.equalizer = (m['equalizer'] ?? 0) as int;
+    c.ref.carrierFreq = ((m['carrier_freq'] ?? 19000.0) as num).toDouble();
+    c.ref.bandwidth = ((m['bandwidth'] ?? 2000.0) as num).toDouble();
+    c.ref.symbolDuration = ((m['symbol_duration'] ?? 0.02) as num).toDouble();
+    c.ref.amplitude = ((m['amplitude'] ?? 0.8) as num).toDouble();
+    c.ref.ofdmModulation =
+        (m['ofdm_modulation'] ?? 1) as int; // Default 1 = QPSK
     return c;
   }
 }
-
-// Opaque handle for audio capture/playback (void* in C)
-final class AudioHandle extends Opaque {}
 
 // Error codes (matches sw_error_t)
 class SwException implements Exception {
   final int code;
   SwException(this.code);
+
+  String get message {
+    switch (code) {
+      case -1:
+        return 'Invalid parameter or NULL pointer';
+      case -2:
+        return 'Out of memory';
+      case -3:
+        return 'RS decode failure (too many errors)';
+      case -4:
+        return 'Frame synchronisation/CFO estimate failed';
+      case -5:
+        return 'Real-time audio device I/O error';
+      case -6:
+        return 'Feature not implemented';
+      case -7:
+        return 'Output buffer too small / overflow';
+      default:
+        return 'Unknown native code: $code';
+    }
+  }
+
   @override
-  String toString() => 'SwException(code=$code)';
+  String toString() => 'SwException(code=$code, message="$message")';
 }

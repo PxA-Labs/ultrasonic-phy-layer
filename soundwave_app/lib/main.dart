@@ -3,18 +3,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'state/app_state.dart';
 import 'screens/dashboard.dart';
 import 'screens/monitor.dart';
 import 'screens/settings.dart';
 
 void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppState(),
-      child: const SoundwaveApp(),
-    ),
-  );
+  runApp(const SoundwaveApp());
 }
 
 class SoundwaveApp extends StatelessWidget {
@@ -22,16 +18,19 @@ class SoundwaveApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Soundwave',
-      theme: ThemeData.dark().copyWith(
-        primaryColor: const Color(0xFF0D47A1),
-        colorScheme: ColorScheme.dark(
-          primary: const Color(0xFF0D47A1),
-          secondary: const Color(0xFF00BCD4),
+    return ChangeNotifierProvider(
+      create: (_) => AppState(),
+      child: MaterialApp(
+        title: 'Soundwave',
+        theme: ThemeData.dark().copyWith(
+          primaryColor: const Color(0xFF0D47A1),
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFF0D47A1),
+            secondary: Color(0xFF00BCD4),
+          ),
         ),
+        home: const MainShell(),
       ),
-      home: const MainShell(),
     );
   }
 }
@@ -58,7 +57,10 @@ class _MainShellState extends State<MainShell> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          NavigationDestination(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
           NavigationDestination(icon: Icon(Icons.show_chart), label: 'Monitor'),
           NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
         ],

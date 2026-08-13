@@ -30,11 +30,24 @@ class AppState extends ChangeNotifier {
   String get txMessage => _txMessage;
   List<String> get messages => List.unmodifiable(_messages);
 
-  set txMessage(String v) { _txMessage = v; }
+  set txMessage(String v) {
+    _txMessage = v;
+  }
 
-  void setMode(int m) { _mode = m; notifyListeners(); }
-  void setSf(int v) { _sf = v; notifyListeners(); }
-  void setNumSubcarriers(int v) { _numSubcarriers = v; notifyListeners(); }
+  void setMode(int m) {
+    _mode = m;
+    notifyListeners();
+  }
+
+  void setSf(int v) {
+    _sf = v;
+    notifyListeners();
+  }
+
+  void setNumSubcarriers(int v) {
+    _numSubcarriers = v;
+    notifyListeners();
+  }
 
   void toggleListening() {
     _isListening = !_isListening;
@@ -42,7 +55,10 @@ class AppState extends ChangeNotifier {
   }
 
   void addMessage(String msg, double snr) {
-    _messages.insert(0, '[${DateTime.now().hour}:${DateTime.now().minute}:${DateTime.now().second}] "$msg" (SNR: ${snr.toStringAsFixed(1)} dB)');
+    _messages.insert(
+      0,
+      '[${DateTime.now().hour}:${DateTime.now().minute}:${DateTime.now().second}] "$msg" (SNR: ${snr.toStringAsFixed(1)} dB)',
+    );
     if (_messages.length > 100) _messages.removeLast();
     notifyListeners();
   }
@@ -50,13 +66,18 @@ class AppState extends ChangeNotifier {
   void loadPreset(String name) {
     switch (name) {
       case 'default':
-        _mode = 0; _sf = 8; _numSubcarriers = 256; _cpLength = 64;
+        _mode = 0;
+        _sf = 8;
+        _numSubcarriers = 256;
+        _cpLength = 64;
         break;
       case 'long_range':
-        _mode = 0; _sf = 12;
+        _mode = 0;
+        _sf = 12;
         break;
       case 'high_speed':
-        _mode = 1; _numSubcarriers = 2048;
+        _mode = 1;
+        _numSubcarriers = 2048;
         break;
     }
     notifyListeners();

@@ -7,9 +7,9 @@ import 'package:soundwave/screens/dashboard.dart';
 import 'package:soundwave/state/app_state.dart';
 
 Widget createApp() => ChangeNotifierProvider(
-  create: (_) => AppState(),
-  child: const MaterialApp(home: DashboardScreen()),
-);
+      create: (_) => AppState(),
+      child: const MaterialApp(home: DashboardScreen()),
+    );
 
 void main() {
   group('DashboardScreen', () {

@@ -11,7 +11,8 @@ class WavRecorder {
   Future<String> startRecording(String directory) async {
     final dir = Directory(directory);
     if (!dir.existsSync()) dir.createSync(recursive: true);
-    final path = '${directory}soundwave_${DateTime.now().millisecondsSinceEpoch}.wav';
+    final path =
+        '${directory}soundwave_${DateTime.now().millisecondsSinceEpoch}.wav';
     _file = File(path);
     // Write placeholder header (44 bytes, will overwrite at stop)
     await _file!.writeAsBytes(Uint8List(44));

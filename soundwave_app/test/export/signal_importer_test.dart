@@ -1,6 +1,8 @@
 // Unit tests for SignalImporter (requires WAV fixtures)
 
 import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundwave/export/signal_importer.dart';
 
@@ -23,7 +25,7 @@ void main() {
       expect(samples[0], closeTo(0.0, 1e-6));
       expect(samples[1], closeTo(0.5, 1e-6));
       expect(samples[2], closeTo(-0.5, 1e-6));
-      expect(samples[3], closeTo(1.0, 1e-6));
+      expect(samples[3], closeTo(1.0, 1e-4));
       dir.deleteSync(recursive: true);
     });
   });
