@@ -11,6 +11,9 @@ import 'rx_engine.dart';
 class MessageHistory {
   final List<DecodedMessage> _messages = [];
   static const int _maxEntries = 100;
+  final String? customDirectory;
+
+  MessageHistory({this.customDirectory});
 
   List<DecodedMessage> get messages => List.unmodifiable(_messages);
 
@@ -44,9 +47,15 @@ class MessageHistory {
   }
 
   Future<File> _getFile() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final swDir = Directory('${dir.path}/soundwave');
-    if (!swDir.existsSync()) swDir.createSync();
+    final String basePath;
+    if (customDirectory != null) {
+      basePath = customDirectory!;
+    } else {
+      final dir = await getApplicationDocumentsDirectory();
+      basePath = dir.path;
+    }
+    final swDir = Directory('$basePath/soundwave');
+    if (!swDir.existsSync()) swDir.createSync(recursive: true);
     return File('${swDir.path}/message_history.json');
   }
 
