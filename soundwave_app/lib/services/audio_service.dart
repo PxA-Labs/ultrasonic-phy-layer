@@ -74,13 +74,13 @@ class NativeAudioService implements AudioService {
 
   @override
   List<AudioDevice> get inputDevices => [
-    const AudioDevice(name: 'Default Microphone (Native)', id: 0),
-  ];
+        const AudioDevice(name: 'Default Microphone (Native)', id: 0),
+      ];
 
   @override
   List<AudioDevice> get outputDevices => [
-    const AudioDevice(name: 'Default Speaker (Native)', id: 0),
-  ];
+        const AudioDevice(name: 'Default Speaker (Native)', id: 0),
+      ];
 
   @override
   Future<void> startCapture() async {
@@ -188,13 +188,13 @@ class RecordAudioService implements AudioService {
 
   @override
   List<AudioDevice> get inputDevices => [
-    const AudioDevice(name: 'Default Microphone (Fallback)', id: 0),
-  ];
+        const AudioDevice(name: 'Default Microphone (Fallback)', id: 0),
+      ];
 
   @override
   List<AudioDevice> get outputDevices => [
-    const AudioDevice(name: 'Default Speaker (Fallback)', id: 0),
-  ];
+        const AudioDevice(name: 'Default Speaker (Fallback)', id: 0),
+      ];
 
   @override
   Future<void> startCapture() async {

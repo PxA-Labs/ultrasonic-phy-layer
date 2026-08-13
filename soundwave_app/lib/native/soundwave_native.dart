@@ -222,47 +222,47 @@ class SoundwaveNative {
     _cssModulate = _lib.lookupFunction<CssModulateCNative, CssModulateDart>(
       'sw_css_modulate',
     );
-    _cssDemodulate = _lib
-        .lookupFunction<CssDemodulateCNative, CssDemodulateDart>(
-          'sw_css_demodulate',
-        );
+    _cssDemodulate =
+        _lib.lookupFunction<CssDemodulateCNative, CssDemodulateDart>(
+      'sw_css_demodulate',
+    );
     _ofdmModulate = _lib.lookupFunction<OfdmModulateCNative, OfdmModulateDart>(
       'sw_ofdm_modulate',
     );
-    _ofdmDemodulate = _lib
-        .lookupFunction<OfdmDemodulateCNative, OfdmDemodulateDart>(
-          'sw_ofdm_demodulate',
-        );
+    _ofdmDemodulate =
+        _lib.lookupFunction<OfdmDemodulateCNative, OfdmDemodulateDart>(
+      'sw_ofdm_demodulate',
+    );
     _detectFrame = _lib.lookupFunction<DetectFrameCNative, DetectFrameDart>(
       'sw_detect_frame',
     );
     _estimateCfo = _lib.lookupFunction<EstimateCfoCNative, EstimateCfoDart>(
       'sw_estimate_cfo',
     );
-    _audioCaptureStart = _lib
-        .lookupFunction<AudioCaptureStartCNative, AudioCaptureStartDart>(
-          'sw_audio_capture_start',
-        );
-    _audioCaptureStop = _lib
-        .lookupFunction<AudioCaptureStopCNative, AudioCaptureStopDart>(
-          'sw_audio_capture_stop',
-        );
-    _audioCaptureRead = _lib
-        .lookupFunction<AudioCaptureReadCNative, AudioCaptureReadDart>(
-          'sw_audio_capture_read',
-        );
-    _audioPlaybackStart = _lib
-        .lookupFunction<AudioPlaybackStartCNative, AudioPlaybackStartDart>(
-          'sw_audio_playback_start',
-        );
-    _audioPlaybackStop = _lib
-        .lookupFunction<AudioPlaybackStopCNative, AudioPlaybackStopDart>(
-          'sw_audio_playback_stop',
-        );
-    _audioPlaybackWrite = _lib
-        .lookupFunction<AudioPlaybackWriteCNative, AudioPlaybackWriteDart>(
-          'sw_audio_playback_write',
-        );
+    _audioCaptureStart =
+        _lib.lookupFunction<AudioCaptureStartCNative, AudioCaptureStartDart>(
+      'sw_audio_capture_start',
+    );
+    _audioCaptureStop =
+        _lib.lookupFunction<AudioCaptureStopCNative, AudioCaptureStopDart>(
+      'sw_audio_capture_stop',
+    );
+    _audioCaptureRead =
+        _lib.lookupFunction<AudioCaptureReadCNative, AudioCaptureReadDart>(
+      'sw_audio_capture_read',
+    );
+    _audioPlaybackStart =
+        _lib.lookupFunction<AudioPlaybackStartCNative, AudioPlaybackStartDart>(
+      'sw_audio_playback_start',
+    );
+    _audioPlaybackStop =
+        _lib.lookupFunction<AudioPlaybackStopCNative, AudioPlaybackStopDart>(
+      'sw_audio_playback_stop',
+    );
+    _audioPlaybackWrite =
+        _lib.lookupFunction<AudioPlaybackWriteCNative, AudioPlaybackWriteDart>(
+      'sw_audio_playback_write',
+    );
   }
 
   static SoundwaveNative get instance => _instance ??= SoundwaveNative._();
