@@ -106,6 +106,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -124,6 +125,8 @@ All notable changes to this project will be documented in this file.
 - **api:** Implement miniaudio I/O ring buffers and FFI API bindings (#25, #26)
 - **dsp:** Implement SIMD NEON and AVX2 vectorization for core DSP loops (#69)
 - **app:** Implement FFI bindings and Audio Service layer (#29) (#31)
+- **app:** Implement TX/RX Engine, Message Queue, History persistence and unit tests (#32)
+- **app:** Implement TX/RX Engine, Message Queue, History persistence and unit tests (#32)
 
 ### Maintenance
 
