@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'state/app_state.dart';
 import 'screens/dashboard.dart';
 import 'screens/monitor.dart';
@@ -58,7 +59,10 @@ class _MainShellState extends State<MainShell> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          NavigationDestination(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
           NavigationDestination(icon: Icon(Icons.show_chart), label: 'Monitor'),
           NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
         ],

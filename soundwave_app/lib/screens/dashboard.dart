@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../state/app_state.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -80,7 +81,9 @@ class _RxSection extends StatelessWidget {
               children: [
                 ElevatedButton(
                   onPressed: () => state.toggleListening(),
-                  child: Text(state.isListening ? 'Stop Listening' : 'Start Listening'),
+                  child: Text(
+                    state.isListening ? 'Stop Listening' : 'Start Listening',
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Text('SNR: ${state.lastSnr.toStringAsFixed(1)} dB'),
@@ -105,7 +108,10 @@ class _MessagesLog extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Received Messages', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'Received Messages',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             state.messages.isEmpty
                 ? const Text('No messages yet')
@@ -113,10 +119,8 @@ class _MessagesLog extends StatelessWidget {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: state.messages.length,
-                    itemBuilder: (_, i) => ListTile(
-                      title: Text(state.messages[i]),
-                      dense: true,
-                    ),
+                    itemBuilder: (_, i) =>
+                        ListTile(title: Text(state.messages[i]), dense: true),
                   ),
           ],
         ),

@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundwave/services/audio_service.dart';
 
@@ -17,7 +18,12 @@ void main() {
     });
 
     test('2. Generate Linear Chirp (LFM)', () {
-      final samples = TestToneGenerator.generateChirp(18000.0, 20000.0, 0.5, 44100.0);
+      final samples = TestToneGenerator.generateChirp(
+        18000.0,
+        20000.0,
+        0.5,
+        44100.0,
+      );
       expect(samples.length, equals(22050));
     });
 
@@ -33,7 +39,9 @@ void main() {
   group('WavUtility Header Validation Tests', () {
     test('1. Create WAV from float samples and verify header layout', () {
       // 100 samples
-      final floatSamples = Float64List.fromList(List.generate(100, (i) => (i % 10 - 5) / 5.0));
+      final floatSamples = Float64List.fromList(
+        List.generate(100, (i) => (i % 10 - 5) / 5.0),
+      );
       final wavBytes = WavUtility.createWav(floatSamples, 44100);
 
       // Total size must be 44 header bytes + 200 data bytes (2 bytes per sample) = 244 bytes

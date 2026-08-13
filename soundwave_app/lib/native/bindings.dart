@@ -2,6 +2,7 @@
 // Used by soundwave_native.dart to call into libsoundwave via dart:ffi.
 
 import 'dart:ffi';
+
 import 'package:ffi/ffi.dart';
 
 // Mirrors native/sw_config_t
@@ -63,7 +64,8 @@ final class SwConfig extends Struct {
     c.ref.bandwidth = ((m['bandwidth'] ?? 2000.0) as num).toDouble();
     c.ref.symbolDuration = ((m['symbol_duration'] ?? 0.02) as num).toDouble();
     c.ref.amplitude = ((m['amplitude'] ?? 0.8) as num).toDouble();
-    c.ref.ofdmModulation = (m['ofdm_modulation'] ?? 1) as int; // Default 1 = QPSK
+    c.ref.ofdmModulation =
+        (m['ofdm_modulation'] ?? 1) as int; // Default 1 = QPSK
     return c;
   }
 }

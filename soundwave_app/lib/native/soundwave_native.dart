@@ -4,57 +4,189 @@
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:ffi/ffi.dart';
+
 import 'bindings.dart';
 
 // C function type definitions
-typedef Crc32CNative = Int32 Function(Pointer<Uint8> data, IntPtr len, Pointer<Uint32> crc);
-typedef Crc32Dart = int Function(Pointer<Uint8> data, int len, Pointer<Uint32> crc);
+typedef Crc32CNative = Int32 Function(
+  Pointer<Uint8> data,
+  IntPtr len,
+  Pointer<Uint32> crc,
+);
+typedef Crc32Dart = int Function(
+  Pointer<Uint8> data,
+  int len,
+  Pointer<Uint32> crc,
+);
 
 typedef VersionCNative = Pointer<Utf8> Function();
 typedef VersionDart = Pointer<Utf8> Function();
 
-typedef RsEncodeCNative = Int32 Function(Pointer<Uint8> data, IntPtr dataLen, Pointer<Uint8> parity, Pointer<IntPtr> parityLen);
-typedef RsEncodeDart = int Function(Pointer<Uint8> data, int dataLen, Pointer<Uint8> parity, Pointer<IntPtr> parityLen);
+typedef RsEncodeCNative = Int32 Function(
+  Pointer<Uint8> data,
+  IntPtr dataLen,
+  Pointer<Uint8> parity,
+  Pointer<IntPtr> parityLen,
+);
+typedef RsEncodeDart = int Function(
+  Pointer<Uint8> data,
+  int dataLen,
+  Pointer<Uint8> parity,
+  Pointer<IntPtr> parityLen,
+);
 
-typedef RsDecodeCNative = Int32 Function(Pointer<Uint8> data, Pointer<IntPtr> dataLen, Pointer<Uint8> parity, IntPtr parityLen, Pointer<Int32> errorsCorrected);
-typedef RsDecodeDart = int Function(Pointer<Uint8> data, Pointer<IntPtr> dataLen, Pointer<Uint8> parity, int parityLen, Pointer<Int32> errorsCorrected);
+typedef RsDecodeCNative = Int32 Function(
+  Pointer<Uint8> data,
+  Pointer<IntPtr> dataLen,
+  Pointer<Uint8> parity,
+  IntPtr parityLen,
+  Pointer<Int32> errorsCorrected,
+);
+typedef RsDecodeDart = int Function(
+  Pointer<Uint8> data,
+  Pointer<IntPtr> dataLen,
+  Pointer<Uint8> parity,
+  int parityLen,
+  Pointer<Int32> errorsCorrected,
+);
 
-typedef CssModulateCNative = Int32 Function(Pointer<Uint8> bits, IntPtr bitLen, SwConfig cfg, Pointer<Float> samples, Pointer<IntPtr> sampleLen);
-typedef CssModulateDart = int Function(Pointer<Uint8> bits, int bitLen, SwConfig cfg, Pointer<Float> samples, Pointer<IntPtr> sampleLen);
+typedef CssModulateCNative = Int32 Function(
+  Pointer<Uint8> bits,
+  IntPtr bitLen,
+  SwConfig cfg,
+  Pointer<Float> samples,
+  Pointer<IntPtr> sampleLen,
+);
+typedef CssModulateDart = int Function(
+  Pointer<Uint8> bits,
+  int bitLen,
+  SwConfig cfg,
+  Pointer<Float> samples,
+  Pointer<IntPtr> sampleLen,
+);
 
-typedef CssDemodulateCNative = Int32 Function(Pointer<Float> samples, IntPtr sampleLen, SwConfig cfg, Pointer<Uint8> bits, Pointer<IntPtr> bitLen);
-typedef CssDemodulateDart = int Function(Pointer<Float> samples, int sampleLen, SwConfig cfg, Pointer<Uint8> bits, Pointer<IntPtr> bitLen);
+typedef CssDemodulateCNative = Int32 Function(
+  Pointer<Float> samples,
+  IntPtr sampleLen,
+  SwConfig cfg,
+  Pointer<Uint8> bits,
+  Pointer<IntPtr> bitLen,
+);
+typedef CssDemodulateDart = int Function(
+  Pointer<Float> samples,
+  int sampleLen,
+  SwConfig cfg,
+  Pointer<Uint8> bits,
+  Pointer<IntPtr> bitLen,
+);
 
-typedef OfdmModulateCNative = Int32 Function(Pointer<Uint8> bits, IntPtr bitLen, SwConfig cfg, Pointer<Float> samples, Pointer<IntPtr> sampleLen);
-typedef OfdmModulateDart = int Function(Pointer<Uint8> bits, int bitLen, SwConfig cfg, Pointer<Float> samples, Pointer<IntPtr> sampleLen);
+typedef OfdmModulateCNative = Int32 Function(
+  Pointer<Uint8> bits,
+  IntPtr bitLen,
+  SwConfig cfg,
+  Pointer<Float> samples,
+  Pointer<IntPtr> sampleLen,
+);
+typedef OfdmModulateDart = int Function(
+  Pointer<Uint8> bits,
+  int bitLen,
+  SwConfig cfg,
+  Pointer<Float> samples,
+  Pointer<IntPtr> sampleLen,
+);
 
-typedef OfdmDemodulateCNative = Int32 Function(Pointer<Float> samples, IntPtr sampleLen, SwConfig cfg, Pointer<Uint8> bits, Pointer<IntPtr> bitLen);
-typedef OfdmDemodulateDart = int Function(Pointer<Float> samples, int sampleLen, SwConfig cfg, Pointer<Uint8> bits, Pointer<IntPtr> bitLen);
+typedef OfdmDemodulateCNative = Int32 Function(
+  Pointer<Float> samples,
+  IntPtr sampleLen,
+  SwConfig cfg,
+  Pointer<Uint8> bits,
+  Pointer<IntPtr> bitLen,
+);
+typedef OfdmDemodulateDart = int Function(
+  Pointer<Float> samples,
+  int sampleLen,
+  SwConfig cfg,
+  Pointer<Uint8> bits,
+  Pointer<IntPtr> bitLen,
+);
 
-typedef DetectFrameCNative = Int32 Function(Pointer<Float> samples, IntPtr len, SwConfig cfg, Pointer<IntPtr> frameStart, Pointer<Float> snr);
-typedef DetectFrameDart = int Function(Pointer<Float> samples, int len, SwConfig cfg, Pointer<IntPtr> frameStart, Pointer<Float> snr);
+typedef DetectFrameCNative = Int32 Function(
+  Pointer<Float> samples,
+  IntPtr len,
+  SwConfig cfg,
+  Pointer<IntPtr> frameStart,
+  Pointer<Float> snr,
+);
+typedef DetectFrameDart = int Function(
+  Pointer<Float> samples,
+  int len,
+  SwConfig cfg,
+  Pointer<IntPtr> frameStart,
+  Pointer<Float> snr,
+);
 
-typedef EstimateCfoCNative = Int32 Function(Pointer<Float> samples, IntPtr len, SwConfig cfg, Pointer<Float> cfoHz);
-typedef EstimateCfoDart = int Function(Pointer<Float> samples, int len, SwConfig cfg, Pointer<Float> cfoHz);
+typedef EstimateCfoCNative = Int32 Function(
+  Pointer<Float> samples,
+  IntPtr len,
+  SwConfig cfg,
+  Pointer<Float> cfoHz,
+);
+typedef EstimateCfoDart = int Function(
+  Pointer<Float> samples,
+  int len,
+  SwConfig cfg,
+  Pointer<Float> cfoHz,
+);
 
-typedef AudioCaptureStartCNative = Int32 Function(SwConfig cfg, Pointer<Pointer<Void>> handle);
-typedef AudioCaptureStartDart = int Function(SwConfig cfg, Pointer<Pointer<Void>> handle);
+typedef AudioCaptureStartCNative = Int32 Function(
+  SwConfig cfg,
+  Pointer<Pointer<Void>> handle,
+);
+typedef AudioCaptureStartDart = int Function(
+  SwConfig cfg,
+  Pointer<Pointer<Void>> handle,
+);
 
 typedef AudioCaptureStopCNative = Int32 Function(Pointer<Void> handle);
 typedef AudioCaptureStopDart = int Function(Pointer<Void> handle);
 
-typedef AudioCaptureReadCNative = Int32 Function(Pointer<Void> handle, Pointer<Float> buffer, IntPtr count, Pointer<IntPtr> read);
-typedef AudioCaptureReadDart = int Function(Pointer<Void> handle, Pointer<Float> buffer, int count, Pointer<IntPtr> read);
+typedef AudioCaptureReadCNative = Int32 Function(
+  Pointer<Void> handle,
+  Pointer<Float> buffer,
+  IntPtr count,
+  Pointer<IntPtr> read,
+);
+typedef AudioCaptureReadDart = int Function(
+  Pointer<Void> handle,
+  Pointer<Float> buffer,
+  int count,
+  Pointer<IntPtr> read,
+);
 
-typedef AudioPlaybackStartCNative = Int32 Function(SwConfig cfg, Pointer<Pointer<Void>> handle);
-typedef AudioPlaybackStartDart = int Function(SwConfig cfg, Pointer<Pointer<Void>> handle);
+typedef AudioPlaybackStartCNative = Int32 Function(
+  SwConfig cfg,
+  Pointer<Pointer<Void>> handle,
+);
+typedef AudioPlaybackStartDart = int Function(
+  SwConfig cfg,
+  Pointer<Pointer<Void>> handle,
+);
 
 typedef AudioPlaybackStopCNative = Int32 Function(Pointer<Void> handle);
 typedef AudioPlaybackStopDart = int Function(Pointer<Void> handle);
 
-typedef AudioPlaybackWriteCNative = Int32 Function(Pointer<Void> handle, Pointer<Float> buffer, IntPtr count);
-typedef AudioPlaybackWriteDart = int Function(Pointer<Void> handle, Pointer<Float> buffer, int count);
+typedef AudioPlaybackWriteCNative = Int32 Function(
+  Pointer<Void> handle,
+  Pointer<Float> buffer,
+  IntPtr count,
+);
+typedef AudioPlaybackWriteDart = int Function(
+  Pointer<Void> handle,
+  Pointer<Float> buffer,
+  int count,
+);
 
 class SoundwaveNative {
   static SoundwaveNative? _instance;
@@ -81,20 +213,56 @@ class SoundwaveNative {
     _lib = _loadLibrary();
     _version = _lib.lookupFunction<VersionCNative, VersionDart>('sw_version');
     _crc32 = _lib.lookupFunction<Crc32CNative, Crc32Dart>('sw_crc32');
-    _rsEncode = _lib.lookupFunction<RsEncodeCNative, RsEncodeDart>('sw_rs_encode');
-    _rsDecode = _lib.lookupFunction<RsDecodeCNative, RsDecodeDart>('sw_rs_decode');
-    _cssModulate = _lib.lookupFunction<CssModulateCNative, CssModulateDart>('sw_css_modulate');
-    _cssDemodulate = _lib.lookupFunction<CssDemodulateCNative, CssDemodulateDart>('sw_css_demodulate');
-    _ofdmModulate = _lib.lookupFunction<OfdmModulateCNative, OfdmModulateDart>('sw_ofdm_modulate');
-    _ofdmDemodulate = _lib.lookupFunction<OfdmDemodulateCNative, OfdmDemodulateDart>('sw_ofdm_demodulate');
-    _detectFrame = _lib.lookupFunction<DetectFrameCNative, DetectFrameDart>('sw_detect_frame');
-    _estimateCfo = _lib.lookupFunction<EstimateCfoCNative, EstimateCfoDart>('sw_estimate_cfo');
-    _audioCaptureStart = _lib.lookupFunction<AudioCaptureStartCNative, AudioCaptureStartDart>('sw_audio_capture_start');
-    _audioCaptureStop = _lib.lookupFunction<AudioCaptureStopCNative, AudioCaptureStopDart>('sw_audio_capture_stop');
-    _audioCaptureRead = _lib.lookupFunction<AudioCaptureReadCNative, AudioCaptureReadDart>('sw_audio_capture_read');
-    _audioPlaybackStart = _lib.lookupFunction<AudioPlaybackStartCNative, AudioPlaybackStartDart>('sw_audio_playback_start');
-    _audioPlaybackStop = _lib.lookupFunction<AudioPlaybackStopCNative, AudioPlaybackStopDart>('sw_audio_playback_stop');
-    _audioPlaybackWrite = _lib.lookupFunction<AudioPlaybackWriteCNative, AudioPlaybackWriteDart>('sw_audio_playback_write');
+    _rsEncode = _lib.lookupFunction<RsEncodeCNative, RsEncodeDart>(
+      'sw_rs_encode',
+    );
+    _rsDecode = _lib.lookupFunction<RsDecodeCNative, RsDecodeDart>(
+      'sw_rs_decode',
+    );
+    _cssModulate = _lib.lookupFunction<CssModulateCNative, CssModulateDart>(
+      'sw_css_modulate',
+    );
+    _cssDemodulate = _lib
+        .lookupFunction<CssDemodulateCNative, CssDemodulateDart>(
+          'sw_css_demodulate',
+        );
+    _ofdmModulate = _lib.lookupFunction<OfdmModulateCNative, OfdmModulateDart>(
+      'sw_ofdm_modulate',
+    );
+    _ofdmDemodulate = _lib
+        .lookupFunction<OfdmDemodulateCNative, OfdmDemodulateDart>(
+          'sw_ofdm_demodulate',
+        );
+    _detectFrame = _lib.lookupFunction<DetectFrameCNative, DetectFrameDart>(
+      'sw_detect_frame',
+    );
+    _estimateCfo = _lib.lookupFunction<EstimateCfoCNative, EstimateCfoDart>(
+      'sw_estimate_cfo',
+    );
+    _audioCaptureStart = _lib
+        .lookupFunction<AudioCaptureStartCNative, AudioCaptureStartDart>(
+          'sw_audio_capture_start',
+        );
+    _audioCaptureStop = _lib
+        .lookupFunction<AudioCaptureStopCNative, AudioCaptureStopDart>(
+          'sw_audio_capture_stop',
+        );
+    _audioCaptureRead = _lib
+        .lookupFunction<AudioCaptureReadCNative, AudioCaptureReadDart>(
+          'sw_audio_capture_read',
+        );
+    _audioPlaybackStart = _lib
+        .lookupFunction<AudioPlaybackStartCNative, AudioPlaybackStartDart>(
+          'sw_audio_playback_start',
+        );
+    _audioPlaybackStop = _lib
+        .lookupFunction<AudioPlaybackStopCNative, AudioPlaybackStopDart>(
+          'sw_audio_playback_stop',
+        );
+    _audioPlaybackWrite = _lib
+        .lookupFunction<AudioPlaybackWriteCNative, AudioPlaybackWriteDart>(
+          'sw_audio_playback_write',
+        );
   }
 
   static SoundwaveNative get instance => _instance ??= SoundwaveNative._();
@@ -120,7 +288,9 @@ class SoundwaveNative {
     }
 
     if (Platform.isAndroid) return DynamicLibrary.open('libsoundwave.so');
-    throw UnsupportedError('Could not load native Soundwave library. Searched in: $searchPaths');
+    throw UnsupportedError(
+      'Could not load native Soundwave library. Searched in: $searchPaths',
+    );
   }
 
   String get version => _version().toDartString();
@@ -167,14 +337,19 @@ class SoundwaveNative {
       msgLenPtr.value = message.length;
       parityPtr.asTypedList(parity.length).setAll(0, parity);
 
-      final ret = _rsDecode(msgPtr, msgLenPtr, parityPtr, parity.length, errCorrectedPtr);
+      final ret = _rsDecode(
+        msgPtr,
+        msgLenPtr,
+        parityPtr,
+        parity.length,
+        errCorrectedPtr,
+      );
       if (ret != 0) throw SwException(ret);
 
-      final decodedMsg = Uint8List.fromList(msgPtr.asTypedList(msgLenPtr.value));
-      return {
-        'message': decodedMsg,
-        'errors_corrected': errCorrectedPtr.value,
-      };
+      final decodedMsg = Uint8List.fromList(
+        msgPtr.asTypedList(msgLenPtr.value),
+      );
+      return {'message': decodedMsg, 'errors_corrected': errCorrectedPtr.value};
     } finally {
       calloc.free(msgPtr);
       calloc.free(msgLenPtr);
@@ -192,7 +367,13 @@ class SoundwaveNative {
     try {
       bitsPtr.asTypedList(bits.length).setAll(0, bits);
       samplesLenPtr.value = samplesCapacity;
-      final ret = _cssModulate(bitsPtr, bits.length, config.ref, samplesPtr, samplesLenPtr);
+      final ret = _cssModulate(
+        bitsPtr,
+        bits.length,
+        config.ref,
+        samplesPtr,
+        samplesLenPtr,
+      );
       if (ret != 0) throw SwException(ret);
       return Float32List.fromList(samplesPtr.asTypedList(samplesLenPtr.value));
     } finally {
@@ -211,7 +392,13 @@ class SoundwaveNative {
     try {
       samplesPtr.asTypedList(samples.length).setAll(0, samples);
       bitsLenPtr.value = bitsCapacity;
-      final ret = _cssDemodulate(samplesPtr, samples.length, config.ref, bitsPtr, bitsLenPtr);
+      final ret = _cssDemodulate(
+        samplesPtr,
+        samples.length,
+        config.ref,
+        bitsPtr,
+        bitsLenPtr,
+      );
       if (ret != 0) throw SwException(ret);
       return Uint8List.fromList(bitsPtr.asTypedList(bitsLenPtr.value));
     } finally {
@@ -229,7 +416,13 @@ class SoundwaveNative {
     try {
       bitsPtr.asTypedList(bits.length).setAll(0, bits);
       samplesLenPtr.value = samplesCapacity;
-      final ret = _ofdmModulate(bitsPtr, bits.length, config.ref, samplesPtr, samplesLenPtr);
+      final ret = _ofdmModulate(
+        bitsPtr,
+        bits.length,
+        config.ref,
+        samplesPtr,
+        samplesLenPtr,
+      );
       if (ret != 0) throw SwException(ret);
       return Float32List.fromList(samplesPtr.asTypedList(samplesLenPtr.value));
     } finally {
@@ -247,7 +440,13 @@ class SoundwaveNative {
     try {
       samplesPtr.asTypedList(samples.length).setAll(0, samples);
       bitsLenPtr.value = bitsCapacity;
-      final ret = _ofdmDemodulate(samplesPtr, samples.length, config.ref, bitsPtr, bitsLenPtr);
+      final ret = _ofdmDemodulate(
+        samplesPtr,
+        samples.length,
+        config.ref,
+        bitsPtr,
+        bitsLenPtr,
+      );
       if (ret != 0) throw SwException(ret);
       return Uint8List.fromList(bitsPtr.asTypedList(bitsLenPtr.value));
     } finally {
@@ -257,18 +456,24 @@ class SoundwaveNative {
     }
   }
 
-  Map<String, dynamic> detectFrame(Float32List samples, Pointer<SwConfig> config) {
+  Map<String, dynamic> detectFrame(
+    Float32List samples,
+    Pointer<SwConfig> config,
+  ) {
     final samplesPtr = calloc<Float>(samples.length);
     final frameStartPtr = calloc<IntPtr>();
     final snrPtr = calloc<Float>();
     try {
       samplesPtr.asTypedList(samples.length).setAll(0, samples);
-      final ret = _detectFrame(samplesPtr, samples.length, config.ref, frameStartPtr, snrPtr);
+      final ret = _detectFrame(
+        samplesPtr,
+        samples.length,
+        config.ref,
+        frameStartPtr,
+        snrPtr,
+      );
       if (ret != 0) throw SwException(ret);
-      return {
-        'frame_start': frameStartPtr.value,
-        'snr': snrPtr.value,
-      };
+      return {'frame_start': frameStartPtr.value, 'snr': snrPtr.value};
     } finally {
       calloc.free(samplesPtr);
       calloc.free(frameStartPtr);
@@ -281,7 +486,12 @@ class SoundwaveNative {
     final cfoHzPtr = calloc<Float>();
     try {
       samplesPtr.asTypedList(samples.length).setAll(0, samples);
-      final ret = _estimateCfo(samplesPtr, samples.length, config.ref, cfoHzPtr);
+      final ret = _estimateCfo(
+        samplesPtr,
+        samples.length,
+        config.ref,
+        cfoHzPtr,
+      );
       if (ret != 0) throw SwException(ret);
       return cfoHzPtr.value;
     } finally {

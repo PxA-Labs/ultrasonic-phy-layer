@@ -3,6 +3,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundwave/engine/rx_engine.dart';
 import 'package:soundwave/export/message_exporter.dart';
@@ -10,8 +11,18 @@ import 'package:soundwave/export/message_exporter.dart';
 void main() {
   group('MessageExporter', () {
     final messages = [
-      DecodedMessage(text: 'hello', snr: 12.5, timestamp: DateTime(2026, 7, 19), rawBytes: Uint8List(0)),
-      DecodedMessage(text: 'world', snr: 8.2, timestamp: DateTime(2026, 7, 19, 1), rawBytes: Uint8List(0)),
+      DecodedMessage(
+        text: 'hello',
+        snr: 12.5,
+        timestamp: DateTime(2026, 7, 19),
+        rawBytes: Uint8List(0),
+      ),
+      DecodedMessage(
+        text: 'world',
+        snr: 8.2,
+        timestamp: DateTime(2026, 7, 19, 1),
+        rawBytes: Uint8List(0),
+      ),
     ];
 
     test('export as JSON', () async {

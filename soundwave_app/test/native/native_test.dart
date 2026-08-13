@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:ffi/ffi.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundwave/native/bindings.dart';
@@ -15,7 +16,9 @@ void main() {
         native = SoundwaveNative.instance;
         libraryLoaded = true;
       } catch (e) {
-        print('Skipping native FFI tests: dynamic library could not be loaded ($e)');
+        print(
+          'Skipping native FFI tests: dynamic library could not be loaded ($e)',
+        );
       }
     });
 
