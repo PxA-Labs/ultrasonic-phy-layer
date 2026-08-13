@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:soundwave/services/audio_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('TestToneGenerator Tests', () {
     test('1. Generate Sine Wave', () {
       final samples = TestToneGenerator.generateSine(440.0, 1.0, 44100.0);

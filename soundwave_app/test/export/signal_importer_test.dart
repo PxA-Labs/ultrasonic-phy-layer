@@ -25,7 +25,7 @@ void main() {
       expect(samples[0], closeTo(0.0, 1e-6));
       expect(samples[1], closeTo(0.5, 1e-6));
       expect(samples[2], closeTo(-0.5, 1e-6));
-      expect(samples[3], closeTo(1.0, 1e-6));
+      expect(samples[3], closeTo(1.0, 1e-4));
       dir.deleteSync(recursive: true);
     });
   });

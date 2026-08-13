@@ -10,12 +10,7 @@ import 'screens/monitor.dart';
 import 'screens/settings.dart';
 
 void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppState(),
-      child: const SoundwaveApp(),
-    ),
-  );
+  runApp(const SoundwaveApp());
 }
 
 class SoundwaveApp extends StatelessWidget {
@@ -23,16 +18,19 @@ class SoundwaveApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Soundwave',
-      theme: ThemeData.dark().copyWith(
-        primaryColor: const Color(0xFF0D47A1),
-        colorScheme: ColorScheme.dark(
-          primary: const Color(0xFF0D47A1),
-          secondary: const Color(0xFF00BCD4),
+    return ChangeNotifierProvider(
+      create: (_) => AppState(),
+      child: MaterialApp(
+        title: 'Soundwave',
+        theme: ThemeData.dark().copyWith(
+          primaryColor: const Color(0xFF0D47A1),
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFF0D47A1),
+            secondary: Color(0xFF00BCD4),
+          ),
         ),
+        home: const MainShell(),
       ),
-      home: const MainShell(),
     );
   }
 }

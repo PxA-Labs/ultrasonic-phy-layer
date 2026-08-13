@@ -44,7 +44,7 @@ void main() {
       expect(file.existsSync(), true);
       final csv = await file.readAsString();
       expect(csv, contains('timestamp,text,snr,mode'));
-      expect(csv, contains('hello,12.5,CSS'));
+      expect(csv, contains('"hello",12.5,CSS'));
       dir.deleteSync(recursive: true);
     });
 
