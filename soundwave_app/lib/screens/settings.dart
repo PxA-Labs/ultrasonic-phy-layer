@@ -98,7 +98,7 @@ class _OfdmSettings extends StatelessWidget {
             Text('OFDM Settings', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             DropdownButtonFormField<int>(
-              value: state.numSubcarriers,
+              initialValue: state.numSubcarriers,
               items: const [256, 512, 1024, 2048].map((v) =>
                 DropdownMenuItem(value: v, child: Text('FFT: $v'))).toList(),
               onChanged: (v) => state.setNumSubcarriers(v ?? 256),

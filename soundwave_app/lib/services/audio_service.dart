@@ -7,8 +7,8 @@ import 'dart:ffi';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:ffi/ffi.dart';
-import 'package:soundwave_app/native/soundwave_native.dart';
-import 'package:soundwave_app/native/bindings.dart';
+import 'package:soundwave/native/soundwave_native.dart';
+import 'package:soundwave/native/bindings.dart';
 
 class AudioDevice {
   final String name;
