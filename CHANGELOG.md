@@ -38,6 +38,7 @@ All notable changes to this project will be documented in this file.
 - **dsp-core:** Rename kissfft to kiss_fft target in benchmark CMake (#76)
 - **ofdm:** Resolve PR #78 review comments on OFDM modulator and FFI boundaries
 - **ofdm:** Resolve PR #79 review comments on memory safety and API consistency
+- **app:** Resolve static analysis warnings and undefined type errors in Flutter project
 
 ### Build
 
@@ -104,6 +105,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -121,14 +123,21 @@ All notable changes to this project will be documented in this file.
 - **sync:** Implement CSS and OFDM timing synchronization and noise estimation (#21)
 - **api:** Implement miniaudio I/O ring buffers and FFI API bindings (#25, #26)
 - **dsp:** Implement SIMD NEON and AVX2 vectorization for core DSP loops (#69)
+- **app:** Implement FFI bindings and Audio Service layer (#29) (#31)
 
 ### Maintenance
 
 - Change license from MIT to Apache 2.0
 - Merge main into feat/ci-benchmarking
 
+### Styling
+
+- **app:** Run dart format on all app files
+- **app:** Run dart format with SDK 3.6.0 on all files
+
 ### Testing
 
 - **qa:** Implement AWGN channel simulator and BER benchmarking harness (#72)
+- **app:** Fix ProviderNotFound, CSV csv contains format, closeTo tolerance, and ServicesBinding in tests
 
 
