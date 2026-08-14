@@ -107,6 +107,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -127,6 +128,7 @@ All notable changes to this project will be documented in this file.
 - **app:** Implement FFI bindings and Audio Service layer (#29) (#31)
 - **app:** Implement TX/RX Engine, Message Queue, History persistence and unit tests (#32)
 - **app:** Implement TX/RX Engine, Message Queue, History persistence and unit tests (#32)
+- **ci:** Correct working directory for Flutter builds (#36)
 
 ### Maintenance
 
