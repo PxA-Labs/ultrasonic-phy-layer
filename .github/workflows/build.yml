@@ -8,6 +8,9 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: soundwave_app
     steps:
       - uses: actions/checkout@v7
 
@@ -15,7 +18,7 @@ jobs:
         id: check
         run: |
           if [ ! -f pubspec.yaml ]; then
-            echo "::notice::No pubspec.yaml found at root. Skipping Flutter build."
+            echo "::notice::No pubspec.yaml found. Skipping Flutter build."
             echo "has_pubspec=false" >> $GITHUB_OUTPUT
           else
             echo "has_pubspec=true" >> $GITHUB_OUTPUT
@@ -46,11 +49,14 @@ jobs:
         with:
           name: android-release
           path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/bundle/release/app-release.aab
+            soundwave_app/build/app/outputs/flutter-apk/app-release.apk
+            soundwave_app/build/app/outputs/bundle/release/app-release.aab
 
   build-windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: soundwave_app
     steps:
       - uses: actions/checkout@v7
 
@@ -59,7 +65,7 @@ jobs:
         shell: bash
         run: |
           if [ ! -f pubspec.yaml ]; then
-            echo "::notice::No pubspec.yaml found at root. Skipping Flutter build."
+            echo "::notice::No pubspec.yaml found. Skipping Flutter build."
             echo "has_pubspec=false" >> $GITHUB_OUTPUT
           else
             echo "has_pubspec=true" >> $GITHUB_OUTPUT
@@ -79,10 +85,13 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: windows-release
-          path: build/windows/x64/runner/Release/
+          path: soundwave_app/build/windows/x64/runner/Release/
 
   build-macos:
     runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: soundwave_app
     steps:
       - uses: actions/checkout@v7
 
@@ -90,7 +99,7 @@ jobs:
         id: check
         run: |
           if [ ! -f pubspec.yaml ]; then
-            echo "::notice::No pubspec.yaml found at root. Skipping Flutter build."
+            echo "::notice::No pubspec.yaml found. Skipping Flutter build."
             echo "has_pubspec=false" >> $GITHUB_OUTPUT
           else
             echo "has_pubspec=true" >> $GITHUB_OUTPUT
@@ -110,10 +119,13 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: macos-release
-          path: build/macos/Build/Products/Release/
+          path: soundwave_app/build/macos/Build/Products/Release/
 
   build-linux:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: soundwave_app
     steps:
       - uses: actions/checkout@v7
 
@@ -121,7 +133,7 @@ jobs:
         id: check
         run: |
           if [ ! -f pubspec.yaml ]; then
-            echo "::notice::No pubspec.yaml found at root. Skipping Flutter build."
+            echo "::notice::No pubspec.yaml found. Skipping Flutter build."
             echo "has_pubspec=false" >> $GITHUB_OUTPUT
           else
             echo "has_pubspec=true" >> $GITHUB_OUTPUT
@@ -148,4 +160,4 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: linux-release
-          path: build/linux/x64/release/bundle/
+          path: soundwave_app/build/linux/x64/release/bundle/
