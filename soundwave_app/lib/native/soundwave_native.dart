@@ -400,7 +400,7 @@ class SoundwaveNative {
         bitsLenPtr,
       );
       if (ret != 0) throw SwException(ret);
-      return Uint8List.fromList(bitsPtr.asTypedList(bitsLenPtr.value));
+      return Uint8List.fromList(bitsPtr.asTypedList(bitsLenPtr.value ~/ 8));
     } finally {
       calloc.free(samplesPtr);
       calloc.free(bitsPtr);
@@ -448,7 +448,7 @@ class SoundwaveNative {
         bitsLenPtr,
       );
       if (ret != 0) throw SwException(ret);
-      return Uint8List.fromList(bitsPtr.asTypedList(bitsLenPtr.value));
+      return Uint8List.fromList(bitsPtr.asTypedList(bitsLenPtr.value ~/ 8));
     } finally {
       calloc.free(samplesPtr);
       calloc.free(bitsPtr);
