@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [main]
 
+permissions: write-all
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -40,6 +42,17 @@ jobs:
       - name: Analyze Dart code
         if: steps.check.outputs.exists == 'true'
         run: flutter analyze --fatal-infos
+
+      - name: Format Dart code
+        if: steps.check.outputs.exists == 'true'
+        run: dart format .
+
+      - name: Commit formatted files
+        if: steps.check.outputs.exists == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style(ui): format Dart code with dart format"
+          branch: ${{ github.head_ref || github.ref_name }}
 
       - name: Check formatting
         if: steps.check.outputs.exists == 'true'
