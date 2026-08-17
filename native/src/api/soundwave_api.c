@@ -21,8 +21,8 @@ SW_API int sw_crc32(const uint8_t* data, size_t len, uint32_t* crc) {
 SW_API int sw_rs_encode(const uint8_t* data, size_t data_len,
                         uint8_t* parity, size_t* parity_len) {
     if (!data || !parity || !parity_len) return SW_ERR_BAD_PARAM;
-    rs_encode(data, data_len, parity, 255);
-    *parity_len = 255 - data_len;
+    rs_encode(data, data_len, parity, data_len + 32);
+    *parity_len = 32;
     return SW_OK;
 }
 
