@@ -15,7 +15,8 @@ class Complex {
 
   Complex operator +(Complex o) => Complex(r + o.r, i + o.i);
   Complex operator -(Complex o) => Complex(r - o.r, i - o.i);
-  Complex operator *(Complex o) => Complex(r * o.r - i * o.i, r * o.i + i * o.r);
+  Complex operator *(Complex o) =>
+      Complex(r * o.r - i * o.i, r * o.i + i * o.r);
 }
 
 // Cooley-Tukey Radix-2 FFT
@@ -88,7 +89,8 @@ class _MonitorScreenState extends State<MonitorScreen> {
         // Process 512-point FFT if enough samples
         while (_fftSlidingBuffer.length >= 512) {
           final List<double> fftInput = _fftSlidingBuffer.sublist(0, 512);
-          _fftSlidingBuffer.removeRange(0, 256); // 50% overlap for smooth waterfall
+          _fftSlidingBuffer.removeRange(
+              0, 256); // 50% overlap for smooth waterfall
 
           // Calculate dBFS Level Meter
           double sumSq = 0.0;
@@ -141,7 +143,9 @@ class _MonitorScreenState extends State<MonitorScreen> {
 
           // Normalize magnitudes for heatmap display (0.0 to 1.0)
           final List<double> normalized = List.generate(256, (i) {
-            final magDb = magnitudes[i] > 0.0 ? 20 * math.log(magnitudes[i]) / math.ln10 : -100.0;
+            final magDb = magnitudes[i] > 0.0
+                ? 20 * math.log(magnitudes[i]) / math.ln10
+                : -100.0;
             // Map -80dB..0dB to 0.0..1.0
             double norm = (magDb + 80.0) / 80.0;
             if (norm < 0.0) norm = 0.0;
@@ -190,7 +194,10 @@ class _MonitorScreenState extends State<MonitorScreen> {
                   children: [
                     Text(
                       'Waveform (Time Domain)',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: Colors.grey),
                     ),
                     Expanded(
                       child: CustomPaint(
@@ -215,12 +222,16 @@ class _MonitorScreenState extends State<MonitorScreen> {
                   children: [
                     Text(
                       'Waterfall Spectrogram (FFT Heatmap)',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: Colors.grey),
                     ),
                     Expanded(
                       child: ClipRect(
                         child: CustomPaint(
-                          painter: _WaterfallPainter(history: _waterfallHistory),
+                          painter:
+                              _WaterfallPainter(history: _waterfallHistory),
                           size: Size.infinite,
                         ),
                       ),
@@ -244,7 +255,11 @@ class _MonitorScreenState extends State<MonitorScreen> {
                       value: levelProgress,
                       backgroundColor: Colors.grey.shade800,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        levelProgress > 0.9 ? Colors.red : (levelProgress > 0.7 ? Colors.yellow : Colors.green),
+                        levelProgress > 0.9
+                            ? Colors.red
+                            : (levelProgress > 0.7
+                                ? Colors.yellow
+                                : Colors.green),
                       ),
                     ),
                   ),

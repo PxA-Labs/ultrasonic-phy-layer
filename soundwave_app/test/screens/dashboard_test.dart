@@ -23,7 +23,8 @@ void main() {
 
     testWidgets('send button disabled when empty', (tester) async {
       await tester.pumpWidget(createApp());
-      final sendBtn = find.widgetWithText(ElevatedButton, 'Send / Modulate & Play');
+      final sendBtn =
+          find.widgetWithText(ElevatedButton, 'Send / Modulate & Play');
       expect(tester.widget<ElevatedButton>(sendBtn).onPressed, isNull);
     });
   });

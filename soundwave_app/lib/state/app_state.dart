@@ -65,8 +65,10 @@ class AppState extends ChangeNotifier {
 
   AppState() {
     _audio = AudioService.preferred(configMap);
-    _txEngine = TxEngine(audio: _audio, configMap: configMap, useIsolates: false);
-    _rxEngine = RxEngine(audio: _audio, configMap: configMap, useIsolates: false);
+    _txEngine =
+        TxEngine(audio: _audio, configMap: configMap, useIsolates: false);
+    _rxEngine =
+        RxEngine(audio: _audio, configMap: configMap, useIsolates: false);
     _txQueue = TxQueue(txEngine: _txEngine);
 
     // Prepopulate audio devices
@@ -242,7 +244,8 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> emitTestTone() async {
-    final samples = TestToneGenerator.generateSine(440, 1.0, _sampleRate.toDouble());
+    final samples =
+        TestToneGenerator.generateSine(440, 1.0, _sampleRate.toDouble());
     await _audio.enqueueForPlayback(samples);
     await _audio.startPlayback();
   }

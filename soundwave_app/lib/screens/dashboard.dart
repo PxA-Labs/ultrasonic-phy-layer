@@ -76,7 +76,8 @@ class _TxSectionState extends State<_TxSection> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Transmission Control', style: Theme.of(context).textTheme.titleMedium),
+            Text('Transmission Control',
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             TextField(
               controller: _controller,
@@ -93,12 +94,13 @@ class _TxSectionState extends State<_TxSection> {
               const SizedBox(height: 8),
             ],
             ElevatedButton.icon(
-              onPressed: widget.state.txMessage.isEmpty || widget.state.isTransmitting
-                  ? null
-                  : () {
-                      widget.state.sendCurrentMessage();
-                      _controller.clear();
-                    },
+              onPressed:
+                  widget.state.txMessage.isEmpty || widget.state.isTransmitting
+                      ? null
+                      : () {
+                          widget.state.sendCurrentMessage();
+                          _controller.clear();
+                        },
               icon: const Icon(Icons.send),
               label: const Text('Send / Modulate & Play'),
             ),
@@ -127,7 +129,8 @@ class _RxSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Receiver Control', style: Theme.of(context).textTheme.titleMedium),
+            Text('Receiver Control',
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -136,7 +139,8 @@ class _RxSection extends StatelessWidget {
                   onPressed: () => state.toggleListening(),
                   icon: Icon(state.isListening ? Icons.stop : Icons.mic),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: state.isListening ? Colors.red.shade900 : null,
+                    backgroundColor:
+                        state.isListening ? Colors.red.shade900 : null,
                   ),
                   label: Text(
                     state.isListening ? 'Stop Listening' : 'Start Listening',
@@ -144,7 +148,8 @@ class _RxSection extends StatelessWidget {
                 ),
                 Row(
                   children: [
-                    const Text('Status: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text('Status: ',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                     Text(
                       state.isListening ? 'Listening...' : 'Idle',
                       style: TextStyle(
@@ -159,9 +164,11 @@ class _RxSection extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Text('Estimated SNR: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('Estimated SNR: ',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: _getSnrColor(state.lastSnr).withAlpha(50),
                       borderRadius: BorderRadius.circular(4),
@@ -197,7 +204,8 @@ class _QuickActionsRow extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Quick Actions', style: Theme.of(context).textTheme.titleMedium),
+            Text('Quick Actions',
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -271,7 +279,8 @@ class _MessagesLog extends StatelessWidget {
                     itemCount: state.messages.length,
                     separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (_, i) => ListTile(
-                      leading: const Icon(Icons.arrow_downward, color: Colors.cyan),
+                      leading:
+                          const Icon(Icons.arrow_downward, color: Colors.cyan),
                       title: Text(state.messages[i]),
                       dense: true,
                     ),
