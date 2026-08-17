@@ -161,7 +161,7 @@ class _RxSection extends StatelessWidget {
                 children: [
                   const Text('Estimated SNR: ', style: TextStyle(fontWeight: FontWeight.bold)),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, py: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: _getSnrColor(state.lastSnr).withAlpha(50),
                       borderRadius: BorderRadius.circular(4),

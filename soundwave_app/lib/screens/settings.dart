@@ -97,7 +97,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const Divider(),
                   DropdownButtonFormField<double>(
-                    value: state.codingRate,
+                    initialValue: state.codingRate,
                     decoration: const InputDecoration(labelText: 'Convolutional Coding Rate'),
                     items: const [
                       DropdownMenuItem(value: 0.5, child: Text('Rate 1/2 (More Robust)')),
@@ -121,7 +121,7 @@ class SettingsScreen extends StatelessWidget {
                   Text('Audio I/O & Level Controls', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: state.inputDevice?.name,
+                    initialValue: state.inputDevice?.name,
                     decoration: const InputDecoration(labelText: 'Capture Device (Microphone)'),
                     items: state.inputDevices
                         .map((d) => DropdownMenuItem(value: d.name, child: Text(d.name)))
@@ -133,7 +133,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: state.outputDevice?.name,
+                    initialValue: state.outputDevice?.name,
                     decoration: const InputDecoration(labelText: 'Playback Device (Speaker)'),
                     items: state.outputDevices
                         .map((d) => DropdownMenuItem(value: d.name, child: Text(d.name)))
@@ -233,7 +233,7 @@ class _OfdmSettingsCard extends StatelessWidget {
             Text('OFDM Modulation Config', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
-              value: state.numSubcarriers,
+              initialValue: state.numSubcarriers,
               decoration: const InputDecoration(labelText: 'FFT Subcarriers Size'),
               items: const [256, 512, 1024, 2048]
                   .map((v) => DropdownMenuItem(value: v, child: Text('FFT Size: $v')))
@@ -242,7 +242,7 @@ class _OfdmSettingsCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
-              value: state.cpLength,
+              initialValue: state.cpLength,
               decoration: const InputDecoration(labelText: 'Cyclic Prefix (CP) Length'),
               items: [
                 DropdownMenuItem(value: state.numSubcarriers ~/ 4, child: const Text('1/4 of FFT')),
@@ -253,7 +253,7 @@ class _OfdmSettingsCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
-              value: state.numPilots,
+              initialValue: state.numPilots,
               decoration: const InputDecoration(labelText: 'Pilot Subcarriers Count'),
               items: const [4, 8, 16, 32, 64]
                   .map((v) => DropdownMenuItem(value: v, child: Text('$v Pilots')))
