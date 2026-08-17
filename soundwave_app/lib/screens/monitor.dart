@@ -55,16 +55,22 @@ class _MonitorScreenState extends State<MonitorScreen> {
   bool _paused = false;
   double _peakFreqHz = 0.0;
   double _dbfs = -60.0;
+  late AppState _state;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _state = Provider.of<AppState>(context, listen: false);
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final state = Provider.of<AppState>(context, listen: false);
-      if (!state.isAudioCapturing) {
-        state.startAudioCapture();
+      if (!_state.isAudioCapturing) {
+        _state.startAudioCapture();
       }
-      _subscribeToAudio(state);
+      _subscribeToAudio(_state);
     });
   }
 
@@ -166,9 +172,8 @@ class _MonitorScreenState extends State<MonitorScreen> {
   @override
   void dispose() {
     _audioSubscription?.cancel();
-    final state = Provider.of<AppState>(context, listen: false);
-    if (!state.isListening && state.isAudioCapturing) {
-      state.stopAudioCapture();
+    if (!_state.isListening && _state.isAudioCapturing) {
+      _state.stopAudioCapture();
     }
     super.dispose();
   }
