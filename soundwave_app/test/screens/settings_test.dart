@@ -23,7 +23,7 @@ void main() {
 
     testWidgets('switching to OFDM shows FFT options', (tester) async {
       await tester.pumpWidget(createApp());
-      await tester.tap(find.textContaining('OFDM'));
+      await tester.tap(find.text('OFDM (Orthogonal Freq Division)'));
       await tester.pumpAndSettle();
       expect(find.textContaining('FFT Size: 256'), findsOneWidget);
     });

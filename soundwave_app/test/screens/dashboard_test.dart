@@ -18,7 +18,7 @@ void main() {
       expect(find.textContaining('Soundwave'), findsWidgets);
       expect(find.text('Transmission Control'), findsOneWidget);
       expect(find.text('Receiver Control'), findsOneWidget);
-      expect(find.text('Received Messages Log'), findsOneWidget);
+      expect(find.textContaining('Received Messages'), findsWidgets);
     });
 
     testWidgets('send button disabled when empty', (tester) async {

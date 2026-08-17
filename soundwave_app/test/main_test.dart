@@ -6,6 +6,6 @@ import 'package:soundwave/main.dart';
 void main() {
   testWidgets('app smoke test', (tester) async {
     await tester.pumpWidget(const SoundwaveApp());
-    expect(find.text('Soundwave'), findsOneWidget);
+    expect(find.text('Soundwave Dashboard'), findsOneWidget);
   });
 }

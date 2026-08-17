@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:soundwave/state/app_state.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('AppState', () {
     test('default values', () {
       final state = AppState();
