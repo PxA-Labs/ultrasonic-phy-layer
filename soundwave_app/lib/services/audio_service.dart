@@ -162,8 +162,7 @@ class NativeAudioService implements AudioService {
   void updateConfig(Map<String, dynamic> config) {
     _nativeConfig.ref.sampleRate =
         ((config['sample_rate'] ?? 44100) as num).toInt();
-    _nativeConfig.ref.modulation =
-        ((config['modulation'] ?? 0) as num).toInt();
+    _nativeConfig.ref.modulation = ((config['modulation'] ?? 0) as num).toInt();
     _nativeConfig.ref.sf = ((config['sf'] ?? 8) as num).toInt();
     _nativeConfig.ref.numSubcarriers =
         ((config['num_subcarriers'] ?? 256) as num).toInt();
