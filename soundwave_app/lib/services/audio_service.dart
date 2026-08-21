@@ -160,20 +160,30 @@ class NativeAudioService implements AudioService {
 
   @override
   void updateConfig(Map<String, dynamic> config) {
-    _nativeConfig.ref.sampleRate = ((config['sample_rate'] ?? 44100) as num).toInt();
-    _nativeConfig.ref.modulation = ((config['modulation'] ?? 0) as num).toInt();
+    _nativeConfig.ref.sampleRate =
+        ((config['sample_rate'] ?? 44100) as num).toInt();
+    _nativeConfig.ref.modulation =
+        ((config['modulation'] ?? 0) as num).toInt();
     _nativeConfig.ref.sf = ((config['sf'] ?? 8) as num).toInt();
-    _nativeConfig.ref.numSubcarriers = ((config['num_subcarriers'] ?? 256) as num).toInt();
+    _nativeConfig.ref.numSubcarriers =
+        ((config['num_subcarriers'] ?? 256) as num).toInt();
     _nativeConfig.ref.cpLength = ((config['cp_length'] ?? 64) as num).toInt();
     _nativeConfig.ref.numPilots = ((config['num_pilots'] ?? 8) as num).toInt();
-    _nativeConfig.ref.codingRate = ((config['coding_rate'] ?? 0.5) as num).toDouble();
-    _nativeConfig.ref.threshold = ((config['threshold'] ?? 3.0) as num).toDouble();
+    _nativeConfig.ref.codingRate =
+        ((config['coding_rate'] ?? 0.5) as num).toDouble();
+    _nativeConfig.ref.threshold =
+        ((config['threshold'] ?? 3.0) as num).toDouble();
     _nativeConfig.ref.equalizer = ((config['equalizer'] ?? 0) as num).toInt();
-    _nativeConfig.ref.carrierFreq = ((config['carrier_freq'] ?? 19000.0) as num).toDouble();
-    _nativeConfig.ref.bandwidth = ((config['bandwidth'] ?? 2000.0) as num).toDouble();
-    _nativeConfig.ref.symbolDuration = ((config['symbol_duration'] ?? 0.02) as num).toDouble();
-    _nativeConfig.ref.amplitude = ((config['amplitude'] ?? 0.8) as num).toDouble();
-    _nativeConfig.ref.ofdmModulation = ((config['ofdm_modulation'] ?? 1) as num).toInt();
+    _nativeConfig.ref.carrierFreq =
+        ((config['carrier_freq'] ?? 19000.0) as num).toDouble();
+    _nativeConfig.ref.bandwidth =
+        ((config['bandwidth'] ?? 2000.0) as num).toDouble();
+    _nativeConfig.ref.symbolDuration =
+        ((config['symbol_duration'] ?? 0.02) as num).toDouble();
+    _nativeConfig.ref.amplitude =
+        ((config['amplitude'] ?? 0.8) as num).toDouble();
+    _nativeConfig.ref.ofdmModulation =
+        ((config['ofdm_modulation'] ?? 1) as num).toInt();
   }
 
   void dispose() {
