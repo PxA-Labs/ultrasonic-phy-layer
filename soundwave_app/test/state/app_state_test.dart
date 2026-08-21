@@ -49,5 +49,15 @@ void main() {
       expect(state.mode, 1);
       expect(state.numSubcarriers, 2048);
     });
+
+    test('setters update configMap dynamically', () {
+      final state = AppState(audio: MockAudioService());
+      state.setCarrierFreq(20000.0);
+      expect(state.configMap['carrier_freq'], 20000.0);
+      state.setBandwidth(3000.0);
+      expect(state.configMap['bandwidth'], 3000.0);
+      state.setMode(1);
+      expect(state.configMap['modulation'], 1);
+    });
   });
 }

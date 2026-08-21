@@ -20,7 +20,7 @@ SW_API int sw_crc32(const uint8_t* data, size_t len, uint32_t* crc) {
 
 SW_API int sw_rs_encode(const uint8_t* data, size_t data_len,
                         uint8_t* parity, size_t* parity_len) {
-    if (!data || !parity || !parity_len) return SW_ERR_BAD_PARAM;
+    if (!data || !parity || !parity_len || data_len == 0 || data_len > 223) return SW_ERR_BAD_PARAM;
     rs_encode(data, data_len, parity, data_len + 32);
     *parity_len = 32;
     return SW_OK;
@@ -50,7 +50,7 @@ SW_API int sw_rs_decode(uint8_t* data, size_t* data_len,
 
 SW_API int sw_css_modulate(const uint8_t* bits, size_t bit_len,
                            sw_config_t cfg, float* samples, size_t* sample_len) {
-    if (!bits || !samples || !sample_len) return SW_ERR_BAD_PARAM;
+    if (!bits || !samples || !sample_len || bit_len == 0) return SW_ERR_BAD_PARAM;
 
     sw_signal sig = css_modulate(bits, bit_len, cfg);
     if (!sig.data) return SW_ERR_MEMORY;
@@ -69,7 +69,7 @@ SW_API int sw_css_modulate(const uint8_t* bits, size_t bit_len,
 
 SW_API int sw_css_demodulate(const float* samples, size_t sample_len,
                              sw_config_t cfg, uint8_t* bits, size_t* bit_len) {
-    if (!samples || !bits || !bit_len) return SW_ERR_BAD_PARAM;
+    if (!samples || !bits || !bit_len || sample_len == 0 || *bit_len == 0) return SW_ERR_BAD_PARAM;
 
     size_t out_bytes = 0;
     uint8_t* decoded = css_demodulate(samples, sample_len, cfg, &out_bytes);
@@ -94,7 +94,7 @@ SW_API int sw_css_demodulate(const float* samples, size_t sample_len,
 
 SW_API int sw_ofdm_modulate(const uint8_t* bits, size_t bit_len,
                             sw_config_t cfg, float* samples, size_t* sample_len) {
-    if (!bits || !samples || !sample_len) return SW_ERR_BAD_PARAM;
+    if (!bits || !samples || !sample_len || bit_len == 0) return SW_ERR_BAD_PARAM;
 
     sw_signal sig = ofdm_modulate(bits, bit_len, cfg);
     if (!sig.data) return SW_ERR_MEMORY;
@@ -114,7 +114,7 @@ SW_API int sw_ofdm_modulate(const uint8_t* bits, size_t bit_len,
 
 SW_API int sw_ofdm_demodulate(const float* samples, size_t sample_len,
                               sw_config_t cfg, uint8_t* bits, size_t* bit_len) {
-    if (!samples || !bits || !bit_len) return SW_ERR_BAD_PARAM;
+    if (!samples || !bits || !bit_len || sample_len == 0 || *bit_len == 0) return SW_ERR_BAD_PARAM;
 
     size_t out_bits_count = 0;
     uint8_t* decoded = NULL;
@@ -141,7 +141,7 @@ SW_API int sw_ofdm_demodulate(const float* samples, size_t sample_len,
 
 SW_API int sw_detect_frame(const float* samples, size_t len,
                            sw_config_t cfg, size_t* frame_start, float* snr) {
-    if (!samples || !frame_start || !snr) return SW_ERR_BAD_PARAM;
+    if (!samples || !frame_start || !snr || len == 0) return SW_ERR_BAD_PARAM;
     
     sync_config_t sync_cfg;
     memset(&sync_cfg, 0, sizeof(sync_cfg));
@@ -175,7 +175,7 @@ SW_API int sw_detect_frame(const float* samples, size_t len,
 
 SW_API int sw_estimate_cfo(const float* samples, size_t len,
                            sw_config_t cfg, float* cfo_hz) {
-    if (!samples || !cfo_hz) return SW_ERR_BAD_PARAM;
+    if (!samples || !cfo_hz || len == 0) return SW_ERR_BAD_PARAM;
     int N = cfg.num_subcarriers;
     int cp = cfg.cp_length;
     *cfo_hz = sync_schmidl_cox_cfo(samples, len, N + cp, (float)cfg.sample_rate);

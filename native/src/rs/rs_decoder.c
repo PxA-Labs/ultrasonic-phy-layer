@@ -33,7 +33,7 @@ static int rs_syndromes_all_zero(const uint8_t* S, size_t num_parity) {
 
 // 2. Berlekamp-Massey Algorithm for arbitrary number of syndromes (2t)
 int rs_berlekamp_massey_len(const uint8_t* S, int num_syndromes, uint8_t* lambda, uint8_t* omega) {
-    if (!S || !lambda || !omega || num_syndromes <= 0) return -1;
+    if (!S || !lambda || !omega || num_syndromes <= 0 || num_syndromes > 64) return -1;
 
     memset(lambda, 0, (size_t)(num_syndromes + 1));
     memset(omega, 0, (size_t)(num_syndromes + 1));
@@ -183,7 +183,7 @@ void rs_forney(const uint8_t* omega, const uint8_t* lambda,
 
 // 5. Full Decoder Integration
 int rs_decode(uint8_t* r, size_t n) {
-    if (!r || n == 0) return -1;
+    if (!r || n == 0 || n > 255) return -1;
 
     size_t num_parity = get_num_parity(n);
     uint8_t S[64] = {0};

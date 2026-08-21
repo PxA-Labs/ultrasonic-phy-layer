@@ -45,31 +45,36 @@ class AppState extends ChangeNotifier {
   StreamSubscription<DecodedMessage>? _rxSubscription;
   bool _isDisposed = false;
 
-  Map<String, dynamic> get configMap => {
-        'sample_rate': _sampleRate,
-        'modulation': _mode,
-        'sf': _sf,
-        'num_subcarriers': _numSubcarriers,
-        'cp_length': _cpLength,
-        'num_pilots': _numPilots,
-        'carrier_freq': _carrierFreq,
-        'bandwidth': _bandwidth,
-        'symbol_duration': _symbolDuration,
-        'amplitude': _amplitude,
-        'ofdm_modulation': _ofdmModulation,
-        'threshold': _threshold,
-        'equalizer': _equalizer,
-        'coding_rate': _codingRate,
-        'enable_rs': _enableRs,
-        'volume': _volume,
-      };
+  late final Map<String, dynamic> _configMap;
+  Map<String, dynamic> get configMap => _configMap;
+
+  void _syncConfigMap() {
+    _configMap['sample_rate'] = _sampleRate;
+    _configMap['modulation'] = _mode;
+    _configMap['sf'] = _sf;
+    _configMap['num_subcarriers'] = _numSubcarriers;
+    _configMap['cp_length'] = _cpLength;
+    _configMap['num_pilots'] = _numPilots;
+    _configMap['carrier_freq'] = _carrierFreq;
+    _configMap['bandwidth'] = _bandwidth;
+    _configMap['symbol_duration'] = _symbolDuration;
+    _configMap['amplitude'] = _amplitude;
+    _configMap['ofdm_modulation'] = _ofdmModulation;
+    _configMap['threshold'] = _threshold;
+    _configMap['equalizer'] = _equalizer;
+    _configMap['coding_rate'] = _codingRate;
+    _configMap['enable_rs'] = _enableRs;
+    _configMap['volume'] = _volume;
+  }
 
   AppState({AudioService? audio}) {
-    _audio = audio ?? AudioService.preferred(configMap);
+    _configMap = {};
+    _syncConfigMap();
+    _audio = audio ?? AudioService.preferred(_configMap);
     _txEngine =
-        TxEngine(audio: _audio, configMap: configMap, useIsolates: false);
+        TxEngine(audio: _audio, configMap: _configMap, useIsolates: false);
     _rxEngine =
-        RxEngine(audio: _audio, configMap: configMap, useIsolates: false);
+        RxEngine(audio: _audio, configMap: _configMap, useIsolates: false);
     _txQueue = TxQueue(txEngine: _txEngine);
 
     // Prepopulate audio devices
@@ -110,6 +115,12 @@ class AppState extends ChangeNotifier {
   List<String> get messages => List.unmodifiable(_messages);
   bool get isTransmitting => _isTransmitting;
 
+  void _updateConfigField(String key, dynamic value) {
+    _configMap[key] = value;
+    _audio.updateConfig(_configMap);
+    notifyListeners();
+  }
+
   // Setters
   set txMessage(String v) {
     _txMessage = v;
@@ -118,77 +129,77 @@ class AppState extends ChangeNotifier {
 
   void setMode(int m) {
     _mode = m;
-    notifyListeners();
+    _updateConfigField('modulation', m);
   }
 
   void setSf(int v) {
     _sf = v;
-    notifyListeners();
+    _updateConfigField('sf', v);
   }
 
   void setNumSubcarriers(int v) {
     _numSubcarriers = v;
-    notifyListeners();
+    _updateConfigField('num_subcarriers', v);
   }
 
   void setCpLength(int v) {
     _cpLength = v;
-    notifyListeners();
+    _updateConfigField('cp_length', v);
   }
 
   void setNumPilots(int v) {
     _numPilots = v;
-    notifyListeners();
+    _updateConfigField('num_pilots', v);
   }
 
   void setCarrierFreq(double v) {
     _carrierFreq = v;
-    notifyListeners();
+    _updateConfigField('carrier_freq', v);
   }
 
   void setBandwidth(double v) {
     _bandwidth = v;
-    notifyListeners();
+    _updateConfigField('bandwidth', v);
   }
 
   void setSymbolDuration(double v) {
     _symbolDuration = v;
-    notifyListeners();
+    _updateConfigField('symbol_duration', v);
   }
 
   void setAmplitude(double v) {
     _amplitude = v;
-    notifyListeners();
+    _updateConfigField('amplitude', v);
   }
 
   void setOfdmModulation(int v) {
     _ofdmModulation = v;
-    notifyListeners();
+    _updateConfigField('ofdm_modulation', v);
   }
 
   void setThreshold(double v) {
     _threshold = v;
-    notifyListeners();
+    _updateConfigField('threshold', v);
   }
 
   void setEqualizer(int v) {
     _equalizer = v;
-    notifyListeners();
+    _updateConfigField('equalizer', v);
   }
 
   void setCodingRate(double v) {
     _codingRate = v;
-    notifyListeners();
+    _updateConfigField('coding_rate', v);
   }
 
   void setEnableRs(bool v) {
     _enableRs = v;
-    notifyListeners();
+    _updateConfigField('enable_rs', v);
   }
 
   void setVolume(double v) {
     _volume = v;
-    notifyListeners();
+    _updateConfigField('volume', v);
   }
 
   void setInputDevice(AudioDevice? device) {
@@ -299,6 +310,8 @@ class AppState extends ChangeNotifier {
         _bandwidth = 4000.0;
         break;
     }
+    _syncConfigMap();
+    _audio.updateConfig(_configMap);
     notifyListeners();
   }
 
