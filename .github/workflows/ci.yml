@@ -20,7 +20,7 @@ jobs:
       run:
         working-directory: soundwave_app
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Check for Flutter project
         id: check
@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: github.event_name == 'push' && steps.check.outputs.exists == 'true'
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@v4
         with:
           files: soundwave_app/coverage/lcov.info
 
@@ -62,7 +62,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Check for native CMakeLists
         id: check
@@ -96,7 +96,7 @@ jobs:
 
       - name: Cache ccache
         if: steps.check.outputs.exists == 'true'
-        uses: actions/cache@v6
+        uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ccache-${{ matrix.os }}-dsp-${{ github.sha }}
@@ -132,7 +132,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -172,7 +172,7 @@ jobs:
           fi
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@v4
         with:
           files: native/build/coverage_filtered.info
           flags: dsp-core
@@ -182,7 +182,7 @@ jobs:
   docs-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Validate headings
         run: |
