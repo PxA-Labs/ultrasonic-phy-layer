@@ -108,6 +108,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -129,6 +130,7 @@ All notable changes to this project will be documented in this file.
 - **app:** Implement TX/RX Engine, Message Queue, History persistence and unit tests (#32)
 - **app:** Implement TX/RX Engine, Message Queue, History persistence and unit tests (#32)
 - **ci:** Correct working directory for Flutter builds (#36)
+- **cli:** Implement standalone developer CLI tool soundwave-cli (#70)
 
 ### Maintenance
 

@@ -144,3 +144,13 @@ endif()
 if(SW_BUILD_FUZZ)
     add_subdirectory(Fuzzing)
 endif()
+
+# Standalone CLI Developer Tool
+add_executable(soundwave_cli
+    tools/soundwave_cli/main.c
+    tools/soundwave_cli/wav_util.c
+)
+target_link_libraries(soundwave_cli PRIVATE soundwave_static)
+target_include_directories(soundwave_cli PRIVATE tools/soundwave_cli)
+set_target_properties(soundwave_cli PROPERTIES OUTPUT_NAME "soundwave-cli")
+
