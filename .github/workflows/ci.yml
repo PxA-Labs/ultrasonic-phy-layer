@@ -43,17 +43,6 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         run: flutter analyze --fatal-infos
 
-      - name: Format Dart code
-        if: steps.check.outputs.exists == 'true'
-        run: dart format .
-
-      - name: Commit formatted files
-        if: steps.check.outputs.exists == 'true' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "style(ui): format Dart code with dart format"
-          branch: ${{ github.head_ref || github.ref_name }}
-
       - name: Check formatting
         if: steps.check.outputs.exists == 'true'
         run: dart format --set-exit-if-changed .
