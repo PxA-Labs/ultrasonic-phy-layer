@@ -52,6 +52,7 @@ All notable changes to this project will be documented in this file.
 - Retrigger workflows [skip ci]
 - Retrigger workflows
 - Add benchmarking, cross-platform matrix, coverage, static analysis, and PR linting
+- Fix invalid GitHub action major versions in workflow files
 
 ### Documentation
 
@@ -96,6 +97,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - **onboarding:** Add developer guide, API reference, PR template, and Doxygen headers (#73)
+- Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
