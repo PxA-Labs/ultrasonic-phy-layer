@@ -63,8 +63,8 @@ class AppState extends ChangeNotifier {
         'volume': _volume,
       };
 
-  AppState() {
-    _audio = AudioService.preferred(configMap);
+  AppState({AudioService? audio}) {
+    _audio = audio ?? AudioService.preferred(configMap);
     _txEngine =
         TxEngine(audio: _audio, configMap: configMap, useIsolates: false);
     _rxEngine =

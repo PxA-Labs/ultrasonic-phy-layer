@@ -1,12 +1,11 @@
-// Unit tests for AppState
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundwave/state/app_state.dart';
+import '../engine/mock_native.dart';
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
   group('AppState', () {
     test('default values', () {
-      final state = AppState();
+      final state = AppState(audio: MockAudioService());
       expect(state.sampleRate, 44100);
       expect(state.mode, 0);
       expect(state.sf, 8);
@@ -17,19 +16,19 @@ void main() {
     });
 
     test('setMode toggles mode', () {
-      final state = AppState();
+      final state = AppState(audio: MockAudioService());
       state.setMode(1);
       expect(state.mode, 1);
     });
 
     test('setSf sets spreading factor', () {
-      final state = AppState();
+      final state = AppState(audio: MockAudioService());
       state.setSf(12);
       expect(state.sf, 12);
     });
 
     test('addMessage prepends and caps at 100', () {
-      final state = AppState();
+      final state = AppState(audio: MockAudioService());
       for (int i = 0; i < 101; i++) {
         state.addMessage('msg$i', i.toDouble());
       }
@@ -38,14 +37,14 @@ void main() {
     });
 
     test('loadPreset long_range sets sf=12 mode=0', () {
-      final state = AppState();
+      final state = AppState(audio: MockAudioService());
       state.loadPreset('long_range');
       expect(state.mode, 0);
       expect(state.sf, 12);
     });
 
     test('loadPreset high_speed sets mode=1 nsc=2048', () {
-      final state = AppState();
+      final state = AppState(audio: MockAudioService());
       state.loadPreset('high_speed');
       expect(state.mode, 1);
       expect(state.numSubcarriers, 2048);
