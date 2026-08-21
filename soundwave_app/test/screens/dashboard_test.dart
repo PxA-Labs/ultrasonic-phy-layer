@@ -20,7 +20,7 @@ void main() {
       expect(find.textContaining('Soundwave'), findsWidgets);
       expect(find.text('Transmission Control'), findsOneWidget);
       expect(find.text('Receiver Control'), findsOneWidget);
-      
+
       // Scroll down to bring the _MessagesLog card into view
       await tester.drag(find.byType(ListView), const Offset(0, -400));
       await tester.pump();
