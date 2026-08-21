@@ -6,8 +6,10 @@ import 'package:provider/provider.dart';
 import 'package:soundwave/screens/settings.dart';
 import 'package:soundwave/state/app_state.dart';
 
+import '../engine/mock_native.dart';
+
 Widget createApp() => ChangeNotifierProvider(
-      create: (_) => AppState(),
+      create: (_) => AppState(audio: MockAudioService()),
       child: const MaterialApp(home: SettingsScreen()),
     );
 

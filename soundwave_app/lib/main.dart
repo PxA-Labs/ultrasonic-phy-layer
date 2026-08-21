@@ -14,12 +14,13 @@ void main() {
 }
 
 class SoundwaveApp extends StatelessWidget {
-  const SoundwaveApp({super.key});
+  final AppState? appState;
+  const SoundwaveApp({super.key, this.appState});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => AppState(),
+      create: (_) => appState ?? AppState(),
       child: MaterialApp(
         title: 'Soundwave',
         theme: ThemeData.dark().copyWith(
