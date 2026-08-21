@@ -140,6 +140,9 @@ class MockAudioService implements AudioService {
     isPlaying = false;
   }
 
+  @override
+  void updateConfig(Map<String, dynamic> config) {}
+
   void pushMockChunk(Float64List chunk) {
     _audioStreamController.add(chunk);
   }
