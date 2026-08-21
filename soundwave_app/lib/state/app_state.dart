@@ -43,6 +43,7 @@ class AppState extends ChangeNotifier {
   late final RxEngine _rxEngine;
   late final TxQueue _txQueue;
   StreamSubscription<DecodedMessage>? _rxSubscription;
+  bool _isDisposed = false;
 
   Map<String, dynamic> get configMap => {
         'sample_rate': _sampleRate,
@@ -315,7 +316,14 @@ class AppState extends ChangeNotifier {
   }
 
   @override
+  void notifyListeners() {
+    if (_isDisposed) return;
+    super.notifyListeners();
+  }
+
+  @override
   void dispose() {
+    _isDisposed = true;
     _rxSubscription?.cancel();
     _rxEngine.stopListening();
     super.dispose();
