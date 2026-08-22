@@ -111,7 +111,7 @@ void rs_init_generator(void) {
 }
 
 void rs_encode(const uint8_t* data, size_t k, uint8_t* parity, size_t n) {
-    if (!data || !parity || k == 0 || n <= k) return;
+    if (!data || !parity || k == 0 || n <= k || n > 255) return;
     if (!rs_initialized) rs_init_generator();
 
     size_t num_parity = n - k;

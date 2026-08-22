@@ -23,7 +23,7 @@ class DecodedMessage {
 }
 
 class RxEngine {
-  final SoundwaveNative _native;
+  final SoundwaveNative? _native;
   final AudioService _audio;
   final Map<String, dynamic> _configMap;
   final bool _useIsolates;
@@ -39,10 +39,12 @@ class RxEngine {
     required AudioService audio,
     required Map<String, dynamic> configMap,
     bool useIsolates = true,
-  })  : _native = native ?? SoundwaveNative.instance,
+  })  : _native = native,
         _audio = audio,
         _configMap = configMap,
         _useIsolates = useIsolates;
+
+  SoundwaveNative get native => _native ?? SoundwaveNative.instance;
 
   Stream<DecodedMessage> startListening() {
     if (_isListening) return _messageStreamController.stream;
@@ -65,7 +67,7 @@ class RxEngine {
 
           final configPtr = SwConfig.fromMap(_configMap);
           try {
-            final syncRes = _native.detectFrame(searchSlice, configPtr);
+            final syncRes = native.detectFrame(searchSlice, configPtr);
             final frameStart = syncRes['frame_start'] as int;
             final snr = syncRes['snr'] as double;
 
@@ -90,10 +92,10 @@ class RxEngine {
                   try {
                     if (_configMap['modulation'] == 1) {
                       demodulatedBytes =
-                          _native.ofdmDemodulate(frameSamples, configPtr2);
+                          native.ofdmDemodulate(frameSamples, configPtr2);
                     } else {
                       demodulatedBytes =
-                          _native.cssDemodulate(frameSamples, configPtr2);
+                          native.cssDemodulate(frameSamples, configPtr2);
                     }
                   } finally {
                     calloc.free(configPtr2);
@@ -107,7 +109,7 @@ class RxEngine {
                       demodulatedBytes.sublist(demodulatedBytes.length - 32);
 
                   try {
-                    final decodeRes = _native.rsDecode(packet, parity);
+                    final decodeRes = native.rsDecode(packet, parity);
                     final correctedPacket = decodeRes['message'] as Uint8List;
 
                     if (correctedPacket.length > 4) {
@@ -115,7 +117,7 @@ class RxEngine {
                           ByteData.sublistView(correctedPacket, 0, 4)
                               .getUint32(0, Endian.little);
                       final payload = correctedPacket.sublist(4);
-                      final calculatedCrc = _native.crc32(payload);
+                      final calculatedCrc = native.crc32(payload);
 
                       if (receivedCrc == calculatedCrc) {
                         final text = utf8.decode(payload, allowMalformed: true);

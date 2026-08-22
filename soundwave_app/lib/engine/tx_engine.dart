@@ -8,7 +8,7 @@ import 'package:soundwave/native/bindings.dart';
 import 'package:soundwave/services/audio_service.dart';
 
 class TxEngine {
-  final SoundwaveNative _native;
+  final SoundwaveNative? _native;
   final AudioService _audio;
   final Map<String, dynamic> _configMap;
   final bool _useIsolates;
@@ -18,16 +18,18 @@ class TxEngine {
     required AudioService audio,
     required Map<String, dynamic> configMap,
     bool useIsolates = true,
-  })  : _native = native ?? SoundwaveNative.instance,
+  })  : _native = native,
         _audio = audio,
         _configMap = configMap,
         _useIsolates = useIsolates;
+
+  SoundwaveNative get native => _native ?? SoundwaveNative.instance;
 
   Future<void> sendMessage(String text) async {
     final payload = Uint8List.fromList(utf8.encode(text));
 
     // Calculate CRC-32 of payload
-    final crc = _native.crc32(payload);
+    final crc = native.crc32(payload);
 
     // Frame layout: Prepend CRC-32 (4 bytes, little-endian)
     final crcBytes = ByteData(4)..setUint32(0, crc, Endian.little);
@@ -36,7 +38,7 @@ class TxEngine {
     packet.setRange(4, packet.length, payload);
 
     // Apply Reed-Solomon encoding
-    final parity = _native.rsEncode(packet);
+    final parity = native.rsEncode(packet);
     final frame = Uint8List(packet.length + parity.length);
     frame.setRange(0, packet.length, packet);
     frame.setRange(packet.length, frame.length, parity);
@@ -52,9 +54,9 @@ class TxEngine {
       final configPtr = SwConfig.fromMap(_configMap);
       try {
         if (_configMap['modulation'] == 1) {
-          samples = _native.ofdmModulate(frame, configPtr);
+          samples = native.ofdmModulate(frame, configPtr);
         } else {
-          samples = _native.cssModulate(frame, configPtr);
+          samples = native.cssModulate(frame, configPtr);
         }
       } finally {
         calloc.free(configPtr);
