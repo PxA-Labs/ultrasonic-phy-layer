@@ -39,6 +39,15 @@ All notable changes to this project will be documented in this file.
 - **ofdm:** Resolve PR #78 review comments on OFDM modulator and FFI boundaries
 - **ofdm:** Resolve PR #79 review comments on memory safety and API consistency
 - **app:** Resolve static analysis warnings and undefined type errors in Flutter project
+- **ui:** Resolve padding named parameter typo and deprecation warnings in settings and dashboard
+- **engine:** Make native FFI bindings lazy in TxEngine and RxEngine to prevent test environment crash
+- **test:** Resolve Flutter widget and unit test errors including ServicesBinding initialization and finder ambiguity
+- **ui:** Safely cache AppState in didChangeDependencies to prevent crash on monitor dispose
+- **ui:** Inject mock AudioService in AppState to fix tests & prevent duplicate/failing CI workflows
+- **test:** Inject MockAudioService in widget tests to prevent native plugin channel crashes
+- **test:** Scroll ListView in dashboard_test to bring message log into view
+- **ui:** Prevent notifyListeners calls after AppState is disposed
+- **test:** Implement updateConfig in MockAudioService
 
 ### Build
 
@@ -53,6 +62,8 @@ All notable changes to this project will be documented in this file.
 - Retrigger workflows
 - Add benchmarking, cross-platform matrix, coverage, static analysis, and PR linting
 - Fix invalid GitHub action major versions in workflow files
+- **workflow:** Add auto-formatting and auto-commit step to CI for Dart files
+- Remove redundant auto-format and auto-commit steps in ci.yml
 
 ### Documentation
 
@@ -111,6 +122,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -133,6 +145,8 @@ All notable changes to this project will be documented in this file.
 - **app:** Implement TX/RX Engine, Message Queue, History persistence and unit tests (#32)
 - **ci:** Correct working directory for Flutter builds (#36)
 - **cli:** Implement standalone developer CLI tool soundwave-cli (#70)
+- **ui:** Implement Dashboard, Signal Monitor, and Settings screens (#30)
+- **ui:** Dynamic config settings propagation and OpenSSF secure bounds checks
 
 ### Maintenance
 
@@ -143,6 +157,11 @@ All notable changes to this project will be documented in this file.
 
 - **app:** Run dart format on all app files
 - **app:** Run dart format with SDK 3.6.0 on all files
+- **ui:** Format Dart code with dart format
+- **ui:** Format Dart code with dart format
+- Remove trailing whitespace in dashboard_test.dart
+- **ui:** Format audio_service.dart according to dart format guidelines
+- **ui:** Apply standard dart format to audio_service.dart
 
 ### Testing
 
