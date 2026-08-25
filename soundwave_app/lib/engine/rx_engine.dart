@@ -1,4 +1,5 @@
 // RX Engine — captures audio, detects frames, demodulates, and decodes messages.
+// Integrates real-time SignalMetrics and RxFrameEvents emission for live status tracking.
 
 import 'dart:async';
 import 'dart:convert';
@@ -7,6 +8,7 @@ import 'package:ffi/ffi.dart';
 import 'package:soundwave/native/soundwave_native.dart';
 import 'package:soundwave/native/bindings.dart';
 import 'package:soundwave/services/audio_service.dart';
+import 'package:soundwave/engine/signal_metrics.dart';
 
 class DecodedMessage {
   final String text;
@@ -32,7 +34,18 @@ class RxEngine {
   final List<double> _sampleBuffer = [];
   final StreamController<DecodedMessage> _messageStreamController =
       StreamController<DecodedMessage>.broadcast();
+  final StreamController<SignalMetrics> _metricsController =
+      StreamController<SignalMetrics>.broadcast();
+  final StreamController<RxFrameEvent> _frameEventsController =
+      StreamController<RxFrameEvent>.broadcast();
+
   StreamSubscription<Float64List>? _audioSubscription;
+
+  int _framesDetected = 0;
+  int _framesReceived = 0;
+  int _frameErrors = 0;
+  int _totalBytesReceived = 0;
+  double _lastSnr = 0.0;
 
   RxEngine({
     SoundwaveNative? native,
@@ -46,10 +59,35 @@ class RxEngine {
 
   SoundwaveNative get native => _native ?? SoundwaveNative.instance;
 
+  Stream<DecodedMessage> get messages => _messageStreamController.stream;
+  Stream<SignalMetrics> get metrics => _metricsController.stream;
+  Stream<RxFrameEvent> get frameEvents => _frameEventsController.stream;
+
+  bool get isListening => _isListening;
+  int get framesDetected => _framesDetected;
+  int get framesReceived => _framesReceived;
+  int get frameErrors => _frameErrors;
+  int get totalBytesReceived => _totalBytesReceived;
+  double get lastSnr => _lastSnr;
+
+  void _emitCurrentMetrics(ModemLinkState state) {
+    if (_metricsController.isClosed) return;
+    _metricsController.add(SignalMetrics(
+      connectionState: state,
+      snr: _lastSnr,
+      totalBytesTransferred: _totalBytesReceived,
+      framesReceived: _framesReceived,
+      framesDetected: _framesDetected,
+      frameErrors: _frameErrors,
+      lastUpdated: DateTime.now(),
+    ));
+  }
+
   Stream<DecodedMessage> startListening() {
     if (_isListening) return _messageStreamController.stream;
     _isListening = true;
     _sampleBuffer.clear();
+    _emitCurrentMetrics(ModemLinkState.listening);
 
     _audio.startCapture().then((_) {
       _audioSubscription = _audio.audioStream.listen((chunk) async {
@@ -69,10 +107,21 @@ class RxEngine {
           try {
             final syncRes = native.detectFrame(searchSlice, configPtr);
             final frameStart = syncRes['frame_start'] as int;
-            final snr = syncRes['snr'] as double;
+            final snr = (syncRes['snr'] as num).toDouble();
 
             if (frameStart >= 0) {
               // Frame found!
+              _framesDetected++;
+              _lastSnr = snr;
+              _frameEventsController.add(RxFrameEvent(
+                detected: true,
+                decoded: false,
+                snr: snr,
+                byteLength: 0,
+                timestamp: DateTime.now(),
+              ));
+              _emitCurrentMetrics(ModemLinkState.receiving);
+
               const frameLength = 17640;
               if (frameStart + frameLength <= _sampleBuffer.length) {
                 final frameSamples = Float32List(frameLength);
@@ -102,6 +151,8 @@ class RxEngine {
                   }
                 }
 
+                bool frameDecodedSuccessfully = false;
+
                 if (demodulatedBytes.length > 36) {
                   final packet =
                       demodulatedBytes.sublist(0, demodulatedBytes.length - 32);
@@ -120,19 +171,46 @@ class RxEngine {
                       final calculatedCrc = native.crc32(payload);
 
                       if (receivedCrc == calculatedCrc) {
+                        frameDecodedSuccessfully = true;
+                        _framesReceived++;
+                        _totalBytesReceived += payload.length;
+
                         final text = utf8.decode(payload, allowMalformed: true);
-                        _messageStreamController.add(DecodedMessage(
+                        final decodedMsg = DecodedMessage(
                           text: text,
                           snr: snr,
                           timestamp: DateTime.now(),
                           rawBytes: payload,
+                        );
+
+                        _messageStreamController.add(decodedMsg);
+                        _frameEventsController.add(RxFrameEvent(
+                          detected: true,
+                          decoded: true,
+                          snr: snr,
+                          byteLength: payload.length,
+                          timestamp: DateTime.now(),
                         ));
+                        _emitCurrentMetrics(ModemLinkState.listening);
                       }
                     }
                   } catch (e) {
                     print(
                         'Demodulated frame RS decode/CRC verification failed: $e');
                   }
+                }
+
+                if (!frameDecodedSuccessfully) {
+                  _frameErrors++;
+                  _frameEventsController.add(RxFrameEvent(
+                    detected: true,
+                    decoded: false,
+                    snr: snr,
+                    byteLength: 0,
+                    timestamp: DateTime.now(),
+                    errorMessage: 'CRC / RS decoding check failed',
+                  ));
+                  _emitCurrentMetrics(ModemLinkState.error);
                 }
 
                 _sampleBuffer.removeRange(0, frameStart + frameLength);
@@ -164,6 +242,17 @@ class RxEngine {
     _audioSubscription?.cancel();
     _audioSubscription = null;
     _audio.stopCapture();
+    _emitCurrentMetrics(ModemLinkState.idle);
+  }
+
+  void resetStats() {
+    _framesDetected = 0;
+    _framesReceived = 0;
+    _frameErrors = 0;
+    _totalBytesReceived = 0;
+    _lastSnr = 0.0;
+    _emitCurrentMetrics(
+        _isListening ? ModemLinkState.listening : ModemLinkState.idle);
   }
 }
 

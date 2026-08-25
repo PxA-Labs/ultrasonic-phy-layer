@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:soundwave/screens/dashboard.dart';
 import 'package:soundwave/state/app_state.dart';
+import 'package:soundwave/widgets/signal_status_bar.dart';
 
 import '../engine/mock_native.dart';
 
@@ -26,6 +27,13 @@ void main() {
       await tester.pump();
 
       expect(find.textContaining('Received Messages'), findsWidgets);
+    });
+
+    testWidgets('renders signal status bar', (tester) async {
+      await tester.pumpWidget(createApp());
+      expect(find.byType(SignalStatusBar), findsOneWidget);
+      expect(find.text('--- bps'), findsOneWidget);
+      expect(find.text('SNR'), findsOneWidget);
     });
 
     testWidgets('send button disabled when empty', (tester) async {

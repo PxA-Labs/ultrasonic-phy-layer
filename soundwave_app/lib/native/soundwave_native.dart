@@ -272,6 +272,9 @@ class SoundwaveNative {
       if (Platform.isWindows) 'soundwave.dll',
       if (Platform.isMacOS) 'libsoundwave.dylib',
       if (Platform.isLinux) 'libsoundwave.so',
+      if (Platform.isMacOS) '../build/libsoundwave.dylib',
+      if (Platform.isLinux) '../build/libsoundwave.so',
+      if (Platform.isWindows) '../build/Release/soundwave.dll',
       if (Platform.isMacOS) '../native/build/libsoundwave.dylib',
       if (Platform.isMacOS) '../native/build/asan/libsoundwave.dylib',
       if (Platform.isLinux) '../native/build/libsoundwave.so',
@@ -296,6 +299,7 @@ class SoundwaveNative {
   String get version => _version().toDartString();
 
   int crc32(Uint8List data) {
+    if (data.isEmpty) return 0;
     final ptr = calloc<Uint8>(data.length);
     final crcOut = calloc<Uint32>();
     try {
@@ -360,8 +364,7 @@ class SoundwaveNative {
 
   Float32List cssModulate(Uint8List bits, Pointer<SwConfig> config) {
     final bitsPtr = calloc<Uint8>(bits.length);
-    // Allocate double space to prevent overflow
-    final samplesCapacity = bits.length * 512;
+    final samplesCapacity = bits.length * 4096 + 65536;
     final samplesPtr = calloc<Float>(samplesCapacity);
     final samplesLenPtr = calloc<IntPtr>();
     try {
@@ -386,7 +389,7 @@ class SoundwaveNative {
   Uint8List cssDemodulate(Float32List samples, Pointer<SwConfig> config) {
     final samplesPtr = calloc<Float>(samples.length);
     // Output bits capacity estimation
-    final bitsCapacity = samples.length ~/ 16;
+    final bitsCapacity = samples.length ~/ 16 + 1024;
     final bitsPtr = calloc<Uint8>(bitsCapacity);
     final bitsLenPtr = calloc<IntPtr>();
     try {
@@ -410,7 +413,7 @@ class SoundwaveNative {
 
   Float32List ofdmModulate(Uint8List bits, Pointer<SwConfig> config) {
     final bitsPtr = calloc<Uint8>(bits.length);
-    final samplesCapacity = bits.length * 1024;
+    final samplesCapacity = bits.length * 4096 + 65536;
     final samplesPtr = calloc<Float>(samplesCapacity);
     final samplesLenPtr = calloc<IntPtr>();
     try {

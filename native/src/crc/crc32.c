@@ -10,8 +10,9 @@ void crc32_init_table(void) {
     if (table_initialized) return;
     for (uint32_t i = 0; i < 256; i++) {
         uint32_t crc = i;
-        for (int j = 0; j < 8; j++)
-            crc = (crc >> 1) ^ (0xEDB88320u & ~((crc & 1) - 1));
+        for (int j = 0; j < 8; j++) {
+            crc = (crc & 1u) ? ((crc >> 1) ^ 0xEDB88320u) : (crc >> 1);
+        }
         crc_table[i] = crc;
     }
     table_initialized = 1;
@@ -23,7 +24,7 @@ uint32_t crc32_compute(const uint8_t* data, size_t len) {
 }
 
 uint32_t crc32_compute_fast(const uint8_t* data, size_t len) {
-    if (len == 0) {
+    if (data == NULL || len == 0) {
         return 0x00000000u;
     }
     uint32_t crc = 0xFFFFFFFFu;
