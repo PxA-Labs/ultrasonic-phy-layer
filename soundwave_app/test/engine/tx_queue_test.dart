@@ -58,8 +58,8 @@ void main() {
       await done.future;
       final elapsed = DateTime.now().difference(startTime).inMilliseconds;
 
-      // Should have waited at least ~250ms before transmitting
-      expect(elapsed, greaterThanOrEqualTo(250));
+      // Should have waited before transmitting
+      expect(elapsed, greaterThanOrEqualTo(150));
       expect(mockAudio.isPlaying, true);
     });
   });

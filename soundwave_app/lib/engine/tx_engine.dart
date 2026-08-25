@@ -1,17 +1,26 @@
 // TX Engine — encodes messages into frames and modulates via native DSP.
+// Emits TxMetrics stream for real-time throughput and status tracking.
 
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:ffi/ffi.dart';
 import 'package:soundwave/native/soundwave_native.dart';
 import 'package:soundwave/native/bindings.dart';
 import 'package:soundwave/services/audio_service.dart';
+import 'package:soundwave/engine/signal_metrics.dart';
 
 class TxEngine {
   final SoundwaveNative? _native;
   final AudioService _audio;
   final Map<String, dynamic> _configMap;
   final bool _useIsolates;
+
+  final StreamController<TxMetrics> _metricsController =
+      StreamController<TxMetrics>.broadcast();
+
+  int _totalBytesSent = 0;
+  int _framesSent = 0;
 
   TxEngine({
     SoundwaveNative? native,
@@ -24,6 +33,10 @@ class TxEngine {
         _useIsolates = useIsolates;
 
   SoundwaveNative get native => _native ?? SoundwaveNative.instance;
+  Stream<TxMetrics> get metrics => _metricsController.stream;
+
+  int get totalBytesSent => _totalBytesSent;
+  int get framesSent => _framesSent;
 
   Future<void> sendMessage(String text) async {
     final payload = Uint8List.fromList(utf8.encode(text));
@@ -71,6 +84,20 @@ class TxEngine {
 
     await _audio.enqueueForPlayback(doubleSamples);
     await _audio.startPlayback();
+
+    _totalBytesSent += payload.length;
+    _framesSent++;
+    if (!_metricsController.isClosed) {
+      _metricsController.add(TxMetrics(
+        bytesSent: payload.length,
+        timestamp: DateTime.now(),
+      ));
+    }
+  }
+
+  void resetStats() {
+    _totalBytesSent = 0;
+    _framesSent = 0;
   }
 }
 

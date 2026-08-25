@@ -31,6 +31,20 @@ void main() {
       expect(mockAudio.isPlaying, true);
       expect(mockAudio.playbackQueue, isNotNull);
       expect(mockAudio.playbackQueue!.length, equals(100));
+      expect(txEngine.totalBytesSent, equals(5));
+      expect(txEngine.framesSent, equals(1));
+    });
+
+    test('sendMessage emits TxMetrics event on stream', () async {
+      final emitted = <dynamic>[];
+      final sub = txEngine.metrics.listen(emitted.add);
+
+      await txEngine.sendMessage('world');
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(emitted.length, equals(1));
+      expect(emitted.first.bytesSent, equals(5));
+      await sub.cancel();
     });
   });
 }

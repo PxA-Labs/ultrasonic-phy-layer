@@ -13,7 +13,11 @@
 SW_API const char* sw_version(void) { return SW_VERSION; }
 
 SW_API int sw_crc32(const uint8_t* data, size_t len, uint32_t* crc) {
-    if (!data || !crc || len == 0) return SW_ERR_BAD_PARAM;
+    if (!data || !crc) return SW_ERR_BAD_PARAM;
+    if (len == 0) {
+        *crc = 0;
+        return SW_OK;
+    }
     *crc = crc32_compute(data, len);
     return SW_OK;
 }

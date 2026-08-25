@@ -18,10 +18,15 @@ Thumbs.db
 # Build and dependency directories
 dist/
 build/
+build-*/
 native/build/
 node_modules/
 venv/
 .venv/
+.dart_tool/
+soundwave_app/.dart_tool/
+coverage/
+soundwave_app/coverage/
 
 # Local agent workflow rules
 AGENTS.md

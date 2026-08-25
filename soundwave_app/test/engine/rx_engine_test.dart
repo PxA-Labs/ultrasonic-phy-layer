@@ -57,5 +57,20 @@ void main() {
           equals(
               '\x01\x02\x03')); // matching dummy payload in MockSoundwaveNative
     });
+
+    test('startListening emits metrics state updates', () async {
+      final metricsEvents = <dynamic>[];
+      final sub = rxEngine.metrics.listen(metricsEvents.add);
+
+      rxEngine.startListening();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(metricsEvents.isNotEmpty, true);
+
+      rxEngine.stopListening();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      await sub.cancel();
+    });
   });
 }

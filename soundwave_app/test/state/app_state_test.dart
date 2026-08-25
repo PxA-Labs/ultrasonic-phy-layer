@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundwave/state/app_state.dart';
+import 'package:soundwave/engine/signal_metrics.dart';
 import '../engine/mock_native.dart';
 
 void main() {
@@ -58,6 +59,37 @@ void main() {
       expect(state.configMap['bandwidth'], 3000.0);
       state.setMode(1);
       expect(state.configMap['modulation'], 1);
+    });
+
+    test('metrics initializes with idle state and 0 throughput', () {
+      final state = AppState(audio: MockAudioService());
+      expect(state.metrics.connectionState, ModemLinkState.idle);
+      expect(state.metrics.bitsPerSecond, 0.0);
+      expect(state.metrics.snr, 0.0);
+    });
+
+    test('toggleListening updates connectionState in metrics', () {
+      final state = AppState(audio: MockAudioService());
+      expect(state.metrics.connectionState, ModemLinkState.idle);
+
+      state.toggleListening();
+      expect(state.isListening, true);
+      expect(state.metrics.connectionState, ModemLinkState.listening);
+
+      state.toggleListening();
+      expect(state.isListening, false);
+      expect(state.metrics.connectionState, ModemLinkState.idle);
+    });
+
+    test('resetMetrics clears metrics and resets state', () {
+      final state = AppState(audio: MockAudioService());
+      state.toggleListening();
+      expect(state.metrics.connectionState, ModemLinkState.listening);
+
+      state.resetMetrics();
+      expect(state.metrics.bitsPerSecond, 0.0);
+      expect(state.metrics.framesReceived, 0);
+      expect(state.metrics.frameErrors, 0);
     });
   });
 }
