@@ -12,7 +12,7 @@ jobs:
       run:
         working-directory: soundwave_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check for Flutter project
         id: check
@@ -58,7 +58,7 @@ jobs:
       run:
         working-directory: soundwave_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check for Flutter project
         id: check
@@ -93,7 +93,7 @@ jobs:
       run:
         working-directory: soundwave_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check for Flutter project
         id: check
@@ -127,7 +127,7 @@ jobs:
       run:
         working-directory: soundwave_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check for Flutter project
         id: check
