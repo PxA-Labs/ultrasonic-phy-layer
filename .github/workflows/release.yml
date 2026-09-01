@@ -11,7 +11,7 @@ jobs:
       run:
         working-directory: soundwave_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check for Flutter project
         id: check
@@ -57,7 +57,7 @@ jobs:
       run:
         working-directory: soundwave_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check for Flutter project
         id: check
@@ -92,7 +92,7 @@ jobs:
       run:
         working-directory: soundwave_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check for Flutter project
         id: check
@@ -126,7 +126,7 @@ jobs:
       run:
         working-directory: soundwave_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check for Flutter project
         id: check
@@ -191,7 +191,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/download-artifact@v8
 
@@ -211,7 +211,7 @@ jobs:
     needs: [build-linux]
     if: always() && needs.build-linux.result == 'success'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/download-artifact@v8
         with:
