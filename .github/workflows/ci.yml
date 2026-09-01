@@ -98,7 +98,7 @@ jobs:
 
       - name: Cache ccache
         if: steps.check.outputs.exists == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ccache-${{ matrix.os }}-dsp-${{ github.sha }}
