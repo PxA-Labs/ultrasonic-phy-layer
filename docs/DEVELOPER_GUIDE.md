@@ -158,10 +158,10 @@ try {
 
 | Platform | Required Toolchain | Native Build System |
 |---|---|---|
-| **macOS** | Xcode Command Line Tools, Clang, CMake $\ge 3.20$, Flutter 3.41 | CMake + AppleClang |
-| **Linux (Ubuntu/Debian)** | `build-essential`, `cmake`, `libasound2-dev`, Flutter 3.41 | CMake + GCC/Clang |
-| **Windows** | Visual Studio 2022 (Desktop C++), CMake $\ge 3.20$, Flutter 3.41 | CMake + MSVC |
-| **Android** | Android Studio, Android NDK (r26+), CMake $\ge 3.20$, Flutter 3.41 | CMake + NDK Clang |
+| **macOS** | Xcode Command Line Tools, Clang, CMake $\ge 3.20$, Flutter 3.47 | CMake + AppleClang |
+| **Linux (Ubuntu/Debian)** | `build-essential`, `cmake`, `libasound2-dev`, Flutter 3.47 | CMake + GCC/Clang |
+| **Windows** | Visual Studio 2022 (Desktop C++), CMake $\ge 3.20$, Flutter 3.47 | CMake + MSVC |
+| **Android** | Android Studio, Android NDK (r26+), CMake $\ge 3.20$, Flutter 3.47 | CMake + NDK Clang |
 
 ---
 
