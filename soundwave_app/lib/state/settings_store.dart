@@ -106,6 +106,7 @@ class ModemSettingsSchema {
     doubleIn('coding_rate', (v) => v > 0 && v <= 1.0);
     doubleIn('volume', (v) => v >= 0 && v <= 1.0);
     if (raw['enable_rs'] is bool) out['enable_rs'] = raw['enable_rs']!;
+    if (raw['agc_enabled'] is bool) out['agc_enabled'] = raw['agc_enabled']!;
     return out;
   }
 }

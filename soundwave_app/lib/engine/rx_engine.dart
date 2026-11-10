@@ -11,6 +11,7 @@ import 'package:soundwave/services/audio_service.dart';
 import 'package:soundwave/engine/signal_metrics.dart';
 import 'package:soundwave/engine/frame_codec.dart';
 import 'package:soundwave/engine/frame_geometry.dart';
+import 'package:soundwave/engine/agc_processor.dart';
 
 class DecodedMessage {
   final String text;
@@ -81,6 +82,7 @@ class RxEngine {
       framesReceived: _framesReceived,
       framesDetected: _framesDetected,
       frameErrors: _frameErrors,
+      agcGainDb: agcGainDb,
       lastUpdated: DateTime.now(),
     ));
   }
@@ -109,6 +111,11 @@ class RxEngine {
   bool _processing = false;
 
   FrameCodec get _codec => FrameCodec(native);
+  bool get _agcEnabled => _configMap['agc_enabled'] as bool? ?? true;
+  late final AgcProcessor _agc = AgcProcessor(native);
+
+  /// Current AGC gain in dB, or null when AGC is disabled / not running.
+  double? get agcGainDb => _agcEnabled && _agc.isActive ? _agc.gainDb : null;
   bool get _enableRs => _configMap['enable_rs'] as bool? ?? true;
 
   Stream<DecodedMessage> startListening() {
@@ -116,12 +123,19 @@ class RxEngine {
     _isListening = true;
     _sampleBuffer.clear();
     _pendingFrameSince = null;
+    _agc.reset();
     _emitCurrentMetrics(ModemLinkState.listening);
 
     _audio.startCapture().then((_) {
       _audioSubscription = _audio.audioStream.listen((chunk) async {
         if (!_isListening) return;
-        _sampleBuffer.addAll(chunk);
+        // AGC normalises the level before detection/demodulation (#92).
+        final sampleRate =
+            (_configMap['sample_rate'] as num?)?.toInt() ?? 44100;
+        _sampleBuffer.addAll(_agcEnabled
+            ? _agc.process(chunk,
+                sampleRate: sampleRate > 0 ? sampleRate : 44100)
+            : chunk);
         await _processBuffer();
       }, onError: (err) {
         debugPrint('RX Engine audio stream error: $err');
@@ -305,6 +319,7 @@ class RxEngine {
     _audioSubscription?.cancel();
     _audioSubscription = null;
     _audio.stopCapture();
+    _agc.dispose(); // frees the native instance; recreated on next listen
     _emitCurrentMetrics(ModemLinkState.idle);
   }
 

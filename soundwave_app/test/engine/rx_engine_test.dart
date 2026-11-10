@@ -138,6 +138,29 @@ void main() {
       expect(messages, hasLength(1));
     });
 
+    test('routes audio through AGC when enabled (default)', () async {
+      mockNative.agcLinearGain = 0.5;
+      rxEngine.startListening();
+      await settle();
+      mockAudio.pushMockChunk(Float64List(1024));
+      await settle();
+      expect(mockNative.agcProcessCalls, 1);
+      expect(rxEngine.agcGainDb, 6.0);
+      rxEngine.stopListening();
+      expect(mockNative.agcDestroys, 1); // native instance freed on stop
+    });
+
+    test('skips AGC when agc_enabled is false', () async {
+      config['agc_enabled'] = false;
+      rxEngine.startListening();
+      await settle();
+      mockAudio.pushMockChunk(Float64List(1024));
+      await settle();
+      expect(mockNative.agcProcessCalls, 0);
+      expect(rxEngine.agcGainDb, isNull);
+      rxEngine.stopListening();
+    });
+
     test('startListening emits metrics state updates', () async {
       final metricsEvents = <dynamic>[];
       final sub = rxEngine.metrics.listen(metricsEvents.add);

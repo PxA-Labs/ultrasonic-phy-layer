@@ -31,6 +31,25 @@ void main() {
       b.dispose();
     });
 
+    test('AGC toggle defaults on, persists, and clears the gain readout',
+        () async {
+      final store = InMemorySettingsStore();
+      final a = AppState(audio: MockAudioService(), store: store);
+      expect(a.agcEnabled, isTrue);
+      expect(a.configMap['agc_enabled'], isTrue);
+      a.setAgcEnabled(false);
+      await Future<void>.delayed(Duration.zero);
+      expect(store.values['agc_enabled'], false);
+      expect(a.metrics.agcGainDb, isNull);
+
+      final b = AppState(audio: MockAudioService(), store: store);
+      await b.restoreSettings();
+      expect(b.agcEnabled, isFalse);
+      expect(b.configMap['agc_enabled'], isFalse);
+      a.dispose();
+      b.dispose();
+    });
+
     test('presets are persisted', () async {
       final store = InMemorySettingsStore();
       final a = AppState(audio: MockAudioService(), store: store)
