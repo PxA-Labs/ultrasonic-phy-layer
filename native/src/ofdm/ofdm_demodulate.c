@@ -247,8 +247,11 @@ int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** d
         H_p[p] = H[idx];
     }
     float snr_db = chanest_estimate_snr(Y_p, X_p, H_p, num_pilots);
-    float inv_snr = 1.0f / powf(10.0f, snr_db / 10.0f);
-    if (inv_snr > 10.0f) inv_snr = 10.0f;
+    // 1/SNR_linear = 10^(-SNR_dB/10), computed without a division: silent or
+    // garbage pilots give SNR = -inf/NaN, which used to divide by zero
+    // (libFuzzer + UBSan, issue #28). Clamp to the regularisation ceiling.
+    float inv_snr = isfinite(snr_db) ? powf(10.0f, -snr_db / 10.0f) : 10.0f;
+    if (!(inv_snr <= 10.0f)) inv_snr = 10.0f;
 
     // 6. Demodulate, Equalize & Demap each data symbol
     int num_symbols = (int)((payload_len - (size_t)2 * ((size_t)N + (size_t)cp)) / ((size_t)N + (size_t)cp));
