@@ -33,12 +33,36 @@
     {
       "name": "asan",
       "displayName": "ASan Config",
-      "description": "Debug build with AddressSanitizer",
+      "description": "Debug build with AddressSanitizer (+LeakSanitizer on Linux)",
       "binaryDir": "${sourceDir}/build/asan",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "SW_USE_SANITIZER": "ON",
-        "CMAKE_C_FLAGS": "-fsanitize=address -fno-omit-frame-pointer"
+        "SW_ENABLE_ASAN": "ON"
+      }
+    },
+    {
+      "name": "ubsan",
+      "displayName": "UBSan Config",
+      "description": "Debug build with UndefinedBehaviorSanitizer (fatal)",
+      "binaryDir": "${sourceDir}/build/ubsan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SW_ENABLE_UBSAN": "ON"
+      }
+    },
+    {
+      "name": "fuzz",
+      "displayName": "libFuzzer Config",
+      "description": "libFuzzer harnesses with ASan+UBSan (requires LLVM clang)",
+      "binaryDir": "${sourceDir}/build/fuzz",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "SW_BUILD_TESTS": "OFF",
+        "SW_ENABLE_FUZZER": "ON",
+        "SW_ENABLE_ASAN": "ON",
+        "SW_ENABLE_UBSAN": "ON"
       }
     }
   ]
