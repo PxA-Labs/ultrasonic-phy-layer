@@ -5,6 +5,8 @@
 #include "soundwave/sync.h"
 #include "soundwave/common.h"
 #include <string.h>
+#include <stdint.h>
+#include <limits.h>
 #include <math.h>
 #include <stdlib.h>
 
@@ -188,12 +190,21 @@ void ofdm_insert_pilots(const ofdm_config_t* cfg, kiss_fft_cpx* X) {
 
 void ofdm_modulate_symbol(const ofdm_config_t* cfg, const kiss_fft_cpx* X,
                           float* time) {
+    if (!cfg || !X || !time || cfg->num_subcarriers <= 0 || cfg->cp_length < 0) return;
     int N = cfg->num_subcarriers;
     int cp = cfg->cp_length;
 
     kiss_fft_cfg fft_cfg = kiss_fft_alloc(N, 1, NULL, NULL); // 1 = inverse
-    kiss_fft_cpx* temp_in = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* temp_out = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    kiss_fft_cpx* temp_in = (kiss_fft_cpx*)malloc((size_t)N * sizeof(kiss_fft_cpx));
+    kiss_fft_cpx* temp_out = (kiss_fft_cpx*)malloc((size_t)N * sizeof(kiss_fft_cpx));
+    if (!fft_cfg || !temp_in || !temp_out) {
+        // Emit silence rather than dereferencing NULL on allocation failure.
+        memset(time, 0, ((size_t)N + (size_t)cp) * sizeof(float));
+        free(temp_in);
+        free(temp_out);
+        free(fft_cfg);
+        return;
+    }
 
     // Enforce conjugate symmetry on temp_in to get purely real time-domain output
     temp_in[0].r = X[0].r;
@@ -232,6 +243,8 @@ int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
 
     int N = cfg->num_subcarriers;
     int cp = cfg->cp_length;
+    if (N < 16 || N > 4096 || (N & (N - 1)) != 0 || cp < 0 || cp > N)
+        return SW_ERR_BAD_PARAM;
 
     // Check if the capacity can hold at least the 2 preamble symbols
     if (*sample_len < (size_t)(2 * (N + cp))) {
@@ -252,6 +265,10 @@ int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
                                &num_data, &num_pilots, &num_nulls);
 
     int bits_per_symbol = num_data * (cfg->modulation == 0 ? 1 : 2);
+    if (bits_per_symbol <= 0) {
+        free(data_indices); free(pilot_indices); free(null_indices);
+        return SW_ERR_BAD_PARAM;
+    }
     int num_symbols = (int)((bit_len + bits_per_symbol - 1) / bits_per_symbol);
     if (bit_len == 0) num_symbols = 0;
 
@@ -350,14 +367,22 @@ sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg) {
     num_data -= num_pilots;
 
     int bits_per_symbol = num_data * (ofdm_cfg.modulation == 0 ? 1 : 2);
-    int num_symbols = (int)((num_bits + bits_per_symbol - 1) / bits_per_symbol);
-    if (num_bits == 0) num_symbols = 0;
+    if (!bits || num_bits == 0 || bits_per_symbol <= 0) return sig;
+    size_t num_symbols = (num_bits + (size_t)bits_per_symbol - 1) / (size_t)bits_per_symbol;
+    size_t sym_len = (size_t)N + (size_t)cp;
+    if (num_symbols > (size_t)INT_MAX || num_symbols + 2 > SIZE_MAX / sizeof(float) / sym_len)
+        return sig; // would overflow the size computation below
 
-    size_t total_samples = ((size_t)2 + (size_t)num_symbols) * ((size_t)N + (size_t)cp);
+    size_t total_samples = (2 + num_symbols) * sym_len;
     sig.data = (float*)malloc(total_samples * sizeof(float));
     if (!sig.data) return sig;
 
     sig.length = total_samples;
-    ofdm_modulate_frame(&ofdm_cfg, bits, num_bits, sig.data, &sig.length);
+    if (ofdm_modulate_frame(&ofdm_cfg, bits, num_bits, sig.data, &sig.length) != SW_OK) {
+        // Never hand back a partially written (uninitialised) buffer as success.
+        free(sig.data);
+        sig.data = NULL;
+        sig.length = 0;
+    }
     return sig;
 }
