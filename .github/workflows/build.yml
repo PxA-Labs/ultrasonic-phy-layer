@@ -4,6 +4,20 @@ on:
   push:
     branches: [main]
     tags: ['v**']
+  # Also build on PRs that touch the app or this workflow, so platform
+  # breakage is caught before it lands on main.
+  pull_request:
+    paths:
+      - 'soundwave_app/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-android:
