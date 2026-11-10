@@ -218,6 +218,17 @@ flutter run -d windows  # Windows
 
 ---
 
+### Native library for Flutter tests
+
+`SoundwaveNative` loads `libsoundwave` from `native/build/` (then the legacy `build/`). Set `SOUNDWAVE_LIB=/abs/path/to/libsoundwave.{so,dylib,dll}` to pin a specific build, for example a sanitizer build or the one CI produces. `test/native/loopback_test.dart` runs real TX → audio → RX round trips (CSS and OFDM) against it. Locally it is skipped when no library loads, while CI sets `SOUNDWAVE_REQUIRE_NATIVE=1` so a missing library fails the job.
+
+```bash
+cmake -S native -B native/build -DSW_BUILD_TESTS=OFF && cmake --build native/build --target soundwave_shared
+cd soundwave_app && flutter test
+```
+
+---
+
 ## 5. Testing & Debugging Framework
 
 ### Running Native C Unit Tests
