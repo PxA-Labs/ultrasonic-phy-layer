@@ -197,6 +197,54 @@ void main() {
       expect(got.map((m) => m.text).toList(), ['bpsk']);
     });
 
+    test('AGC: decodes frames at -20, 0 and +20 dB input level (#92)',
+        () async {
+      final cfg = baseConfig(); // OFDM; agc_enabled defaults to true
+      final codec = FrameCodec(native!);
+      final rnd = Random(92);
+      final audio = MockAudioService();
+      final rx = RxEngine(
+          native: native, audio: audio, configMap: cfg, useIsolates: false);
+      final got = <String>[];
+      final sub = rx.startListening().listen((m) => got.add(m.text));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // Level changes the way a mic gain or distance change would: signal and
+      // noise floor scale together. +20 dB drives samples far past full scale.
+      final parts = <Float32List>[];
+      for (final (text, gain) in [
+        ('quiet', 0.1),
+        ('normal', 1.0),
+        ('loud', 10.0)
+      ]) {
+        final s =
+            modulate(cfg, codec.encode(Uint8List.fromList(utf8.encode(text))));
+        final x = inNoise(s, 0.01, 4000, 2000, rnd);
+        for (var i = 0; i < x.length; i++) {
+          x[i] *= gain;
+        }
+        parts.add(x);
+      }
+      final g = FrameGeometry.fromConfig(cfg);
+      parts.add(inNoise(Float32List(0), 0.01, 0,
+          2 * RxEngine.retryStepSymbols * g.samplesPerSymbol, rnd));
+      final stream = Float64List.fromList([for (final p in parts) ...p]);
+      for (var i = 0; i < stream.length; i += 441) {
+        audio.pushMockChunk(
+            Float64List.sublistView(stream, i, min(i + 441, stream.length)));
+        await Future<void>.delayed(Duration.zero);
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      final gain = rx.agcGainDb;
+      rx.stopListening();
+      await sub.cancel();
+
+      expect(got, ['quiet', 'normal', 'loud']);
+      expect(native!.hasAgc, isTrue);
+      expect(gain, isNotNull);
+      expect(gain!, inInclusiveRange(-20.0, 32.0));
+    });
+
     test('CSS: receives a short message', () async {
       final got = await receive(baseConfig(modulation: 0), ['Hi']);
       expect(got.map((m) => m.text).toList(), ['Hi']);

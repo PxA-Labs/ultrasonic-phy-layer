@@ -149,6 +149,22 @@ typedef AudioCaptureStartDart = int Function(
   Pointer<Pointer<Void>> handle,
 );
 
+// AGC (issue #92)
+typedef AgcCreateCNative = Int32 Function(
+    Int32 sampleRate, Float targetRms, Pointer<Pointer<Void>> handle);
+typedef AgcCreateDart = int Function(
+    int sampleRate, double targetRms, Pointer<Pointer<Void>> handle);
+typedef AgcProcessCNative = Int32 Function(
+    Pointer<Void> handle, Pointer<Float> samples, IntPtr len);
+typedef AgcProcessDart = int Function(
+    Pointer<Void> handle, Pointer<Float> samples, int len);
+typedef AgcGainDbCNative = Int32 Function(
+    Pointer<Void> handle, Pointer<Float> gainDb);
+typedef AgcGainDbDart = int Function(
+    Pointer<Void> handle, Pointer<Float> gainDb);
+typedef AgcHandleCNative = Int32 Function(Pointer<Void> handle);
+typedef AgcHandleDart = int Function(Pointer<Void> handle);
+
 typedef AudioCaptureStopCNative = Int32 Function(Pointer<Void> handle);
 typedef AudioCaptureStopDart = int Function(Pointer<Void> handle);
 
@@ -301,6 +317,61 @@ class SoundwaveNative {
     throw UnsupportedError(
       'Could not load native Soundwave library. Searched in: $searchPaths',
     );
+  }
+
+  // AGC symbols are resolved lazily so a library built before the AGC module
+  // still loads for everything else; callers can check [hasAgc].
+  late final AgcCreateDart _agcCreate =
+      _lib.lookupFunction<AgcCreateCNative, AgcCreateDart>('sw_agc_create');
+  late final AgcProcessDart _agcProcess =
+      _lib.lookupFunction<AgcProcessCNative, AgcProcessDart>('sw_agc_process');
+  late final AgcGainDbDart _agcGainDb = _lib
+      .lookupFunction<AgcGainDbCNative, AgcGainDbDart>('sw_agc_get_gain_db');
+  late final AgcHandleDart _agcReset =
+      _lib.lookupFunction<AgcHandleCNative, AgcHandleDart>('sw_agc_reset');
+  late final AgcHandleDart _agcDestroy =
+      _lib.lookupFunction<AgcHandleCNative, AgcHandleDart>('sw_agc_destroy');
+
+  /// Whether the loaded library exports the AGC API.
+  bool get hasAgc => _lib.providesSymbol('sw_agc_create');
+
+  /// Creates a native AGC instance ([targetRms] 0 = default 0.25).
+  Pointer<Void> agcCreate(int sampleRate, {double targetRms = 0.0}) {
+    final handlePtr = calloc<Pointer<Void>>();
+    try {
+      final ret = _agcCreate(sampleRate, targetRms, handlePtr);
+      if (ret != 0) throw SwException(ret);
+      return handlePtr.value;
+    } finally {
+      calloc.free(handlePtr);
+    }
+  }
+
+  /// Applies AGC in place to [len] floats at [samples] (caller-owned buffer).
+  void agcProcess(Pointer<Void> handle, Pointer<Float> samples, int len) {
+    final ret = _agcProcess(handle, samples, len);
+    if (ret != 0) throw SwException(ret);
+  }
+
+  double agcGainDb(Pointer<Void> handle) {
+    final out = calloc<Float>();
+    try {
+      final ret = _agcGainDb(handle, out);
+      if (ret != 0) throw SwException(ret);
+      return out.value;
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  void agcReset(Pointer<Void> handle) {
+    final ret = _agcReset(handle);
+    if (ret != 0) throw SwException(ret);
+  }
+
+  void agcDestroy(Pointer<Void> handle) {
+    final ret = _agcDestroy(handle);
+    if (ret != 0) throw SwException(ret);
   }
 
   String get version => _version().toDartString();

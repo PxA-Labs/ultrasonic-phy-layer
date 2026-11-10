@@ -30,6 +30,7 @@ class AppState extends ChangeNotifier {
   double _codingRate = 0.5;
   bool _enableRs = true;
   double _volume = 0.8;
+  bool _agcEnabled = true; // RX automatic gain control (#92)
 
   // Audio devices
   AudioDevice? _inputDevice;
@@ -77,6 +78,7 @@ class AppState extends ChangeNotifier {
     _configMap['coding_rate'] = _codingRate;
     _configMap['enable_rs'] = _enableRs;
     _configMap['volume'] = _volume;
+    _configMap['agc_enabled'] = _agcEnabled;
   }
 
   AppState({AudioService? audio, SettingsStore? store}) : _store = store {
@@ -157,9 +159,15 @@ class AppState extends ChangeNotifier {
         return;
       }
       final currentBps = _throughputCalculator.calculateBitsPerSecond();
-      if ((currentBps - _metrics.bitsPerSecond).abs() > 0.01) {
+      final agc = _rxEngine.agcGainDb;
+      final prevAgc = _metrics.agcGainDb;
+      final agcChanged = (agc == null) != (prevAgc == null) ||
+          (agc != null && prevAgc != null && (agc - prevAgc).abs() >= 0.5);
+      if ((currentBps - _metrics.bitsPerSecond).abs() > 0.01 || agcChanged) {
         _metrics = _metrics.copyWith(
           bitsPerSecond: currentBps,
+          agcGainDb: agc,
+          clearAgcGain: agc == null,
           lastUpdated: DateTime.now(),
         );
         notifyListeners();
@@ -195,6 +203,7 @@ class AppState extends ChangeNotifier {
   double get codingRate => _codingRate;
   bool get enableRs => _enableRs;
   double get volume => _volume;
+  bool get agcEnabled => _agcEnabled;
 
   AudioDevice? get inputDevice => _inputDevice;
   AudioDevice? get outputDevice => _outputDevice;
@@ -256,6 +265,7 @@ class AppState extends ChangeNotifier {
     _codingRate = v['coding_rate'] as double? ?? _codingRate;
     _enableRs = v['enable_rs'] as bool? ?? _enableRs;
     _volume = v['volume'] as double? ?? _volume;
+    _agcEnabled = v['agc_enabled'] as bool? ?? _agcEnabled;
     // A cp from a different FFT size must still be a valid option.
     if (!cpOptionsFor(_numSubcarriers).contains(_cpLength)) {
       _cpLength = _numSubcarriers ~/ 8;
@@ -359,6 +369,12 @@ class AppState extends ChangeNotifier {
     _updateConfigField('volume', v);
   }
 
+  void setAgcEnabled(bool v) {
+    _agcEnabled = v;
+    if (!v) _metrics = _metrics.copyWith(clearAgcGain: true);
+    _updateConfigField('agc_enabled', v);
+  }
+
   void setInputDevice(AudioDevice? device) {
     _inputDevice = device;
     notifyListeners();
@@ -376,6 +392,7 @@ class AppState extends ChangeNotifier {
       _rxEngine.stopListening();
       _isListening = false;
       _metrics = _metrics.copyWith(
+        clearAgcGain: true,
         connectionState:
             _isTransmitting ? ModemLinkState.transmitting : ModemLinkState.idle,
       );

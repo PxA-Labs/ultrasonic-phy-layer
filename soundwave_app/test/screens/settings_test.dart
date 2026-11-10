@@ -65,6 +65,26 @@ void main() {
       expect(find.textContaining('(512)'), findsOneWidget); // 1/4 of 2048
     });
 
+    testWidgets('AGC switch toggles AppState', (tester) async {
+      final state = AppState(audio: MockAudioService());
+      await tester.pumpWidget(ChangeNotifierProvider.value(
+        value: state,
+        child: const MaterialApp(home: SettingsScreen()),
+      ));
+      final toggle = find.byKey(const Key('agc_toggle'));
+      // The settings list builds lazily: scroll until the audio card exists.
+      await tester.scrollUntilVisible(toggle, 300,
+          scrollable: find.byType(Scrollable).first);
+      await tester.ensureVisible(toggle);
+      await tester.pumpAndSettle();
+      expect(state.agcEnabled, isTrue);
+      await tester
+          .tap(find.descendant(of: toggle, matching: find.byType(Switch)));
+      await tester.pumpAndSettle();
+      expect(state.agcEnabled, isFalse);
+      expect(state.configMap['agc_enabled'], isFalse);
+    });
+
     testWidgets('load presets', (tester) async {
       await tester.pumpWidget(createApp());
       await tester.tap(find.textContaining('Long Range'));

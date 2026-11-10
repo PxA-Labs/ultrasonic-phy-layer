@@ -172,6 +172,16 @@ class SettingsScreen extends StatelessWidget {
                     label: '${(state.volume * 100).toInt()}%',
                     onChanged: (v) => state.setVolume(v),
                   ),
+                  SwitchListTile(
+                    key: const Key('agc_toggle'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Automatic Gain Control (AGC)'),
+                    subtitle: const Text(
+                        'Normalises microphone level before decoding '
+                        '(-20 to +32 dB). Turn off for manual gain testing.'),
+                    value: state.agcEnabled,
+                    onChanged: state.setAgcEnabled,
+                  ),
                 ],
               ),
             ),

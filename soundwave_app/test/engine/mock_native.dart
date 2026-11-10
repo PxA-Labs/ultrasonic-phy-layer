@@ -29,6 +29,38 @@ class MockSoundwaveNative implements SoundwaveNative {
         if (withParity) ...List.filled(32, 0xAA), // parity
       ]);
 
+  /// Mock AGC: multiplies samples by [agcLinearGain] and reports
+  /// [agcReportedGainDb]. Set [hasAgc] false to simulate an old library.
+  @override
+  bool hasAgc = true;
+  double agcLinearGain = 1.0;
+  double agcReportedGainDb = 6.0;
+  int agcCreates = 0, agcProcessCalls = 0, agcDestroys = 0, agcResets = 0;
+
+  @override
+  Pointer<Void> agcCreate(int sampleRate, {double targetRms = 0.0}) {
+    agcCreates++;
+    return Pointer<Void>.fromAddress(0x1000 + agcCreates);
+  }
+
+  @override
+  void agcProcess(Pointer<Void> handle, Pointer<Float> samples, int len) {
+    agcProcessCalls++;
+    final v = samples.asTypedList(len);
+    for (var i = 0; i < len; i++) {
+      v[i] *= agcLinearGain;
+    }
+  }
+
+  @override
+  double agcGainDb(Pointer<Void> handle) => agcReportedGainDb;
+
+  @override
+  void agcReset(Pointer<Void> handle) => agcResets++;
+
+  @override
+  void agcDestroy(Pointer<Void> handle) => agcDestroys++;
+
   @override
   String get version => '1.0.0-mock';
 
