@@ -14,13 +14,17 @@ static size_t get_num_parity(size_t n) {
 }
 
 // 1. Syndrome Computation
-void rs_compute_syndromes(const uint8_t* r, size_t n, uint8_t* S) {
-    if (!r || !S || n == 0) return;
-    size_t num_parity = get_num_parity(n);
+static void rs_compute_syndromes_nsym(const uint8_t* r, size_t n, size_t num_parity,
+                                      uint8_t* S) {
     for (size_t j = 0; j < num_parity; j++) {
         uint8_t alpha_j = gf_pow(2, (int)(j + 1));
         S[j] = gf_poly_eval(r, n, alpha_j);
     }
+}
+
+void rs_compute_syndromes(const uint8_t* r, size_t n, uint8_t* S) {
+    if (!r || !S || n == 0) return;
+    rs_compute_syndromes_nsym(r, n, get_num_parity(n), S);
 }
 
 // Check if all syndromes are zero
@@ -139,11 +143,10 @@ void rs_chien_search(const uint8_t* lambda, int degree,
 }
 
 // 4. Forney Algorithm
-void rs_forney_n(const uint8_t* omega, const uint8_t* lambda,
-                 const int* positions, int count, size_t n, uint8_t* magnitudes) {
+static void rs_forney_nsym(const uint8_t* omega, const uint8_t* lambda,
+                           const int* positions, int count, size_t n,
+                           size_t num_parity, uint8_t* magnitudes) {
     if (!omega || !lambda || !positions || !magnitudes || count <= 0 || n == 0) return;
-
-    size_t num_parity = get_num_parity(n);
 
     for (int i = 0; i < count; i++) {
         int pos = positions[i];
@@ -176,6 +179,11 @@ void rs_forney_n(const uint8_t* omega, const uint8_t* lambda,
     }
 }
 
+void rs_forney_n(const uint8_t* omega, const uint8_t* lambda,
+                 const int* positions, int count, size_t n, uint8_t* magnitudes) {
+    rs_forney_nsym(omega, lambda, positions, count, n, get_num_parity(n), magnitudes);
+}
+
 void rs_forney(const uint8_t* omega, const uint8_t* lambda,
                int* positions, int count, uint8_t* magnitudes) {
     rs_forney_n(omega, lambda, positions, count, 255, magnitudes);
@@ -184,8 +192,14 @@ void rs_forney(const uint8_t* omega, const uint8_t* lambda,
 // 5. Full Decoder Integration
 int rs_decode(uint8_t* r, size_t n) {
     if (!r || n == 0 || n > 255) return -1;
+    return rs_decode_nsym(r, n, get_num_parity(n));
+}
 
-    size_t num_parity = get_num_parity(n);
+int rs_decode_nsym(uint8_t* r, size_t n, size_t num_parity) {
+    // num_parity is bounded by the 64-entry syndrome/locator buffers below and
+    // must leave at least one data symbol.
+    if (!r || n == 0 || n > 255 || num_parity < 2 || num_parity > 64 || num_parity >= n)
+        return -1;
     uint8_t S[64] = {0};
     uint8_t lambda[65] = {0};
     uint8_t omega[65] = {0};
@@ -194,7 +208,7 @@ int rs_decode(uint8_t* r, size_t n) {
     uint8_t error_mag[64] = {0};
 
     // 1. Compute syndromes
-    rs_compute_syndromes(r, n, S);
+    rs_compute_syndromes_nsym(r, n, num_parity, S);
 
     // If all syndromes zero -> no errors
     if (rs_syndromes_all_zero(S, num_parity)) {
@@ -214,7 +228,7 @@ int rs_decode(uint8_t* r, size_t n) {
     }
 
     // 4. Forney Algorithm
-    rs_forney_n(omega, lambda, error_pos, error_count, n, error_mag);
+    rs_forney_nsym(omega, lambda, error_pos, error_count, n, num_parity, error_mag);
 
     // 5. Apply error corrections
     for (int i = 0; i < error_count; i++) {
@@ -222,7 +236,7 @@ int rs_decode(uint8_t* r, size_t n) {
     }
 
     // 6. Re-verify syndromes to prevent false positive corrections
-    rs_compute_syndromes(r, n, S);
+    rs_compute_syndromes_nsym(r, n, num_parity, S);
     if (!rs_syndromes_all_zero(S, num_parity)) {
         // Revert changes if re-verification failed
         for (int i = 0; i < error_count; i++) {

@@ -49,5 +49,10 @@ void    rs_forney(const uint8_t* omega, const uint8_t* lambda,
 // Full decode: correct errors in r[0..n-1] in place.
 // Returns number of errors corrected, or -1 if uncorrectable.
 int     rs_decode(uint8_t* r, size_t n);
+// Decode with an explicit parity count (nsym = n - k). rs_decode() infers
+// nsym from n (63 -> 16, 31 -> 10, else 32), which is wrong for shortened
+// RS(k+32, k) codes whose length happens to be 63 (k = 31); callers that know
+// their code parameters must use this variant.
+int     rs_decode_nsym(uint8_t* r, size_t n, size_t nsym);
 
 #endif // SOUNDWAVE_RS_H

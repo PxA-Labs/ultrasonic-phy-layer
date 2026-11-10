@@ -9,6 +9,54 @@
 #include "soundwave/sync.h"
 #include "soundwave/cfo.h"
 #include "soundwave/audio.h"
+#include <math.h>
+#include <string.h>
+
+// ---------------------------------------------------------------------------
+// Configuration validation (FFI trust boundary). See sw_config_validate() docs.
+// ---------------------------------------------------------------------------
+
+#define SW_MIN_SAMPLE_RATE   8000
+#define SW_MAX_SAMPLE_RATE   192000
+#define SW_DEFAULT_RATE      44100
+#define SW_MIN_SF            6
+#define SW_MAX_SF            12
+#define SW_MIN_SUBCARRIERS   16
+#define SW_MAX_SUBCARRIERS   4096
+#define SW_MAX_SYMBOL_SEC    1.0f
+
+static int is_pow2(int v) { return v > 0 && (v & (v - 1)) == 0; }
+
+static int finite_nonneg(float v) { return isfinite(v) && v >= 0.0f; }
+
+SW_API int sw_config_validate(sw_config_t cfg) {
+    if (cfg.modulation != 0 && cfg.modulation != 1) return SW_ERR_BAD_PARAM;
+    if (cfg.equalizer != 0 && cfg.equalizer != 1) return SW_ERR_BAD_PARAM;
+    if (cfg.ofdm_modulation != 0 && cfg.ofdm_modulation != 1) return SW_ERR_BAD_PARAM;
+
+    if (cfg.sample_rate != 0 &&
+        (cfg.sample_rate < SW_MIN_SAMPLE_RATE || cfg.sample_rate > SW_MAX_SAMPLE_RATE))
+        return SW_ERR_BAD_PARAM;
+    float nyquist = 0.5f * (float)(cfg.sample_rate ? cfg.sample_rate : SW_DEFAULT_RATE);
+
+    if (!isfinite(cfg.coding_rate)) return SW_ERR_BAD_PARAM;
+    if (!finite_nonneg(cfg.threshold)) return SW_ERR_BAD_PARAM;
+    if (!finite_nonneg(cfg.carrier_freq) || cfg.carrier_freq > nyquist) return SW_ERR_BAD_PARAM;
+    if (!finite_nonneg(cfg.bandwidth) || cfg.bandwidth > nyquist) return SW_ERR_BAD_PARAM;
+    if (!finite_nonneg(cfg.symbol_duration) || cfg.symbol_duration > SW_MAX_SYMBOL_SEC)
+        return SW_ERR_BAD_PARAM;
+    if (!finite_nonneg(cfg.amplitude) || cfg.amplitude > 1.0f) return SW_ERR_BAD_PARAM;
+
+    if (cfg.sf != 0 && (cfg.sf < SW_MIN_SF || cfg.sf > SW_MAX_SF)) return SW_ERR_BAD_PARAM;
+
+    int N = cfg.num_subcarriers;
+    if (N != 0 && (!is_pow2(N) || N < SW_MIN_SUBCARRIERS || N > SW_MAX_SUBCARRIERS))
+        return SW_ERR_BAD_PARAM;
+    int n_eff = N ? N : 256; // OFDM default
+    if (cfg.cp_length < 0 || cfg.cp_length > n_eff) return SW_ERR_BAD_PARAM;
+    if (cfg.num_pilots < 0 || cfg.num_pilots > n_eff / 2) return SW_ERR_BAD_PARAM;
+    return SW_OK;
+}
 
 SW_API const char* sw_version(void) { return SW_VERSION; }
 
@@ -35,14 +83,16 @@ SW_API int sw_rs_decode(uint8_t* data, size_t* data_len,
                         int* errors_corrected) {
     if (!data || !data_len || !parity || !errors_corrected) return SW_ERR_BAD_PARAM;
     size_t k = *data_len;
+    // Bound each term before adding so k + parity_len cannot wrap around.
+    if (k == 0 || k > 255 || parity_len < 2 || parity_len > 255 - k) return SW_ERR_BAD_PARAM;
     size_t n = k + parity_len;
-    if (n > 255 || k == 0) return SW_ERR_BAD_PARAM;
 
-    uint8_t r[256];
+    uint8_t r[255];
     memcpy(r, data, k);
     memcpy(r + k, parity, parity_len);
 
-    int errs = rs_decode(r, n);
+    // The parity length is known here: never let the decoder guess it from n.
+    int errs = rs_decode_nsym(r, n, parity_len);
     if (errs < 0) {
         return SW_ERR_DECODE;
     }
@@ -55,6 +105,7 @@ SW_API int sw_rs_decode(uint8_t* data, size_t* data_len,
 SW_API int sw_css_modulate(const uint8_t* bits, size_t bit_len,
                            sw_config_t cfg, float* samples, size_t* sample_len) {
     if (!bits || !samples || !sample_len || bit_len == 0) return SW_ERR_BAD_PARAM;
+    if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
 
     sw_signal sig = css_modulate(bits, bit_len, cfg);
     if (!sig.data) return SW_ERR_MEMORY;
@@ -74,6 +125,7 @@ SW_API int sw_css_modulate(const uint8_t* bits, size_t bit_len,
 SW_API int sw_css_demodulate(const float* samples, size_t sample_len,
                              sw_config_t cfg, uint8_t* bits, size_t* bit_len) {
     if (!samples || !bits || !bit_len || sample_len == 0 || *bit_len == 0) return SW_ERR_BAD_PARAM;
+    if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
 
     size_t out_bytes = 0;
     uint8_t* decoded = css_demodulate(samples, sample_len, cfg, &out_bytes);
@@ -99,6 +151,7 @@ SW_API int sw_css_demodulate(const float* samples, size_t sample_len,
 SW_API int sw_ofdm_modulate(const uint8_t* bits, size_t bit_len,
                             sw_config_t cfg, float* samples, size_t* sample_len) {
     if (!bits || !samples || !sample_len || bit_len == 0) return SW_ERR_BAD_PARAM;
+    if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
 
     sw_signal sig = ofdm_modulate(bits, bit_len, cfg);
     if (!sig.data) return SW_ERR_MEMORY;
@@ -119,6 +172,7 @@ SW_API int sw_ofdm_modulate(const uint8_t* bits, size_t bit_len,
 SW_API int sw_ofdm_demodulate(const float* samples, size_t sample_len,
                               sw_config_t cfg, uint8_t* bits, size_t* bit_len) {
     if (!samples || !bits || !bit_len || sample_len == 0 || *bit_len == 0) return SW_ERR_BAD_PARAM;
+    if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
 
     size_t out_bits_count = 0;
     uint8_t* decoded = NULL;
@@ -146,6 +200,7 @@ SW_API int sw_ofdm_demodulate(const float* samples, size_t sample_len,
 SW_API int sw_detect_frame(const float* samples, size_t len,
                            sw_config_t cfg, size_t* frame_start, float* snr) {
     if (!samples || !frame_start || !snr || len == 0) return SW_ERR_BAD_PARAM;
+    if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
     
     sync_config_t sync_cfg;
     memset(&sync_cfg, 0, sizeof(sync_cfg));
@@ -180,9 +235,14 @@ SW_API int sw_detect_frame(const float* samples, size_t len,
 SW_API int sw_estimate_cfo(const float* samples, size_t len,
                            sw_config_t cfg, float* cfo_hz) {
     if (!samples || !cfo_hz || len == 0) return SW_ERR_BAD_PARAM;
-    int N = cfg.num_subcarriers;
-    int cp = cfg.cp_length;
-    *cfo_hz = sync_schmidl_cox_cfo(samples, len, N + cp, (float)cfg.sample_rate);
+    if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
+    // Same defaults as the OFDM modules (config already validated).
+    int N = cfg.num_subcarriers ? cfg.num_subcarriers : 256;
+    int cp = cfg.cp_length ? cfg.cp_length : N / 8;
+    int fs = cfg.sample_rate ? cfg.sample_rate : SW_DEFAULT_RATE;
+    size_t period = (size_t)N + (size_t)cp;
+    if (len < 2 * period) return SW_ERR_SYNC; // two repeated symbols required
+    *cfo_hz = sync_schmidl_cox_cfo(samples, len, (int)period, (float)fs);
     return SW_OK;
 }
 
@@ -193,6 +253,8 @@ typedef struct {
 
 SW_API int sw_audio_capture_start(sw_config_t cfg, void** handle) {
     if (!handle) return SW_ERR_BAD_PARAM;
+    if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
+    if (cfg.sample_rate == 0) cfg.sample_rate = SW_DEFAULT_RATE;
 
     sw_audio_capture_handle_t* h = (sw_audio_capture_handle_t*)calloc(1, sizeof(sw_audio_capture_handle_t));
     if (!h) return SW_ERR_MEMORY;
@@ -237,6 +299,8 @@ typedef struct {
 
 SW_API int sw_audio_playback_start(sw_config_t cfg, void** handle) {
     if (!handle) return SW_ERR_BAD_PARAM;
+    if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
+    if (cfg.sample_rate == 0) cfg.sample_rate = SW_DEFAULT_RATE;
 
     sw_audio_playback_handle_t* h = (sw_audio_playback_handle_t*)calloc(1, sizeof(sw_audio_playback_handle_t));
     if (!h) return SW_ERR_MEMORY;
