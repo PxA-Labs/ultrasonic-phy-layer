@@ -273,3 +273,73 @@ SW_API int sw_audio_playback_write(void* handle, const float* buffer,
     sw_audio_playback_handle_t* h = (sw_audio_playback_handle_t*)handle;
     return audio_playback_write(h->play, buffer, count);
 }
+
+/* ------------------------------------------------------------------------
+ * AGC (issue #92). Handles carry a magic tag so a stale or garbage pointer
+ * passed across the FFI boundary is rejected instead of dereferenced as an
+ * AGC state; the tag is cleared on destroy.
+ * ------------------------------------------------------------------------ */
+
+#include "soundwave/agc.h"
+#include <math.h>
+
+#define SW_AGC_MAGIC 0x41474331u /* "AGC1" */
+
+typedef struct {
+    uint32_t magic;
+    agc_state_t* agc;
+} sw_agc_handle_t;
+
+static sw_agc_handle_t* agc_handle(void* handle) {
+    sw_agc_handle_t* h = (sw_agc_handle_t*)handle;
+    return (h && h->magic == SW_AGC_MAGIC && h->agc) ? h : NULL;
+}
+
+SW_API int sw_agc_create(int sample_rate, float target_rms, void** handle) {
+    if (!handle) return SW_ERR_BAD_PARAM;
+    *handle = NULL;
+    if (target_rms == 0.0f) target_rms = AGC_DEFAULT_TARGET_RMS;
+    if (sample_rate < 8000 || sample_rate > 192000 || !isfinite(target_rms) ||
+        target_rms <= 0.0f || target_rms > 1.0f)
+        return SW_ERR_BAD_PARAM;
+    sw_agc_handle_t* h = (sw_agc_handle_t*)calloc(1, sizeof(*h));
+    if (!h) return SW_ERR_MEMORY;
+    h->agc = agc_create((float)sample_rate, target_rms);
+    if (!h->agc) {
+        free(h);
+        return SW_ERR_MEMORY;
+    }
+    h->magic = SW_AGC_MAGIC;
+    *handle = h;
+    return SW_OK;
+}
+
+SW_API int sw_agc_process(void* handle, float* samples, size_t len) {
+    sw_agc_handle_t* h = agc_handle(handle);
+    if (!h || (!samples && len > 0)) return SW_ERR_BAD_PARAM;
+    return agc_process(h->agc, samples, len) == 0 ? SW_OK : SW_ERR_BAD_PARAM;
+}
+
+SW_API int sw_agc_get_gain_db(void* handle, float* gain_db) {
+    sw_agc_handle_t* h = agc_handle(handle);
+    if (!h || !gain_db) return SW_ERR_BAD_PARAM;
+    *gain_db = agc_gain_db(h->agc);
+    return SW_OK;
+}
+
+SW_API int sw_agc_reset(void* handle) {
+    sw_agc_handle_t* h = agc_handle(handle);
+    if (!h) return SW_ERR_BAD_PARAM;
+    agc_reset(h->agc);
+    return SW_OK;
+}
+
+SW_API int sw_agc_destroy(void* handle) {
+    sw_agc_handle_t* h = agc_handle(handle);
+    if (!h) return SW_ERR_BAD_PARAM;
+    agc_destroy(h->agc);
+    h->agc = NULL;
+    h->magic = 0;
+    free(h);
+    return SW_OK;
+}
