@@ -49,8 +49,10 @@ done:
 float sync_schmidl_cox_cfo(const float* y, size_t len, int N, float fs) {
     // Needs two repeated halves of N samples; anything else has no estimate.
     if (!y || N <= 0 || len < 2 * (size_t)N || !isfinite(fs) || fs <= 0.0f) return 0.0f;
-    float* ar = (float*)malloc(len * sizeof(float));
-    float* ai = (float*)malloc(len * sizeof(float));
+    // Zero-initialised so no path can read indeterminate values
+    // (clang-analyzer UndefinedBinaryOperatorResult).
+    float* ar = (float*)calloc(len, sizeof(float));
+    float* ai = (float*)calloc(len, sizeof(float));
     float cfo = 0.0f;
     if (ar && ai && sync_real_to_analytic(y, len, ar, ai) == 0) {
         double sum_real = 0.0, sum_imag = 0.0;
