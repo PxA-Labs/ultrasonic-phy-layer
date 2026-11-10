@@ -1,68 +1,60 @@
-// FEC module — RS(255,223) encode/decode with convolutional interleaving.
+// FEC module — RS(255,223) encode/decode with block interleaving.
 
 #include "soundwave/fec.h"
 #include "soundwave/rs.h"
 #include <string.h>
 
-#define INTERLEAVE_BRANCHES 12
-#define INTERLEAVE_DEPTH    17
+#define FEC_N      255
+#define FEC_K      223
+#define FEC_NSYM   (FEC_N - FEC_K)
+#define FEC_DEPTH  17 // interleaver columns; 255 = 15 x 17
 
+// Column-major read-out of a row-major grid with FEC_DEPTH columns. This is a
+// bijection for every len, so no symbol is dropped or duplicated (the previous
+// delay-line scheme only covered 204 of 255 positions and left the rest of the
+// output uninitialised). `in` and `out` must not alias.
 void fec_interleave(const uint8_t* in, size_t len, uint8_t* out) {
-    size_t idx = 0;
-    for (int b = 0; b < INTERLEAVE_BRANCHES && idx < len; b++) {
-        for (int d = 0; d < INTERLEAVE_DEPTH && idx < len; d++) {
-            int delay = (INTERLEAVE_DEPTH - 1) * b;
-            size_t pos = idx + (size_t)delay;
-            if (pos < len) out[pos] = in[idx];
-            idx++;
-        }
-    }
+    if (!in || !out || in == out) return;
+    size_t k = 0;
+    for (size_t c = 0; c < FEC_DEPTH; c++)
+        for (size_t i = c; i < len; i += FEC_DEPTH) out[k++] = in[i];
 }
 
 void fec_deinterleave(const uint8_t* in, size_t len, uint8_t* out) {
-    size_t idx = 0;
-    for (int b = 0; b < INTERLEAVE_BRANCHES && idx < len; b++) {
-        for (int d = 0; d < INTERLEAVE_DEPTH && idx < len; d++) {
-            int delay = (INTERLEAVE_DEPTH - 1) * b;
-            size_t pos = idx + (size_t)delay;
-            if (pos < len) out[idx] = in[pos];
-            idx++;
-        }
-    }
+    if (!in || !out || in == out) return;
+    size_t k = 0;
+    for (size_t c = 0; c < FEC_DEPTH; c++)
+        for (size_t i = c; i < len; i += FEC_DEPTH) out[i] = in[k++];
 }
 
 int fec_encode(const uint8_t* data, size_t data_len,
                uint8_t* coded, size_t* coded_len) {
-    if (data_len > 223) return -1;
-    size_t rs_len = 255;
+    if (!coded || !coded_len || data_len > FEC_K || (data_len && !data)) return -1;
 
-    // Pad to 223, RS encode (data -> coded)
-    uint8_t buf[223];
-    memset(buf, 0, 223);
-    memcpy(buf, data, data_len);
-    rs_encode(buf, data_len, coded, rs_len);
+    // Systematic codeword: [data zero-padded to 223][32 parity bytes].
+    uint8_t codeword[FEC_N];
+    memset(codeword, 0, sizeof codeword);
+    if (data_len) memcpy(codeword, data, data_len);
+    rs_encode(codeword, FEC_K, codeword + FEC_K, FEC_N);
 
-    // Interleave in place
-    fec_interleave(coded, rs_len, coded);
-
-    *coded_len = rs_len;
+    fec_interleave(codeword, FEC_N, coded);
+    *coded_len = FEC_N;
     return 0;
 }
 
 int fec_decode(const uint8_t* coded, size_t coded_len,
                uint8_t* data, size_t* data_len, int* errors_corrected) {
-    if (coded_len < 255) return -1;
+    if (errors_corrected) *errors_corrected = -1;
+    if (!coded || !data || !data_len || coded_len < FEC_N) return -1;
 
-    // Deinterleave
-    uint8_t deinterleaved[255];
-    fec_deinterleave(coded, coded_len, deinterleaved);
+    uint8_t codeword[FEC_N];
+    fec_deinterleave(coded, FEC_N, codeword); // only the first block is used
 
-    // RS decode (in-place)
-    int errs = rs_decode(deinterleaved, 255);
+    int errs = rs_decode_nsym(codeword, FEC_N, FEC_NSYM);
     if (errors_corrected) *errors_corrected = errs;
     if (errs < 0) return -1;
 
-    memcpy(data, deinterleaved, 223);
-    *data_len = 223;
+    memcpy(data, codeword, FEC_K);
+    *data_len = FEC_K;
     return errs;
 }

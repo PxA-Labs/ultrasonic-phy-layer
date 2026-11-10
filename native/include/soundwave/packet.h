@@ -7,7 +7,7 @@
 
 typedef struct {
     uint16_t sync_word;    // 2-byte sync word (default 0xA53C)
-    size_t max_payload;    // Maximum payload bytes (default 256)
+    size_t max_payload;    // Maximum payload bytes (default and upper bound 255)
     int preamble_len;      // Preamble length in bytes (default 64)
     int header_len;        // Header length in bytes (default 8)
 } packet_config_t;
