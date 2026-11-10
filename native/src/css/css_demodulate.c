@@ -5,6 +5,10 @@
 #include "soundwave/common.h"
 #include "kiss_fft.h"
 #include <string.h>
+#include <limits.h>
+
+// Below this a chirp cannot carry a symbol (and N_sym = 0 would divide by 0).
+#define CSS_MIN_SYMBOL_SAMPLES 16
 #include <math.h>
 #include <stdlib.h>
 
@@ -102,19 +106,23 @@ uint8_t* css_demodulate(const float* samples, size_t len, sw_config cfg, size_t*
     if (cfg.symbol_duration <= 0.0f) cfg.symbol_duration = 0.02f;
     if (cfg.amplitude <= 0.0f) cfg.amplitude = 0.8f;
 
-    int N_pre = (int)(cfg.symbol_duration * cfg.sample_rate + 0.5);
-    int N_sym = N_pre;
-
     // Generate templates
     sw_signal pre_up = css_generate_chirp(cfg.carrier_freq, cfg.bandwidth, cfg.symbol_duration, cfg.amplitude, 0.0, cfg.sample_rate);
     sw_signal pre_down = css_generate_chirp(cfg.carrier_freq, -cfg.bandwidth, cfg.symbol_duration, cfg.amplitude, 0.0, cfg.sample_rate);
 
-    if (!pre_up.data || !pre_down.data) {
+    // Symbol length comes from the templates themselves: an independently
+    // rounded value could exceed the template and over-read it, or be 0 and
+    // divide by zero below. Inputs must also fit in int indexing.
+    if (!pre_up.data || !pre_down.data || pre_up.length != pre_down.length ||
+        pre_up.length < CSS_MIN_SYMBOL_SAMPLES || len > (size_t)INT_MAX) {
         free(pre_up.data);
         free(pre_down.data);
         *out_bytes = 0;
         return NULL;
     }
+
+    int N_pre = (int)pre_up.length;
+    int N_sym = N_pre;
 
     // Sync
     int max_search = (int)len - 10 * N_pre;
@@ -136,7 +144,6 @@ uint8_t* css_demodulate(const float* samples, size_t len, sw_config cfg, size_t*
         return NULL;
     }
 
-    printf("DEBUG: allocated power buffers, starting correlation loop\n");
     for (int m = 0; m < max_search; m++) {
         float corr_up = 0.0f;
         float corr_down = 0.0f;
