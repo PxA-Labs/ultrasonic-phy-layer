@@ -127,6 +127,7 @@ set(SW_SOURCES
     src/rs/rs_decoder.c
     src/sync/sync_cfo.c
     src/sync/sync_frame.c
+    src/sync/sync_xcorr.c
 )
 
 # Object library target containing common compiled objects

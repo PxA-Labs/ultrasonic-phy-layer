@@ -3,6 +3,7 @@
 
 #include "soundwave/css.h"
 #include "soundwave/common.h"
+#include "soundwave/sync.h"
 #include "kiss_fft.h"
 #include <string.h>
 #include <limits.h>
@@ -144,15 +145,14 @@ uint8_t* css_demodulate(const float* samples, size_t len, sw_config cfg, size_t*
         return NULL;
     }
 
-    for (int m = 0; m < max_search; m++) {
-        float corr_up = 0.0f;
-        float corr_down = 0.0f;
-        for (int n = 0; n < N_pre; n++) {
-            corr_up += samples[m + n] * pre_up.data[n];
-            corr_down += samples[m + n] * pre_down.data[n];
-        }
-        power_up[m] = corr_up * corr_up;
-        power_down[m] = corr_down * corr_down;
+    // Matched-filter power via FFT correlation (O(len log N) instead of
+    // O(len * N); see sync_xcorr.c).
+    if (sync_xcorr_power_fft(samples, (size_t)len, pre_up.data, (size_t)N_pre,
+                             power_up, (size_t)max_search) != 0 ||
+        sync_xcorr_power_fft(samples, (size_t)len, pre_down.data, (size_t)N_pre,
+                             power_down, (size_t)max_search) != 0) {
+        memset(power_up, 0, (size_t)max_search * sizeof(float));
+        memset(power_down, 0, (size_t)max_search * sizeof(float));
     }
 
     // Compute template energies for threshold
@@ -309,15 +309,14 @@ int css_detect_and_sync(const float* samples, int len, int SF, int N, float* tim
         return 0;
     }
 
-    for (int m = 0; m < max_search; m++) {
-        float corr_up = 0.0f;
-        float corr_down = 0.0f;
-        for (int n = 0; n < N; n++) {
-            corr_up += samples[m + n] * pre_up.data[n];
-            corr_down += samples[m + n] * pre_down.data[n];
-        }
-        power_up[m] = corr_up * corr_up;
-        power_down[m] = corr_down * corr_down;
+    // Matched-filter power via FFT correlation (O(len log N) instead of
+    // O(len * N); see sync_xcorr.c).
+    if (sync_xcorr_power_fft(samples, (size_t)len, pre_up.data, (size_t)N,
+                             power_up, (size_t)max_search) != 0 ||
+        sync_xcorr_power_fft(samples, (size_t)len, pre_down.data, (size_t)N,
+                             power_down, (size_t)max_search) != 0) {
+        memset(power_up, 0, (size_t)max_search * sizeof(float));
+        memset(power_down, 0, (size_t)max_search * sizeof(float));
     }
 
     float max_score = 0.0f;

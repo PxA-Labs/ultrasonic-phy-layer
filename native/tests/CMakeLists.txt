@@ -35,6 +35,7 @@ sw_add_test(test_e2e                 test_e2e.c)
 sw_add_test(integration_loopback     integration_loopback.c)
 sw_add_test(test_ber                 test_ber.c)
 sw_add_test(test_memsafety           test_memsafety.c)
+sw_add_test(test_xcorr               test_xcorr.c)
 
 # Sanitizer canary (issue #28): deliberate memory errors that ASan must report.
 # A silently missing sanitizer prints no report, so the test fails.

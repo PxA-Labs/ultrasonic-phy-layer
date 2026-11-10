@@ -8,9 +8,9 @@
 #       ./build-fuzz/Fuzzing/fuzz_api -max_total_time=60
 #
 #   otherwise (SW_FUZZ_SMOKE=ON, default) -> harness + standalone_main.c driver,
-#       registered with CTest as <name>_smoke. Each run replays any files given on
-#       the command line, then feeds SW_FUZZ_SMOKE_RUNS deterministic pseudo-random
-#       inputs. Combine with SW_ENABLE_ASAN/UBSAN for sanitizer coverage on any
+#       registered with CTest as <name>_smoke. Each run replays the committed
+#       reproducers in regressions/<name>/ (inputs that once crashed or hung),
+#       then feeds SW_FUZZ_SMOKE_RUNS deterministic pseudo-random inputs. Combine with SW_ENABLE_ASAN/UBSAN for sanitizer coverage on any
 #       compiler (GCC, AppleClang, MSVC).
 
 set(SW_FUZZ_TARGETS
@@ -39,8 +39,10 @@ foreach(target ${SW_FUZZ_TARGETS})
         target_link_options(${target} PRIVATE -fsanitize=fuzzer)
     else()
         add_executable(${target} ${target}.c standalone_main.c)
+        # Replay every committed reproducer (regressions/<target>/*) first.
+        file(GLOB _regressions "${CMAKE_CURRENT_SOURCE_DIR}/regressions/${target}/*")
         add_test(NAME ${target}_smoke
-                 COMMAND ${target} -runs=${SW_FUZZ_SMOKE_RUNS} -seed=1)
+                 COMMAND ${target} -runs=${SW_FUZZ_SMOKE_RUNS} -seed=1 ${_regressions})
         set_tests_properties(${target}_smoke PROPERTIES LABELS "fuzz" TIMEOUT 600)
         if(SW_FUZZ_USE_GUARD_MALLOC)
             set_tests_properties(${target}_smoke PROPERTIES

@@ -103,15 +103,14 @@ int sync_detect_frame(const float* samples, size_t len,
             return 0;
         }
         
-        for (size_t m = 0; m < max_search; m++) {
-            float corr_up = 0.0f;
-            float corr_down = 0.0f;
-            for (size_t n = 0; n < N_pre; n++) {
-                corr_up += samples[m + n] * pre_up.data[n];
-                corr_down += samples[m + n] * pre_down.data[n];
-            }
-            power_up[m] = corr_up * corr_up;
-            power_down[m] = corr_down * corr_down;
+        // Matched-filter power via FFT correlation (see sync_xcorr.c).
+        if (sync_xcorr_power_fft(samples, len, pre_up.data, N_pre,
+                                 power_up, max_search) != 0 ||
+            sync_xcorr_power_fft(samples, len, pre_down.data, N_pre,
+                                 power_down, max_search) != 0) {
+            free(power_up); free(power_down);
+            free(pre_up.data); free(pre_down.data);
+            return 0;
         }
         
         float max_score = 0.0f;
