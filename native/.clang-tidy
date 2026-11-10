@@ -1,0 +1,21 @@
+# clang-tidy configuration for the DSP core (issue #28).
+# CI fails on Clang Static Analyzer findings (null dereference, use-after-free,
+# leaks, uninitialised reads, ...). bugprone/CERT checks are reported as
+# advisory warnings so they can be burned down without blocking merges.
+Checks: >
+  -*,
+  clang-analyzer-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -clang-analyzer-security.insecureAPI.strcpy,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-narrowing-conversions,
+  -bugprone-multi-level-implicit-pointer-conversion,
+  cert-err33-c,
+  cert-flp30-c,
+  cert-msc30-c,
+  cert-msc50-cpp
+WarningsAsErrors: 'clang-analyzer-*'
+HeaderFilterRegex: 'native/include/.*'
+FormatStyle: none

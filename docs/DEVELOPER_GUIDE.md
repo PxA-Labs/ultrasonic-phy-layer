@@ -196,6 +196,8 @@ cmake --build --preset release
 ctest --preset release
 ```
 
+Available presets: `default`, `debug`, `release`, `asan`, `ubsan`, `fuzz` (see [Sanitizers & Fuzzing](#sanitizers--fuzzing)).
+
 ---
 
 ### Step 2: Running the Flutter App
@@ -232,16 +234,47 @@ cd build
 ./tests/catch_tests        # Run Catch2 C++ test runner
 ```
 
-### Debugging with AddressSanitizer (ASan) & UBSan
+### Sanitizers & Fuzzing
 
-To detect memory leaks, buffer overflows, or undefined behavior in C code:
+The DSP core treats every `sw_*` call as a trust boundary: Dart passes user-controlled settings and microphone samples straight into C. Sanitizer and fuzzing support is built in (issue #28).
+
+| CMake option | Default | Effect |
+|---|---|---|
+| `SW_ENABLE_ASAN` | OFF | AddressSanitizer (+LeakSanitizer on Linux). GCC/Clang: `-fsanitize=address`; MSVC: `/fsanitize=address` |
+| `SW_ENABLE_UBSAN` | OFF | UndefinedBehaviorSanitizer, fatal on the first report. With Clang it also traps float division by zero, which in DSP code signals a missing guard |
+| `SW_ENABLE_FUZZER` | OFF | Builds the `native/Fuzzing/` harnesses as real libFuzzer binaries (needs LLVM Clang; AppleClang has no libFuzzer) |
+| `SW_FUZZ_SMOKE` | ON | Builds the same harnesses with a standalone driver and registers them in CTest as `fuzz_*_smoke` (`SW_FUZZ_SMOKE_RUNS` random inputs each) |
+| `SW_USE_SANITIZER`, `SW_BUILD_FUZZ` | OFF | Deprecated aliases for ASan+UBSan and `SW_ENABLE_FUZZER` |
 
 ```bash
-cd build
-cmake -DSW_USE_SANITIZER=ON ../native
-cmake --build .
-ctest --output-on-failure
+cd native
+cmake --preset asan  && cmake --build build/asan  && ctest --test-dir build/asan  --output-on-failure
+cmake --preset ubsan && cmake --build build/ubsan && ctest --test-dir build/ubsan --output-on-failure
+
+# libFuzzer (Linux, or macOS with Homebrew LLVM)
+cmake --preset fuzz && cmake --build build/fuzz
+./build/fuzz/Fuzzing/fuzz_api -max_total_time=60
 ```
+
+**Harnesses** (`native/Fuzzing/`). Each one checks *properties*, not just "no crash":
+
+- `fuzz_crc`: the table, fast and FFI CRC paths agree, and every 1-bit error is detected.
+- `fuzz_rs`: arbitrary words decode only to valid codewords, and encode→corrupt(≤16)→decode restores the message with the exact error count.
+- `fuzz_packet`, `fuzz_fec`: decoding arbitrary bytes is safe, and encode→decode round-trips.
+- `fuzz_css`, `fuzz_ofdm`: raw samples (NaN/Inf/huge) through the internal entry points and the FFI wrappers.
+- `fuzz_api`: every `sw_*` function with fuzzed configs and exact-capacity output buffers. It includes modulate→perturb→demodulate round trips so deep demodulator paths get exercised.
+
+**Reproducing a CI crash.** Download the `crash-<target>` artifact and replay it. The same command works with the libFuzzer and the smoke builds:
+
+```bash
+./build/asan/Fuzzing/fuzz_api path/to/crash-<sha1>
+```
+
+**macOS note.** On some macOS releases the AppleClang ASan runtime hangs during start-up. Homebrew LLVM works: configure with `-DCMAKE_C_COMPILER=$(brew --prefix llvm)/bin/clang -DCMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++`, which also gives you libFuzzer on macOS. When ASan is off, the CTest fuzz smoke tests on macOS automatically run under Guard Malloc (`libgmalloc`), which puts every allocation against a guard page so heap overruns still fault.
+
+**Canaries.** In ASan builds, `asan_trigger_*` tests make deliberate overflow, use-after-free and (Linux) leak errors. They pass only when the sanitizer report appears, so a green run proves the sanitizer is actually active.
+
+**Static analysis.** CI runs `cppcheck` (`native/.cppcheck-suppressions`) and `clang-tidy` (`native/.clang-tidy`). Clang Static Analyzer findings fail the build; bugprone/CERT checks are advisory.
 
 ---
 
