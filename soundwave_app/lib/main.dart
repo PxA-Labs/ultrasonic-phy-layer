@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'state/app_state.dart';
+import 'state/settings_store.dart';
 import 'screens/dashboard.dart';
 import 'screens/monitor.dart';
 import 'screens/settings.dart';
@@ -20,7 +21,10 @@ class SoundwaveApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => appState ?? AppState(),
+      create: (_) =>
+          appState ??
+          (AppState(store: SharedPreferencesSettingsStore())
+            ..restoreSettings()),
       child: MaterialApp(
         title: 'Soundwave',
         theme: ThemeData.dark().copyWith(

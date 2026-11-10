@@ -10,6 +10,7 @@ import 'package:soundwave/engine/tx_queue.dart';
 import 'package:soundwave/engine/signal_metrics.dart';
 import 'package:soundwave/engine/throughput_calculator.dart';
 import 'package:soundwave/services/audio_service.dart';
+import 'package:soundwave/state/settings_store.dart';
 
 class AppState extends ChangeNotifier {
   // Config fields
@@ -54,6 +55,8 @@ class AppState extends ChangeNotifier {
   Timer? _throughputTimer;
   bool _isDisposed = false;
 
+  final SettingsStore? _store;
+
   late final Map<String, dynamic> _configMap;
   Map<String, dynamic> get configMap => _configMap;
 
@@ -76,7 +79,7 @@ class AppState extends ChangeNotifier {
     _configMap['volume'] = _volume;
   }
 
-  AppState({AudioService? audio}) {
+  AppState({AudioService? audio, SettingsStore? store}) : _store = store {
     _configMap = {};
     _syncConfigMap();
     _audio = audio ?? AudioService.preferred(_configMap);
@@ -207,8 +210,63 @@ class AppState extends ChangeNotifier {
   void _updateConfigField(String key, dynamic value) {
     _configMap[key] = value;
     _audio.updateConfig(_configMap);
+    _persist();
     notifyListeners();
   }
+
+  /// Saves the modem configuration (no-op without a store).
+  void _persist() {
+    final store = _store;
+    if (store == null || _isDisposed) return;
+    final snapshot = <String, Object>{
+      for (final e in _configMap.entries)
+        if (e.value is Object) e.key: e.value as Object,
+    };
+    store.save(snapshot).catchError((Object e) {
+      debugPrint('Failed to persist settings: $e');
+    });
+  }
+
+  /// Loads persisted settings, keeping only well-typed in-range values.
+  Future<void> restoreSettings() async {
+    final store = _store;
+    if (store == null) return;
+    final Map<String, Object> raw;
+    try {
+      raw = await store.load();
+    } catch (e) {
+      debugPrint('Failed to load settings: $e');
+      return;
+    }
+    if (_isDisposed) return;
+    final v = ModemSettingsSchema.sanitize(raw);
+    _sampleRate = v['sample_rate'] as int? ?? _sampleRate;
+    _mode = v['modulation'] as int? ?? _mode;
+    _sf = v['sf'] as int? ?? _sf;
+    _numSubcarriers = v['num_subcarriers'] as int? ?? _numSubcarriers;
+    _cpLength = v['cp_length'] as int? ?? _cpLength;
+    _numPilots = v['num_pilots'] as int? ?? _numPilots;
+    _carrierFreq = v['carrier_freq'] as double? ?? _carrierFreq;
+    _bandwidth = v['bandwidth'] as double? ?? _bandwidth;
+    _symbolDuration = v['symbol_duration'] as double? ?? _symbolDuration;
+    _amplitude = v['amplitude'] as double? ?? _amplitude;
+    _ofdmModulation = v['ofdm_modulation'] as int? ?? _ofdmModulation;
+    _threshold = v['threshold'] as double? ?? _threshold;
+    _equalizer = v['equalizer'] as int? ?? _equalizer;
+    _codingRate = v['coding_rate'] as double? ?? _codingRate;
+    _enableRs = v['enable_rs'] as bool? ?? _enableRs;
+    _volume = v['volume'] as double? ?? _volume;
+    // A cp from a different FFT size must still be a valid option.
+    if (!cpOptionsFor(_numSubcarriers).contains(_cpLength)) {
+      _cpLength = _numSubcarriers ~/ 8;
+    }
+    _syncConfigMap();
+    _audio.updateConfig(_configMap);
+    notifyListeners();
+  }
+
+  /// Cyclic-prefix choices offered for an FFT size: N/4, N/8, N/16.
+  static List<int> cpOptionsFor(int n) => [n ~/ 4, n ~/ 8, n ~/ 16];
 
   // Setters
   set txMessage(String v) {
@@ -227,7 +285,17 @@ class AppState extends ChangeNotifier {
   }
 
   void setNumSubcarriers(int v) {
+    // Keep the same CP fraction (N/4, N/8 or N/16) so the CP stays a valid
+    // option for the new FFT size.
+    final ratio = _numSubcarriers > 0 ? _cpLength / _numSubcarriers : 0.125;
+    final options = cpOptionsFor(v);
+    var best = options[1];
+    for (final o in options) {
+      if ((o / v - ratio).abs() < (best / v - ratio).abs()) best = o;
+    }
     _numSubcarriers = v;
+    _cpLength = best;
+    _configMap['cp_length'] = best;
     _updateConfigField('num_subcarriers', v);
   }
 
@@ -448,6 +516,7 @@ class AppState extends ChangeNotifier {
     }
     _syncConfigMap();
     _audio.updateConfig(_configMap);
+    _persist();
     notifyListeners();
   }
 
