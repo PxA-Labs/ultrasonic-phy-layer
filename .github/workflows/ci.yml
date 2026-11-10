@@ -47,8 +47,20 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         run: dart format --set-exit-if-changed .
 
+      - name: Build native library for FFI tests
+        if: steps.check.outputs.exists == 'true'
+        working-directory: native
+        run: |
+          cmake -S . -B build-ffi -DCMAKE_BUILD_TYPE=Release -DSW_BUILD_TESTS=OFF
+          cmake --build build-ffi --target soundwave_shared -j "$(nproc)"
+
       - name: Run Flutter tests
         if: steps.check.outputs.exists == 'true'
+        env:
+          # Run the real-DSP loopback tests against this commit's native code;
+          # fail (instead of skipping) if the library cannot be loaded.
+          SOUNDWAVE_LIB: ${{ github.workspace }}/native/build-ffi/libsoundwave.so
+          SOUNDWAVE_REQUIRE_NATIVE: '1'
         run: flutter test --coverage
 
       - name: Upload coverage to Codecov
