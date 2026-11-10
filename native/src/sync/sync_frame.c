@@ -174,8 +174,27 @@ int sync_detect_frame(const float* samples, size_t len,
             return 0;
         }
         
+        // Normalised Schmidl-Cox metric M(d) = |P(d)|^2 / (R1(d) * R2(d)).
+        // The textbook form divides by R2^2 (energy of the second window
+        // only); at the end of a frame the first window holds loud signal and
+        // the second near-silence, so |P|^2 ~ S^2 N^2 over R2^2 ~ N^4 explodes
+        // and the "peak" lands after the frame. By Cauchy-Schwarz the
+        // two-sided form is bounded by 1 and reaches it only where the two
+        // windows genuinely repeat (the preamble).
+        //
+        // Energy gate: being scale-invariant, M also rates low-level
+        // *structured* residue highly (FFT-Hilbert leakage and circular
+        // wrap-around ringing in a quiet tail repeat far better than noise).
+        // A real preamble is among the most energetic windows, so windows
+        // below SYNC_ENERGY_GATE of the peak window energy cannot win.
+        float* E = (float*)malloc((max_d + 1) * sizeof(float));
+        if (!E) {
+            free(M); free(ar); free(ai);
+            return 0;
+        }
+        double max_energy = 0.0;
         for (size_t d = 0; d <= max_d; d++) {
-            double P_real = 0.0, P_imag = 0.0, R = 0.0;
+            double P_real = 0.0, P_imag = 0.0, R1 = 0.0, R2 = 0.0;
             for (size_t n = 0; n < N_period; n++) {
                 double yr1 = ar[d + n];
                 double yi1 = ai[d + n];
@@ -184,10 +203,19 @@ int sync_detect_frame(const float* samples, size_t len,
                 
                 P_real += yr1 * yr2 + yi1 * yi2;
                 P_imag += yr1 * yi2 - yi1 * yr2;
-                R += yr2 * yr2 + yi2 * yi2;
+                R1 += yr1 * yr1 + yi1 * yi1;
+                R2 += yr2 * yr2 + yi2 * yi2;
             }
-            M[d] = (float)((P_real * P_real + P_imag * P_imag) / (R * R + 1e-10));
+            M[d] = (float)((P_real * P_real + P_imag * P_imag) / (R1 * R2 + 1e-20));
+            double energy = sqrt(R1 * R2);
+            E[d] = (float)energy;
+            if (energy > max_energy) max_energy = energy;
         }
+        const double SYNC_ENERGY_GATE = 0.25;
+        for (size_t d = 0; d <= max_d; d++) {
+            if ((double)E[d] < SYNC_ENERGY_GATE * max_energy) M[d] = 0.0f;
+        }
+        free(E);
         
         // Find peak of M
         size_t peak_idx = 0;
