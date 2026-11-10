@@ -6,18 +6,25 @@
 #include "kiss_fft.h"
 #include <string.h>
 #include <math.h>
+#include <limits.h>
+#include <stdlib.h>
 
-void sync_real_to_analytic(const float* real, size_t len,
-                           float* analytic_real, float* analytic_imag) {
+int sync_real_to_analytic(const float* real, size_t len,
+                          float* analytic_real, float* analytic_imag) {
+    if (!real || !analytic_real || !analytic_imag || len == 0 || len > (size_t)INT_MAX)
+        return -1;
     int N = (int)len;
-    kiss_fft_cpx* fft_in = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* fft_out = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    int rc = -1;
+    kiss_fft_cpx* fft_in = (kiss_fft_cpx*)malloc(len * sizeof(kiss_fft_cpx));
+    kiss_fft_cpx* fft_out = (kiss_fft_cpx*)malloc(len * sizeof(kiss_fft_cpx));
+    kiss_fft_cfg fwd = kiss_fft_alloc(N, 0, NULL, NULL);
+    kiss_fft_cfg inv = kiss_fft_alloc(N, 1, NULL, NULL);
+    if (!fft_in || !fft_out || !fwd || !inv) goto done;
+
     for (int i = 0; i < N; i++) {
         fft_in[i].r = real[i];
         fft_in[i].i = 0.0f;
     }
-    kiss_fft_cfg fwd = kiss_fft_alloc(N, 0, NULL, NULL);
-    kiss_fft_cfg inv = kiss_fft_alloc(N, 1, NULL, NULL);
     kiss_fft(fwd, fft_in, fft_out);
     // Zero negative frequencies, double positive
     for (int i = 0; i < N; i++) {
@@ -33,22 +40,31 @@ void sync_real_to_analytic(const float* real, size_t len,
         analytic_real[i] = fft_in[i].r / (float)N;
         analytic_imag[i] = fft_in[i].i / (float)N;
     }
+    rc = 0;
+done:
     free(fft_in); free(fft_out); free(fwd); free(inv);
+    return rc;
 }
 
 float sync_schmidl_cox_cfo(const float* y, size_t len, int N, float fs) {
+    // Needs two repeated halves of N samples; anything else has no estimate.
+    if (!y || N <= 0 || len < 2 * (size_t)N || !isfinite(fs) || fs <= 0.0f) return 0.0f;
     float* ar = (float*)malloc(len * sizeof(float));
     float* ai = (float*)malloc(len * sizeof(float));
-    sync_real_to_analytic(y, len, ar, ai);
-    double sum_real = 0.0, sum_imag = 0.0;
-    for (int n = 0; n < N; n++) {
-        sum_real += (double)ar[n] * (double)ar[n + N]
-                  + (double)ai[n] * (double)ai[n + N];
-        sum_imag += (double)ar[n] * (double)ai[n + N]
-                  - (double)ai[n] * (double)ar[n + N];
+    float cfo = 0.0f;
+    if (ar && ai && sync_real_to_analytic(y, len, ar, ai) == 0) {
+        double sum_real = 0.0, sum_imag = 0.0;
+        for (int n = 0; n < N; n++) {
+            sum_real += (double)ar[n] * (double)ar[n + N]
+                      + (double)ai[n] * (double)ai[n + N];
+            sum_imag += (double)ar[n] * (double)ai[n + N]
+                      - (double)ai[n] * (double)ar[n + N];
+        }
+        float angle = atan2f((float)sum_imag, (float)sum_real);
+        cfo = isfinite(angle) ? fs / (SW_TWO_PI * (float)N) * angle : 0.0f;
     }
     free(ar); free(ai);
-    return fs / (SW_TWO_PI * (float)N) * atan2f((float)sum_imag, (float)sum_real);
+    return cfo;
 }
 
 void sync_correction_phasor(float cfo, float fs, size_t len,
@@ -63,15 +79,22 @@ void sync_correction_phasor(float cfo, float fs, size_t len,
 void sync_apply_cfo_correction(const float* y_real, const float* y_imag,
                                size_t len, float cfo, float fs,
                                float* out_real) {
+    if (!y_real || !y_imag || !out_real || len == 0) return;
     float* cr = (float*)malloc(len * sizeof(float));
     float* ci = (float*)malloc(len * sizeof(float));
-    sync_correction_phasor(cfo, fs, len, cr, ci);
-    for (size_t n = 0; n < len; n++)
-        out_real[n] = y_real[n] * cr[n] - y_imag[n] * ci[n];
+    if (cr && ci && isfinite(fs) && fs > 0.0f) {
+        sync_correction_phasor(cfo, fs, len, cr, ci);
+        for (size_t n = 0; n < len; n++)
+            out_real[n] = y_real[n] * cr[n] - y_imag[n] * ci[n];
+    } else if (out_real != y_real) {
+        memcpy(out_real, y_real, len * sizeof(float)); // no correction possible
+    }
     free(cr); free(ci);
 }
 
 void sync_schmidl_cox_timing(const float* y, size_t len, int N, float* M) {
+    // len - 2N would wrap for short inputs and run far past the buffer.
+    if (!y || !M || N <= 0 || len < 2 * (size_t)N) return;
     for (size_t d = 0; d <= len - 2 * (size_t)N; d++) {
         double P_real = 0.0, P_imag = 0.0, R = 0.0;
         for (int n = 0; n < N; n++) {
@@ -84,6 +107,7 @@ void sync_schmidl_cox_timing(const float* y, size_t len, int N, float* M) {
 }
 
 int sync_find_timing_peak(const float* M, size_t len, size_t* timing_idx) {
+    if (!M || !timing_idx || len == 0) return -1;
     size_t peak = 0;
     for (size_t i = 1; i < len; i++)
         if (M[i] > M[peak]) peak = i;

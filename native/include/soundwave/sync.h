@@ -18,6 +18,7 @@ typedef struct {
 } sync_config_t;
 
 // Matched filter cross-correlation: R_ys[m] = sum y[n+m] * s[n]
+// R must have room for y_len - s_len + 1 floats; no-op if y_len < s_len.
 void sync_matched_filter(const float* y, size_t y_len,
                          const float* s, size_t s_len, float* R);
 

@@ -21,7 +21,7 @@ int main(void) {
     memset(signal, 0, sizeof(signal));
     memcpy(signal + 20, template, 16 * sizeof(float)); // template at offset 20
 
-    float R[48] = {0};
+    float R[64 - 16 + 1] = {0}; // y_len - s_len + 1 outputs (was 48: 1-float overflow)
     sync_matched_filter(signal, 64, template, 16, R);
 
     size_t peak = 0;
