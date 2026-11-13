@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Soundwave
+GenericName=Ultrasonic Data Modem
+Comment=Send and receive data over ultrasonic audio
+Exec=soundwave
+Icon=soundwave
+Terminal=false
+Categories=Utility;AudioVideo;Audio;
+StartupWMClass=soundwave
