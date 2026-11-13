@@ -210,6 +210,15 @@ void main() {
       await connect(arq: false);
       final texts = <String>[];
       final sub = b.rx.messages.listen((m) => texts.add(m.text));
+      final diag = <String>[];
+      final dsubs = [
+        b.rx.frameEvents.listen((e) => diag.add(
+            'B frame decoded=${e.decoded} len=${e.byteLength} err=${e.errorMessage}')),
+        b.rx.transfers.listen((t) => diag.add(
+            'B transfer ${t.received}/${t.count} ${t.state} ${t.error}')),
+        a.tx.transfers.listen((t) => diag.add(
+            'A tx ${t.fragmentsDone}/${t.fragmentCount} ${t.state}')),
+      ];
       final text =
           List.generate(450, (i) => String.fromCharCode(0x41 + i % 26)).join();
       await a.tx.sendMessage(text);
@@ -218,7 +227,11 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       }
       await sub.cancel();
-      expect(texts, [text]);
+      for (final d in dsubs) {
+        await d.cancel();
+      }
+      expect(texts, [text], reason: diag.join('
+'));
       expect(a.tx.framesSent, greaterThan(1));
       expect(b.tx.framesSent, 0); // a pure listener never transmits
       expect(LinkFrame.maxChunk, lessThan(text.length));
