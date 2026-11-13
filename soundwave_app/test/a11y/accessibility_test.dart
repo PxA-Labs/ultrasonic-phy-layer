@@ -115,6 +115,9 @@ void main() {
     // The OFDM card replaces the CSS card in Settings.
     state.setMode(1);
     await settle(tester);
+    // At 2x the card starts below the fold; scroll until it is built.
+    await tester.scrollUntilVisible(find.textContaining('FFT Size'), 200,
+        scrollable: find.byType(Scrollable).first);
     expect(find.textContaining('FFT Size'), findsOneWidget);
     expect(tester.takeException(), isNull);
     // And the bottom of the settings list.
