@@ -254,6 +254,9 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
+          # ubuntu-22.04 ships libunwind-14-dev, which conflicts with the
+          # libunwind-dev that libgstreamer1.0-dev depends on.
+          sudo apt-get remove -y libunwind-14-dev || true
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
