@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../widgets/file_transfer_card.dart';
 import '../widgets/signal_status_bar.dart';
+import 'signal_files.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -51,6 +52,8 @@ class DashboardScreen extends StatelessWidget {
           _MessagesLog(state: state),
           const SizedBox(height: 16),
           const FileTransferCard(),
+          const SizedBox(height: 16),
+          const SignalFilesCard(),
         ],
       ),
     );
@@ -266,6 +269,7 @@ class _MessagesLog extends StatelessWidget {
                 ),
               ],
             ),
+            const MessageLogActions(),
             const Divider(),
             const SizedBox(height: 8),
             state.messages.isEmpty

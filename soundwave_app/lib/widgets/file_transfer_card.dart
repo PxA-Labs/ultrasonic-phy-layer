@@ -1,27 +1,46 @@
-// File transfer card (#89): send a file by path, show fragment progress for
-// outgoing and incoming transfers, and list received files.
+// File transfer card (#89): pick a file (FileGateway / file_picker) and send
+// it, show fragment progress for outgoing and incoming transfers, and list
+// received files.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../engine/arq.dart';
+import '../engine/link_frame.dart';
 import '../engine/link_receiver.dart';
+import '../export/file_gateway.dart';
 import '../state/app_state.dart';
 
 class FileTransferCard extends StatefulWidget {
-  const FileTransferCard({super.key});
+  const FileTransferCard({
+    super.key,
+    this.gateway = const PlatformFileGateway(),
+  });
+
+  /// Platform file picker; injectable for tests.
+  final FileGateway gateway;
 
   @override
   State<FileTransferCard> createState() => _FileTransferCardState();
 }
 
 class _FileTransferCardState extends State<FileTransferCard> {
-  final _path = TextEditingController();
+  PickedSignalFile? _selected;
+  String? _pickError;
 
-  @override
-  void dispose() {
-    _path.dispose();
-    super.dispose();
+  Future<void> _pick() async {
+    try {
+      final f = await widget.gateway
+          .pickTransferFile(maxBytes: LinkMessage.maxContentBytes);
+      if (!mounted || f == null) return;
+      setState(() {
+        _selected = f;
+        _pickError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _pickError = '$e');
+    }
   }
 
   static String _size(int bytes) {
@@ -48,24 +67,34 @@ class _FileTransferCardState extends State<FileTransferCard> {
           children: [
             Text('File Transfer', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
-            TextField(
-              key: const Key('file_path_field'),
-              controller: _path,
-              decoration: const InputDecoration(
-                labelText: 'File path (up to 1 MB)',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (_) => setState(() {}),
+            Text(
+              _selected == null
+                  ? 'No file selected (up to 1 MB)'
+                  : '${_selected!.name} (${_size(_selected!.bytes.length)})',
+              key: const Key('selected_file_label'),
             ),
+            if (_pickError != null)
+              Text(
+                _pickError!,
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  key: const Key('choose_file_button'),
+                  onPressed: txActive ? null : _pick,
+                  icon: const Icon(Icons.folder_open),
+                  label: const Text('Choose File'),
+                ),
                 ElevatedButton.icon(
                   key: const Key('send_file_button'),
-                  onPressed: _path.text.trim().isEmpty || txActive
+                  onPressed: _selected == null || txActive
                       ? null
-                      : () => state.sendFile(_path.text),
+                      : () => state.sendFileBytes(_selected!.bytes,
+                          fileName: _selected!.name),
                   icon: const Icon(Icons.upload_file),
                   label:
                       Text(state.arqEnabled ? 'Send File (ARQ)' : 'Send File'),

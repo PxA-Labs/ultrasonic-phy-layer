@@ -10,6 +10,7 @@
 #include "soundwave/cfo.h"
 #include "soundwave/audio.h"
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 // ---------------------------------------------------------------------------
@@ -194,6 +195,41 @@ SW_API int sw_ofdm_demodulate(const float* samples, size_t sample_len,
     *bit_len = decoded_bits;
 
     free(decoded);
+    return SW_OK;
+}
+
+SW_API int sw_ofdm_equalized_symbols(const float* samples, size_t sample_len,
+                                     sw_config_t cfg, float* iq, size_t* num_points) {
+    if (!samples || !iq || !num_points || sample_len == 0 || *num_points == 0)
+        return SW_ERR_BAD_PARAM;
+    if (sw_config_validate(cfg) != SW_OK || cfg.modulation != 1) return SW_ERR_BAD_PARAM;
+
+    // Every OFDM symbol spans more samples than it has data subcarriers, so a
+    // frame can never yield more points than input samples. Bounding the
+    // scratch buffer by sample_len keeps a huge advertised capacity from
+    // driving the allocation size.
+    size_t cap = *num_points < sample_len ? *num_points : sample_len;
+    *num_points = 0;
+    if (cap > SIZE_MAX / sizeof(kiss_fft_cpx)) return SW_ERR_MEMORY;
+    kiss_fft_cpx* points = (kiss_fft_cpx*)malloc(cap * sizeof(kiss_fft_cpx));
+    if (!points) return SW_ERR_MEMORY;
+
+    uint8_t* decoded = NULL;
+    size_t decoded_bits = 0;
+    size_t count = 0;
+    int ret = ofdm_demodulate_ex(samples, sample_len, cfg, &decoded, &decoded_bits,
+                                 points, cap, &count);
+    free(decoded);
+    if (ret != SW_OK) {
+        free(points);
+        return ret;
+    }
+    for (size_t i = 0; i < count; i++) {
+        iq[2 * i] = (float)points[i].r;
+        iq[2 * i + 1] = (float)points[i].i;
+    }
+    *num_points = count;
+    free(points);
     return SW_OK;
 }
 

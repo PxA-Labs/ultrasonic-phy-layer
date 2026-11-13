@@ -112,6 +112,21 @@ typedef OfdmDemodulateDart = int Function(
   Pointer<IntPtr> bitLen,
 );
 
+typedef EqSymbolsCNative = Int32 Function(
+  Pointer<Float> samples,
+  IntPtr sampleLen,
+  SwConfig cfg,
+  Pointer<Float> iq,
+  Pointer<IntPtr> numPoints,
+);
+typedef EqSymbolsDart = int Function(
+  Pointer<Float> samples,
+  int sampleLen,
+  SwConfig cfg,
+  Pointer<Float> iq,
+  Pointer<IntPtr> numPoints,
+);
+
 typedef DetectFrameCNative = Int32 Function(
   Pointer<Float> samples,
   IntPtr len,
@@ -284,11 +299,34 @@ class SoundwaveNative {
   static SoundwaveNative get instance => _instance ??= SoundwaveNative._();
 
   static DynamicLibrary _loadLibrary() {
+    // Android: libsoundwave.so is built by Gradle's externalNativeBuild
+    // (android/app/build.gradle.kts -> native/CMakeLists.txt) and packaged in
+    // the APK under lib/<abi>/, so the dynamic linker finds it by name.
+    if (Platform.isAndroid) {
+      try {
+        return DynamicLibrary.open('libsoundwave.so');
+      } on ArgumentError catch (e) {
+        throw UnsupportedError(
+          'Could not load libsoundwave.so from the APK (is the NDK build '
+          'enabled for this ABI?): $e',
+        );
+      }
+    }
+
     // SOUNDWAVE_LIB pins an exact library (CI, sanitizer builds, or when
     // several stale builds exist); it is tried before the relative paths.
     final override = Platform.environment['SOUNDWAVE_LIB'];
+    // Packaged desktop builds ship the library inside the app bundle (see
+    // soundwave_app/{linux,windows}/CMakeLists.txt and
+    // soundwave_app/macos/packaging/embed_native.sh). Resolve it relative to
+    // the executable so it is found regardless of the working directory.
+    final exeDir = File(Platform.resolvedExecutable).parent.path;
+    final sep = Platform.pathSeparator;
     final searchPaths = [
       if (override != null && override.isNotEmpty) override,
+      if (Platform.isWindows) '$exeDir${sep}soundwave.dll',
+      if (Platform.isMacOS) '$exeDir/../Frameworks/libsoundwave.dylib',
+      if (Platform.isLinux) '$exeDir/lib/libsoundwave.so',
       if (Platform.isWindows) 'soundwave.dll',
       if (Platform.isMacOS) 'libsoundwave.dylib',
       if (Platform.isLinux) 'libsoundwave.so',
@@ -298,6 +336,10 @@ class SoundwaveNative {
       if (Platform.isMacOS) '../native/build/libsoundwave.dylib',
       if (Platform.isMacOS) '../native/build/asan/libsoundwave.dylib',
       if (Platform.isLinux) '../native/build/libsoundwave.so',
+      // native/CMakeLists.txt sets PREFIX "lib" on every platform, so a
+      // plain CMake build on Windows produces libsoundwave.dll.
+      if (Platform.isWindows) '../native/build/Release/libsoundwave.dll',
+      if (Platform.isWindows) '../native/build/Debug/libsoundwave.dll',
       if (Platform.isWindows) '../native/build/Release/soundwave.dll',
       if (Platform.isWindows) '../native/build/Debug/soundwave.dll',
       if (Platform.isMacOS) '../build/libsoundwave.dylib',
@@ -313,7 +355,6 @@ class SoundwaveNative {
       }
     }
 
-    if (Platform.isAndroid) return DynamicLibrary.open('libsoundwave.so');
     throw UnsupportedError(
       'Could not load native Soundwave library. Searched in: $searchPaths',
     );
@@ -372,6 +413,47 @@ class SoundwaveNative {
   void agcDestroy(Pointer<Void> handle) {
     final ret = _agcDestroy(handle);
     if (ret != 0) throw SwException(ret);
+  }
+
+  // Resolved lazily, like the AGC symbols, so an older library still loads.
+  static const _eqSymbolsName = 'sw_ofdm_equalized_symbols';
+  late final EqSymbolsDart _eqSymbols =
+      _lib.lookupFunction<EqSymbolsCNative, EqSymbolsDart>(_eqSymbolsName);
+
+  /// Whether the loaded library exports [ofdmEqualizedSymbols].
+  bool get hasEqualizedSymbols => _lib.providesSymbol(_eqSymbolsName);
+
+  /// Demodulates a frame-aligned OFDM frame and returns its equalized
+  /// data-subcarrier points as interleaved I/Q pairs (at most [maxPoints]
+  /// points, in symbol order). Throws [SwException] on native errors.
+  Float32List ofdmEqualizedSymbols(
+    Float32List samples,
+    Pointer<SwConfig> config, {
+    int maxPoints = 4096,
+  }) {
+    if (samples.isEmpty || maxPoints <= 0) throw SwException(-1);
+    final samplesPtr = calloc<Float>(samples.length);
+    final iqPtr = calloc<Float>(2 * maxPoints);
+    final countPtr = calloc<IntPtr>();
+    try {
+      samplesPtr.asTypedList(samples.length).setAll(0, samples);
+      countPtr.value = maxPoints;
+      final ret = _eqSymbols(
+        samplesPtr,
+        samples.length,
+        config.ref,
+        iqPtr,
+        countPtr,
+      );
+      if (ret != 0) throw SwException(ret);
+      final count = countPtr.value;
+      if (count < 0 || count > maxPoints) throw SwException(_errOverflow);
+      return Float32List.fromList(iqPtr.asTypedList(2 * count));
+    } finally {
+      calloc.free(samplesPtr);
+      calloc.free(iqPtr);
+      calloc.free(countPtr);
+    }
   }
 
   String get version => _version().toDartString();

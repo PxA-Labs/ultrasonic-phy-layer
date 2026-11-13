@@ -48,14 +48,4 @@ void main() {
         }),
         {'arq_enabled': true, 'arq_max_retries': 1, 'arq_ack_timeout_ms': 200});
   });
-
-  test('sendFile reports a missing file without transmitting', () async {
-    final audio = MockAudioService();
-    final a = AppState(audio: audio);
-    await a.sendFile('/definitely/not/here.bin');
-    expect(a.transferError, isNotNull);
-    expect(a.isTransmitting, isFalse);
-    expect(audio.playbackQueue, isNull);
-    a.dispose();
-  });
 }

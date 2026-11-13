@@ -126,3 +126,37 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
   install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endif()
+
+# === Soundwave native DSP core (libsoundwave) ===
+# Build native/ as an isolated ExternalProject (its object-library target is
+# also called "soundwave", which would clash with BINARY_NAME) and ship the
+# shared library in bundle/lib/, where lib/native/soundwave_native.dart looks
+# for it (<exe dir>/lib/libsoundwave.so).
+set(SOUNDWAVE_NATIVE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../native")
+if(EXISTS "${SOUNDWAVE_NATIVE_SRC}/CMakeLists.txt")
+  include(ExternalProject)
+  set(SOUNDWAVE_NATIVE_BIN "${CMAKE_BINARY_DIR}/soundwave_native")
+  ExternalProject_Add(soundwave_native
+    SOURCE_DIR "${SOUNDWAVE_NATIVE_SRC}"
+    BINARY_DIR "${SOUNDWAVE_NATIVE_BIN}"
+    CMAKE_ARGS
+      -DCMAKE_BUILD_TYPE=Release
+      -DSW_BUILD_TESTS=OFF
+      -DSW_BUILD_BENCHMARKS=OFF
+      -DSW_FUZZ_SMOKE=OFF
+    BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target soundwave_shared
+    BUILD_BYPRODUCTS "${SOUNDWAVE_NATIVE_BIN}/libsoundwave.so"
+    INSTALL_COMMAND ""
+    BUILD_ALWAYS ON
+  )
+  add_dependencies(${BINARY_NAME} soundwave_native)
+  # libsoundwave.so is a SOVERSION symlink chain; copy the real file under the
+  # unversioned name the Dart loader opens.
+  install(CODE "
+    file(REAL_PATH \"${SOUNDWAVE_NATIVE_BIN}/libsoundwave.so\" _sw_real)
+    file(COPY_FILE \"\${_sw_real}\" \"${INSTALL_BUNDLE_LIB_DIR}/libsoundwave.so\")
+    message(STATUS \"Bundled libsoundwave: \${_sw_real}\")
+    " COMPONENT Runtime)
+else()
+  message(WARNING "native/ not found; libsoundwave will not be bundled")
+endif()
