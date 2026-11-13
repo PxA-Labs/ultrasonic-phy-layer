@@ -21,10 +21,17 @@ concurrency:
 
 jobs:
   build-android:
+    # Issues #87/#94: builds libsoundwave.so for arm64-v8a, armeabi-v7a and
+    # x86_64 via Gradle externalNativeBuild, then debug APK, per-ABI release
+    # APKs and an AAB. Release signing uses the ANDROID_KEYSTORE_* secrets
+    # when present, otherwise release builds are debug-signed.
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: soundwave_app
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -49,22 +56,111 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
+          cache: gradle
 
-      - name: Build APK
+      - name: Configure release signing
+        if: steps.check.outputs.has_pubspec == 'true' && env.HAS_KEYSTORE == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          {
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "storeFile=upload-keystore.jks"
+          } > android/key.properties
+
+      - name: Signing mode
+        if: steps.check.outputs.has_pubspec == 'true' && env.HAS_KEYSTORE != 'true'
+        run: echo "::notice::ANDROID_KEYSTORE_BASE64 not set; release APK/AAB are debug-signed (not for Play Store upload)."
+
+      - name: Build debug APK
         if: steps.check.outputs.has_pubspec == 'true'
-        run: flutter build apk --release
+        run: flutter build apk --debug
+
+      - name: Build release APKs (split per ABI)
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: flutter build apk --release --split-per-abi
 
       - name: Build AAB
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build appbundle --release
 
+      - name: Verify libsoundwave.so is packaged
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          set -euo pipefail
+          apk_dir=build/app/outputs/flutter-apk
+          aab=build/app/outputs/bundle/release/app-release.aab
+          abis="arm64-v8a armeabi-v7a x86_64"
+          fail=0
+          require() { # archive entry
+            if unzip -l "$1" | grep -E " $2\$" > /dev/null; then
+              echo "ok   $1 -> $2"
+            else
+              echo "::error::$2 missing from $1"
+              unzip -l "$1" | grep '\.so$' || true
+              fail=1
+            fi
+          }
+          for abi in $abis; do
+            require "$apk_dir/app-debug.apk" "lib/$abi/libsoundwave.so"
+            require "$apk_dir/app-$abi-release.apk" "lib/$abi/libsoundwave.so"
+            require "$aab" "base/lib/$abi/libsoundwave.so"
+          done
+          [ "$fail" = 0 ] || exit 1
+
+          # Exported FFI symbols and 16 KB ELF alignment (Play requirement).
+          tmp=$(mktemp -d)
+          for abi in $abis; do
+            unzip -p "$apk_dir/app-$abi-release.apk" "lib/$abi/libsoundwave.so" > "$tmp/$abi.so"
+            readelf -h "$tmp/$abi.so" | grep -E 'Class|Machine'
+            for sym in sw_version sw_audio_capture_start sw_audio_playback_start sw_css_modulate; do
+              if ! readelf --dyn-syms -W "$tmp/$abi.so" | grep -w "$sym" > /dev/null; then
+                echo "::error::$abi libsoundwave.so does not export $sym"; exit 1
+              fi
+            done
+            if [ "$abi" != "armeabi-v7a" ]; then
+              if ! readelf -lW "$tmp/$abi.so" | awk '$1=="LOAD" && $NF!="0x4000" { bad=1 } END { exit bad }'; then
+                echo "::error::$abi libsoundwave.so LOAD segments are not 16 KB aligned"
+                readelf -lW "$tmp/$abi.so"; exit 1
+              fi
+            fi
+          done
+          ls -l "$apk_dir" "$(dirname "$aab")"
+
+      - name: Verify signatures
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          set -euo pipefail
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          for apk in build/app/outputs/flutter-apk/*.apk; do
+            echo "== $apk"
+            "$bt/apksigner" verify --print-certs "$apk" | grep -E 'Signer #1 certificate (DN|SHA-256)'
+          done
+          jarsigner -verify build/app/outputs/bundle/release/app-release.aab | tail -1
+
       - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          name: android-release
-          path: |
-            soundwave_app/build/app/outputs/flutter-apk/app-release.apk
-            soundwave_app/build/app/outputs/bundle/release/app-release.aab
+          name: android-debug-apk
+          path: soundwave_app/build/app/outputs/flutter-apk/app-debug.apk
+
+      - uses: actions/upload-artifact@v7
+        if: steps.check.outputs.has_pubspec == 'true'
+        with:
+          name: android-release-apks
+          path: soundwave_app/build/app/outputs/flutter-apk/app-*-release.apk
+
+      - uses: actions/upload-artifact@v7
+        if: steps.check.outputs.has_pubspec == 'true'
+        with:
+          name: android-release-aab
+          path: soundwave_app/build/app/outputs/bundle/release/app-release.aab
 
   build-windows:
     runs-on: windows-latest
