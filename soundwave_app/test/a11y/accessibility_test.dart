@@ -22,12 +22,21 @@ Future<AppState> pumpApp(
   WidgetTester tester, {
   ThemeMode themeMode = ThemeMode.light,
   UiPreferences? prefs,
+  double? textScale,
 }) async {
   final state = AppState(audio: MockAudioService());
-  await tester.pumpWidget(SoundwaveApp(
+  Widget app = SoundwaveApp(
     appState: state,
     uiPreferences: prefs ?? completedPrefs(themeMode),
-  ));
+  );
+  if (textScale != null) {
+    // MaterialApp takes platform-wide settings such as the text scaler from
+    // an enclosing MediaQuery. A linear scaler gives a true 200%, unlike the
+    // platform's non-linear font scaling curve.
+    final data = MediaQueryData(textScaler: TextScaler.linear(textScale));
+    app = MediaQuery(data: data, child: app);
+  }
+  await tester.pumpWidget(app);
   await tester.pump();
   return state;
 }
@@ -91,9 +100,7 @@ void main() {
 
   testWidgets('main screens lay out at 200% text scale without overflow',
       (tester) async {
-    tester.platformDispatcher.textScaleFactorTestValue = 2.0;
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    final state = await pumpApp(tester);
+    final state = await pumpApp(tester, textScale: 2.0);
     state.addMessage('a reasonably long message received over sound', 7.5);
     await settle(tester);
     final title = find.text('Soundwave Dashboard');

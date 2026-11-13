@@ -273,8 +273,8 @@ class _MonitorScreenState extends State<MonitorScreen> {
                   Expanded(
                     flex: 2,
                     child: LinearProgressIndicator(
-                      semanticsLabel: 'Input level',
-                      semanticsValue: '${_dbfs.toStringAsFixed(0)} dBFS',
+                      semanticsLabel:
+                          'Input level ${_dbfs.toStringAsFixed(0)} dBFS',
                       value: levelProgress,
                       backgroundColor: Colors.grey.shade800,
                       valueColor: AlwaysStoppedAnimation<Color>(

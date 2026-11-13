@@ -155,10 +155,13 @@ void main() {
     }
 
     testWidgets('every page lays out at 200% text scale', (tester) async {
-      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      await tester.pumpWidget(host(onFinished: () {}));
+      const data = MediaQueryData(textScaler: TextScaler.linear(2.0));
+      await tester.pumpWidget(
+        MediaQuery(data: data, child: host(onFinished: () {})),
+      );
       await tester.pumpAndSettle();
+      final title = find.text(onboardingPages.first.title);
+      expect(MediaQuery.textScalerOf(tester.element(title)).scale(10), 20);
       for (var i = 0; i < onboardingPages.length; i++) {
         expect(tester.takeException(), isNull);
         expect(find.text(onboardingPages[i].title), findsOneWidget);
