@@ -60,7 +60,12 @@ void main() {
     final frame = FrameCodec(native!).encode(utf8.encode(text));
     final p = SwConfig.fromMap(cfg);
     try {
-      return native.ofdmModulate(frame, p);
+      final x = native.ofdmModulate(frame, p);
+      // Up to one symbol of trailing silence, as a live stream would have:
+      // detection may land a few samples late and only whole symbols are
+      // demodulated.
+      final pad = FrameGeometry.fromConfig(cfg).samplesPerSymbol - 1;
+      return Float32List(x.length + pad)..setAll(0, x);
     } finally {
       calloc.free(p);
     }

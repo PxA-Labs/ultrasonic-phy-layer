@@ -81,7 +81,8 @@ void main() {
       (i) => 0.25 * math.sin(2 * math.pi * hz * i / 44100),
     ));
     audio.pushMockChunk(x);
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 50));
     final level = tester.widget<Text>(find.textContaining('Level')).data;
     final peak = tester.widget<Text>(find.textContaining('Peak:')).data;
     expect(level, 'Level -15 dBFS');
