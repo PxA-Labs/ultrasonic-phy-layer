@@ -212,12 +212,15 @@ void main() {
       final sub = b.rx.messages.listen((m) => texts.add(m.text));
       final diag = <String>[];
       final dsubs = [
-        b.rx.frameEvents.listen((e) => diag.add(
-            'B frame decoded=${e.decoded} len=${e.byteLength} err=${e.errorMessage}')),
-        b.rx.transfers.listen((t) => diag.add(
-            'B transfer ${t.received}/${t.count} ${t.state} ${t.error}')),
-        a.tx.transfers.listen((t) => diag.add(
-            'A tx ${t.fragmentsDone}/${t.fragmentCount} ${t.state}')),
+        b.rx.frameEvents.listen((e) {
+          diag.add('B frame ${e.decoded} ${e.byteLength} ${e.errorMessage}');
+        }),
+        b.rx.transfers.listen((t) {
+          diag.add('B rx ${t.received}/${t.count} ${t.state} ${t.error}');
+        }),
+        a.tx.transfers.listen((t) {
+          diag.add('A tx ${t.fragmentsDone}/${t.fragmentCount} ${t.state}');
+        }),
       ];
       final text =
           List.generate(450, (i) => String.fromCharCode(0x41 + i % 26)).join();
