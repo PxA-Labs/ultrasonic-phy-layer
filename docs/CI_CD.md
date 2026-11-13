@@ -188,75 +188,63 @@ jobs:
 
 ### 3.3 Sign & Deploy — `.github/workflows/release.yml`
 
-**Trigger:** Version tags (`v*`)
+**Triggers:**
 
-```yaml
-name: Release
+- Tag push `v*` — full release: build, sign (when secrets exist), checksum, publish a **draft** GitHub Release, upload to stores.
+- `workflow_dispatch` with input `dry_run` (default `true`) — builds, packages, signs-if-possible and checksums everything, uploading results **only as workflow artifacts**. No GitHub Release, store upload or tag is created. A non-dry manual run publishes only when dispatched on a `v*` tag ref.
 
-on:
-  push:
-    tags: ['v*']
+  ```bash
+  gh workflow run release.yml --ref <branch> -f dry_run=true
+  ```
 
-jobs:
-  deploy-android:
-    needs: [build-android]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: android-release
-      - name: Decode keystore
-        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
-      - name: Deploy to Play Store
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
-          packageName: com.pxalabs.soundwave
-          releaseFiles: app-release.aab
-          track: internal
-          status: completed
+The `meta` job resolves the version (`v1.2.3` tag → `1.2.3`; otherwise `<pubspec version>-dryrun.<run number>`) and a `publish` flag that every publishing job checks.
 
-  deploy-github-release:
-    needs: [build-android, build-windows, build-macos, build-linux]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            android-release/*
-            windows-release/*
-            macos-release/*
-            linux-release/*
-          draft: true
-          generate_release_notes: true
+#### Native library bundling
 
-  deploy-snap:
-    needs: [build-linux]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: linux-release
-          path: snap/gui/
-      - uses: snapcore/action-build@v1
-        id: snapcraft
-      - uses: snapcore/action-publish@v1
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_TOKEN }}
-        with:
-          snap: ${{ steps.snapcraft.outputs.snap }}
-          release: stable
-```
+`libsoundwave` (from `native/`) ships inside every desktop app, and `lib/native/soundwave_native.dart` resolves it relative to the executable (`Platform.resolvedExecutable`):
+
+| Platform | How it is built | Location in the app | Loader path |
+|---|---|---|---|
+| Windows | `ExternalProject` in `soundwave_app/windows/CMakeLists.txt` (part of `flutter build windows`) | `soundwave.dll` next to `soundwave.exe` (renamed from CMake's `libsoundwave.dll`) | `<exe dir>\soundwave.dll` |
+| Linux | `ExternalProject` in `soundwave_app/linux/CMakeLists.txt` (part of `flutter build linux`) | `bundle/lib/libsoundwave.so` | `<exe dir>/lib/libsoundwave.so` |
+| macOS | `soundwave_app/macos/packaging/embed_native.sh` after `flutter build macos` (universal arm64 + x86_64, install name `@rpath/libsoundwave.dylib`) | `soundwave.app/Contents/Frameworks/libsoundwave.dylib` | `<exe dir>/../Frameworks/libsoundwave.dylib` |
+
+The `native/` project is built as an `ExternalProject` (not `add_subdirectory`) because its object-library target is also named `soundwave`, which clashes with the runner executable. Both `build.yml` and `release.yml` assert after the build that the library is present in the bundle, exports `sw_*` symbols and can be loaded (`ctypes.CDLL`), and that the macOS runner has the `@executable_path/../Frameworks` rpath and `NSMicrophoneUsageDescription`.
+
+#### Desktop packages
+
+| Platform | Runner | Artifacts | Packaging script |
+|---|---|---|---|
+| Windows | `windows-latest` | `soundwave-<ver>-windows-x64.zip`, `soundwave-<ver>-windows-x64.msix` | `soundwave_app/windows/packaging/package.ps1` (`Compress-Archive`, Windows SDK `makeappx`; manifest `AppxManifest.xml.in` declares `runFullTrust` + `microphone`) |
+| macOS | `macos-latest` | `soundwave-<ver>-macos-universal.dmg` | `soundwave_app/macos/packaging/sign_and_package.sh` (`codesign` with hardened runtime + `Runner/Release.entitlements`, `hdiutil` UDZO, `notarytool` + `stapler`) |
+| Linux | `ubuntu-22.04` (glibc 2.35 baseline) | `soundwave-<ver>-linux-x64.tar.gz`, `soundwave_<ver>_amd64.deb`, `Soundwave-<ver>-x86_64.AppImage` | `soundwave_app/linux/packaging/package.sh` (`tar`, `dpkg-deb` installing to `/opt/soundwave` + `/usr/bin/soundwave`, `appimagetool` 1.9.1) |
+| All | `ubuntu-latest` (`checksums` job) | `SHA256SUMS`, `SHA256SUMS.asc` (when GPG key set) | inline |
+
+`build.yml` produces the same desktop packages unsigned (macOS ad-hoc signed) on every `main` push / app PR, so packaging regressions surface before a tag.
+
+macOS microphone access: `Info.plist` has `NSMicrophoneUsageDescription`; `Release.entitlements` (applied when signing) has `com.apple.security.app-sandbox` and `com.apple.security.device.audio-input`. The packaging script fails if the signed app lacks the audio-input entitlement.
+
+#### Signing (all optional; gated on secret presence)
+
+`secrets` cannot be used in step-level `if:`, so each job exposes a presence flag in job-level `env` (e.g. `HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 != '' }}`) and signing steps test that flag. Without secrets the pipeline still succeeds with unsigned packages.
+
+| Platform | When secrets exist | Without secrets |
+|---|---|---|
+| Windows | `signtool` (SHA-256, DigiCert RFC 3161 timestamp) signs `soundwave.exe`, `soundwave.dll` and the MSIX. MSIX `Publisher` comes from repository variable `MSIX_PUBLISHER` and must equal the certificate subject. | Unsigned zip + unsigned MSIX (MSIX installs only after signing / developer mode sideload). |
+| macOS | Certificate imported into a temporary keychain; frameworks/dylibs then the app are signed with `Developer ID Application` + hardened runtime + timestamp; DMG signed, notarized with `xcrun notarytool submit --wait` and stapled. Keychain deleted afterwards. | Ad-hoc signature (`codesign -s -`), not notarized; Gatekeeper will require right-click → Open. |
+| Linux | `SHA256SUMS` detached-signed (`SHA256SUMS.asc`) with the GPG key and verified. | Unsigned `SHA256SUMS`. |
+
+#### Publishing
+
+- `deploy-github-release` (needs every platform build + `checksums`, and `publish == 'true'`) creates a **draft** release with all platform assets and checksums.
+- `deploy-android` (Play Store internal track) and the Snap publish step also require `publish == 'true'`.
+- Snap packaging runs only once `snap/snapcraft.yaml` exists (not yet added).
 
 ---
 
 ## 4. Required Secrets
+
+All signing/publishing secrets are optional: when one is missing the corresponding step is skipped with a `::notice::` and unsigned packages are produced. Add them under *Settings → Secrets and variables → Actions*.
 
 | Secret | Platform | Purpose |
 |---|---|---|
@@ -265,16 +253,23 @@ jobs:
 | `ANDROID_KEY_ALIAS` | Android | Key alias |
 | `ANDROID_KEY_PASSWORD` | Android | Key password |
 | `GOOGLE_PLAY_SERVICE_ACCOUNT` | Android | Play Store API credentials |
-| `MACOS_CERTIFICATE_BASE64` | macOS | P12 signing certificate |
-| `MACOS_P12_PASSWORD` | macOS | P12 certificate password |
-| `MACOS_CODESIGN_IDENTITY` | macOS | codesign identity string |
-| `MACOS_NOTARIZATION_APPLE_ID` | macOS | Apple ID for notarization |
-| `MACOS_NOTARIZATION_PASSWORD` | macOS | App-specific password |
+| `MACOS_CERTIFICATE_BASE64` | macOS | Base64 of the **Developer ID Application** certificate + private key exported as `.p12` (`base64 -i cert.p12`) |
+| `MACOS_CERTIFICATE_PASSWORD` | macOS | Password of that `.p12` |
+| `MACOS_NOTARIZATION_APPLE_ID` | macOS | Apple ID email used for `notarytool` |
 | `MACOS_NOTARIZATION_TEAM_ID` | macOS | Apple Developer Team ID |
-| `WINDOWS_CERT_PFX_BASE64` | Windows | PFX code signing certificate |
-| `WINDOWS_CERT_PASSWORD` | Windows | PFX password |
+| `MACOS_NOTARIZATION_APP_PASSWORD` | macOS | App-specific password for that Apple ID |
+| `WINDOWS_CERTIFICATE_BASE64` | Windows | Base64 of the code-signing `.pfx` (`[Convert]::ToBase64String([IO.File]::ReadAllBytes('cert.pfx'))`) |
+| `WINDOWS_CERTIFICATE_PASSWORD` | Windows | Password of that `.pfx` |
+| `LINUX_GPG_PRIVATE_KEY` | Linux / all | ASCII-armored private key (`gpg --armor --export-secret-keys <id>`) used to sign `SHA256SUMS` |
+| `LINUX_GPG_PASSPHRASE` | Linux / all | Passphrase of that key (empty if none) |
 | `SNAP_TOKEN` | Linux | Snapcraft store token |
 | `CODECOV_TOKEN` | All | Codecov upload token |
+
+| Repository **variable** (not secret) | Purpose |
+|---|---|
+| `MSIX_PUBLISHER` | MSIX `Identity/@Publisher`; must exactly equal the Windows certificate subject (e.g. `CN=PxA Labs, O=PxA Labs, C=IN`). Defaults to `CN=PxA Labs`. |
+
+The macOS certificate is detected by the `Developer ID Application` identity in the `.p12`; notarization runs only when that identity and all three `MACOS_NOTARIZATION_*` secrets are present.
 
 ---
 
@@ -354,11 +349,11 @@ main (production)
 | Platform | Channel | Trigger | Automation |
 |---|---|---|---|
 | Android (Play Store) | Internal → Beta → Production | Tag `v*` | `r0adkll/upload-google-play` |
-| Windows | GitHub Releases | Tag `v*` | `softprops/action-gh-release` |
-| macOS | GitHub Releases | Tag `v*` | `softprops/action-gh-release` |
+| Windows (zip, MSIX) | GitHub Releases | Tag `v*` | `softprops/action-gh-release` |
+| macOS (DMG) | GitHub Releases | Tag `v*` | `softprops/action-gh-release` |
 | Linux (Snap) | Snap Store (stable) | Tag `v*` | `snapcore/action-publish` |
-| Linux (DEB) | GitHub Releases | Tag `v*` | `softprops/action-gh-release` |
-| Linux (AppImage) | GitHub Releases | Tag `v*` | `softprops/action-gh-release` |
+| Linux (tar.gz, DEB, AppImage) | GitHub Releases | Tag `v*` | `softprops/action-gh-release` |
+| Checksums (`SHA256SUMS[.asc]`) | GitHub Releases | Tag `v*` | `softprops/action-gh-release` |
 
 ---
 
@@ -367,11 +362,12 @@ main (production)
 1. Update `VERSION` in `pubspec.yaml` and `native/CMakeLists.txt`
 2. Update `CHANGELOG.md` with release notes
 3. Create PR from `develop` → `main`
-4. After merge, create git tag: `git tag v1.0.0`
-5. Push tag: `git push origin v1.0.0`
-6. GitHub Actions triggers release workflow
-7. Artifacts built, signed, and deployed to all targets
-8. Publish GitHub Release (mark as latest)
+4. Rehearse with a dry run: `gh workflow run release.yml --ref main -f dry_run=true`; check the uploaded artifacts and `SHA256SUMS`
+5. After merge, create git tag: `git tag v1.0.0`
+6. Push tag: `git push origin v1.0.0`
+7. GitHub Actions triggers release workflow
+8. Artifacts built, signed, and deployed to all targets
+9. Review and publish the draft GitHub Release (mark as latest)
 
 ---
 
@@ -391,3 +387,4 @@ main (production)
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | 1.0 | 2026-07-18 | PxA Labs | Initial CI/CD specification |
+| 1.1 | 2026-11-14 | PxA Labs | Desktop packaging, native-library bundling, signing, dry-run releases, checksums (#95, #35) |
