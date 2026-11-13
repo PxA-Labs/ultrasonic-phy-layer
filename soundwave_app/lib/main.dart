@@ -11,7 +11,9 @@ import 'state/ui_preferences.dart';
 import 'screens/dashboard.dart';
 import 'screens/monitor.dart';
 import 'screens/settings.dart';
+import 'services/mic_permission.dart';
 import 'theme/soundwave_theme.dart';
+import 'widgets/mic_permission_gate.dart';
 
 void main() {
   runApp(const SoundwaveApp());
@@ -59,8 +61,36 @@ class SoundwaveApp extends StatelessWidget {
 }
 
 /// Shows the onboarding tutorial on first launch, then the main shell.
-class AppRoot extends StatelessWidget {
-  const AppRoot({super.key});
+///
+/// Microphone permission has one flow: on first launch the onboarding
+/// microphone page explains and requests it, so the launch-time
+/// [MicPermissionGate] stays quiet for the rest of that session. On later
+/// launches the gate explains and asks again only if access is still missing
+/// (and starting capture asks via MicPermission.ensureGranted as before).
+class AppRoot extends StatefulWidget {
+  /// Overrides the gate's platform detection (tests).
+  final bool? micGateEnabled;
+  final Future<bool> Function() checkMicGranted;
+  final Future<bool> Function() requestMic;
+
+  const AppRoot({
+    super.key,
+    this.micGateEnabled,
+    this.checkMicGranted = MicPermission.isGranted,
+    this.requestMic = MicPermission.request,
+  });
+
+  @override
+  State<AppRoot> createState() => _AppRootState();
+}
+
+class _AppRootState extends State<AppRoot> {
+  bool _onboardedThisSession = false;
+
+  void _finishOnboarding(UiPreferences prefs) {
+    setState(() => _onboardedThisSession = true);
+    prefs.completeOnboarding();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,9 +100,18 @@ class AppRoot extends StatelessWidget {
       return const Scaffold();
     }
     if (!prefs.onboardingComplete) {
-      return OnboardingScreen(onFinished: prefs.completeOnboarding);
+      return OnboardingScreen(
+        onFinished: () => _finishOnboarding(prefs),
+        requestMicPermission: widget.requestMic,
+      );
     }
-    return const MainShell();
+    if (_onboardedThisSession) return const MainShell();
+    return MicPermissionGate(
+      enabled: widget.micGateEnabled,
+      checkGranted: widget.checkMicGranted,
+      requestPermission: widget.requestMic,
+      child: const MainShell(),
+    );
   }
 }
 

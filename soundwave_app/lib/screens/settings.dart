@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../state/app_state.dart';
 import '../state/ui_preferences.dart';
+import 'signal_files.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -194,6 +195,8 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          const StorageCard(),
           const SizedBox(height: 16),
           const _AppearanceCard(),
           const SizedBox(height: 24),

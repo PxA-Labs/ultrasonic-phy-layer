@@ -37,6 +37,13 @@ void ofdm_dft_demodulate(const float* y, int N, int cp_length, kiss_fft_cpx* Y) 
 }
 
 int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** decoded, size_t* out_len) {
+    return ofdm_demodulate_ex(samples, len, cfg, decoded, out_len, NULL, 0, NULL);
+}
+
+int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
+                       uint8_t** decoded, size_t* out_len,
+                       kiss_fft_cpx* eq_out, size_t eq_cap, size_t* eq_count) {
+    if (eq_count) *eq_count = 0;
     if (!samples || !decoded || !out_len) {
         if (out_len) *out_len = 0;
         return SW_ERR_BAD_PARAM;
@@ -285,6 +292,15 @@ int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** d
             equalize_mmse(Y_sym, H, data_indices, num_data, inv_snr, X_hat);
         } else {
             equalize_zf(Y_sym, H, data_indices, num_data, X_hat);
+        }
+
+        // Optional copy of the equalized data-subcarrier points (constellation
+        // diagram, EVM). Bounded by the caller's capacity.
+        if (eq_out && eq_count) {
+            for (int d = 0; d < num_data && *eq_count < eq_cap; d++) {
+                eq_out[*eq_count] = X_hat[d];
+                (*eq_count)++;
+            }
         }
 
         // Hard Demapping

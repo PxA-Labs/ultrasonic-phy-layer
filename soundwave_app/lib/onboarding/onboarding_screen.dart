@@ -3,17 +3,8 @@
 // and replayable from Settings.
 
 import 'package:flutter/material.dart';
-import 'package:record/record.dart';
 
-/// Asks the platform for microphone access; true when granted.
-Future<bool> requestMicrophonePermission() async {
-  final recorder = AudioRecorder();
-  try {
-    return await recorder.hasPermission();
-  } finally {
-    await recorder.dispose();
-  }
-}
+import '../services/mic_permission.dart';
 
 const _micGranted = 'Microphone access granted.';
 const _micDenied = 'Microphone access not granted. You can enable it later.';
@@ -96,13 +87,18 @@ class OnboardingScreen extends StatefulWidget {
   /// Called when the user finishes or skips the tutorial.
   final VoidCallback onFinished;
 
-  /// Injected for tests; defaults to the platform permission prompt.
+  /// Injected for tests; defaults to the shared [MicPermission] service.
   final Future<bool> Function() requestMicPermission;
+
+  /// Whether to offer the permission button; desktop platforms have no
+  /// runtime microphone permission. Defaults to [MicPermission.isRequired].
+  final bool? showMicPermissionButton;
 
   const OnboardingScreen({
     super.key,
     required this.onFinished,
-    this.requestMicPermission = requestMicrophonePermission,
+    this.requestMicPermission = MicPermission.request,
+    this.showMicPermissionButton,
   });
 
   @override
@@ -168,6 +164,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final total = onboardingPages.length;
+    var showMicButton = MicPermission.isRequired;
+    final micButtonOverride = widget.showMicPermissionButton;
+    if (micButtonOverride != null) showMicButton = micButtonOverride;
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -183,6 +182,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   pageCount: total,
                   micGranted: _micGranted,
                   requesting: _requesting,
+                  showMicButton: showMicButton,
                   onRequestMic: _askForMic,
                 ),
               ),
@@ -228,6 +228,7 @@ class _OnboardingPage extends StatelessWidget {
   final int pageCount;
   final bool? micGranted;
   final bool requesting;
+  final bool showMicButton;
   final VoidCallback onRequestMic;
 
   const _OnboardingPage({
@@ -236,6 +237,7 @@ class _OnboardingPage extends StatelessWidget {
     required this.pageCount,
     required this.micGranted,
     required this.requesting,
+    required this.showMicButton,
     required this.onRequestMic,
   });
 
@@ -287,7 +289,7 @@ class _OnboardingPage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(data.body.join(' '), style: theme.textTheme.bodyLarge),
-          if (data.asksMicPermission) ...[
+          if (data.asksMicPermission && showMicButton) ...[
             const SizedBox(height: 24),
             FilledButton.tonalIcon(
               key: const Key('onboarding_allow_mic'),

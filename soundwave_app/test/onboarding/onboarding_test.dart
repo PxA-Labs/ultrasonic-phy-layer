@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 import 'package:soundwave/main.dart';
 import 'package:soundwave/onboarding/onboarding_screen.dart';
 import 'package:soundwave/state/app_state.dart';
@@ -24,6 +25,7 @@ Widget host({
     home: OnboardingScreen(
       onFinished: onFinished,
       requestMicPermission: requestMic,
+      showMicPermissionButton: true,
     ),
   );
 }
@@ -227,6 +229,96 @@ void main() {
       await settle(tester);
       expect(find.text('Welcome to Soundwave'), findsNothing);
       expect(find.text('Settings & Configuration'), findsOneWidget);
+    });
+  });
+
+  group('single microphone permission flow', () {
+    late int checks;
+    late int requests;
+    late bool granted;
+
+    setUp(() {
+      checks = 0;
+      requests = 0;
+      granted = false;
+    });
+
+    Future<bool> check() async {
+      checks++;
+      return granted;
+    }
+
+    Future<bool> request() async {
+      requests++;
+      return granted;
+    }
+
+    /// AppRoot with the launch-time gate forced on, as on Android.
+    Widget root(UiPreferences prefs) {
+      return MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => AppState(audio: MockAudioService()),
+          ),
+          ChangeNotifierProvider.value(value: prefs),
+        ],
+        child: MaterialApp(
+          theme: SoundwaveTheme.light,
+          home: AppRoot(
+            micGateEnabled: true,
+            checkMicGranted: check,
+            requestMic: request,
+          ),
+        ),
+      );
+    }
+
+    testWidgets('first launch: onboarding asks once and the gate stays quiet',
+        (tester) async {
+      final prefs = UiPreferences();
+      await tester.pumpWidget(root(prefs));
+      await tester.pump();
+      final micPage = onboardingPages.indexWhere((p) => p.asksMicPermission);
+      for (var i = 0; i < onboardingPages.length - 1; i++) {
+        if (i == micPage) {
+          await tester.tap(find.byKey(const Key('onboarding_allow_mic')));
+          await settle(tester);
+        }
+        await tester.tap(find.byKey(const Key('onboarding_next')));
+        await settle(tester);
+      }
+      await tester.tap(find.byKey(const Key('onboarding_next')));
+      await settle(tester);
+
+      expect(prefs.onboardingComplete, isTrue);
+      expect(find.text('Soundwave Dashboard'), findsOneWidget);
+      expect(requests, 1);
+      expect(checks, 0);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('later launch without access: the gate explains and asks',
+        (tester) async {
+      final prefs = UiPreferences(onboardingComplete: true);
+      await tester.pumpWidget(root(prefs));
+      await settle(tester);
+      expect(checks, 1);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.tap(find.text('Continue'));
+      await settle(tester);
+      expect(requests, 1);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('later launch with access: no prompt at all', (tester) async {
+      granted = true;
+      final prefs = UiPreferences(onboardingComplete: true);
+      await tester.pumpWidget(root(prefs));
+      await settle(tester);
+      expect(checks, 1);
+      expect(requests, 0);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Soundwave Dashboard'), findsOneWidget);
     });
   });
 }

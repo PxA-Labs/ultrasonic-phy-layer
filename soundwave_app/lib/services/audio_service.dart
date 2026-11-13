@@ -10,6 +10,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:ffi/ffi.dart';
 import 'package:soundwave/native/soundwave_native.dart';
 import 'package:soundwave/native/bindings.dart';
+import 'package:soundwave/services/mic_permission.dart';
 
 class AudioDevice {
   final String name;
@@ -86,6 +87,9 @@ class NativeAudioService implements AudioService {
   @override
   Future<void> startCapture() async {
     if (_isCapturing) return;
+
+    // AAudio/OpenSL ES capture needs RECORD_AUDIO granted at runtime.
+    await MicPermission.ensureGranted();
 
     _captureHandle = SoundwaveNative.instance.audioCaptureStart(_nativeConfig);
     _isCapturing = true;

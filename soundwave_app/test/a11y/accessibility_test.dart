@@ -14,6 +14,14 @@ import '../engine/mock_native.dart';
 
 const tabs = ['Dashboard', 'Monitor', 'Settings'];
 
+/// Monitor plot tabs (narrow layout) and each plot's semantics label.
+const monitorPlots = {
+  'Spectrum': 'Spectrum analyzer: signal level by frequency',
+  'Waterfall': 'Waterfall spectrogram: frequency content over time',
+  'Constellation': 'Constellation diagram of equalized OFDM symbols',
+  'Waveform': 'Waveform of the microphone input',
+};
+
 UiPreferences completedPrefs(ThemeMode mode) {
   return UiPreferences(themeMode: mode, onboardingComplete: true);
 }
@@ -55,6 +63,12 @@ Future<void> openTab(WidgetTester tester, String label) async {
   await settle(tester);
 }
 
+Future<void> openMonitorPlot(WidgetTester tester, String plot) async {
+  final bar = find.byType(TabBar);
+  await tester.tap(find.descendant(of: bar, matching: find.text(plot)));
+  await settle(tester);
+}
+
 Future<void> expectGuidelines(WidgetTester tester) async {
   await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
   await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
@@ -70,6 +84,12 @@ void main() {
         await pumpApp(tester, themeMode: mode);
         await openTab(tester, tab);
         await expectGuidelines(tester);
+        if (tab == 'Monitor') {
+          for (final plot in monitorPlots.keys) {
+            await openMonitorPlot(tester, plot);
+            await expectGuidelines(tester);
+          }
+        }
         if (tab == 'Settings') {
           // Also check the bottom of the list (theme selector, tutorial).
           await tester.drag(
@@ -111,6 +131,12 @@ void main() {
     for (final tab in tabs) {
       await openTab(tester, tab);
       expect(tester.takeException(), isNull, reason: tab);
+      if (tab == 'Monitor') {
+        for (final plot in monitorPlots.keys) {
+          await openMonitorPlot(tester, plot);
+          expect(tester.takeException(), isNull, reason: plot);
+        }
+      }
     }
     // The OFDM card replaces the CSS card in Settings.
     state.setMode(1);
@@ -150,11 +176,13 @@ void main() {
     await pumpApp(tester);
     await openTab(tester, 'Monitor');
     expect(find.byTooltip('Pause monitor'), findsOneWidget);
-    expect(
-      find.bySemanticsLabel('Live waveform of the microphone input'),
-      findsOneWidget,
-    );
-    expect(find.bySemanticsLabel('Waterfall spectrogram'), findsOneWidget);
+    for (final plot in monitorPlots.entries) {
+      await openMonitorPlot(tester, plot.key);
+      expect(find.bySemanticsLabel(plot.value), findsOneWidget);
+      if (plot.key == 'Waterfall') {
+        expect(find.byTooltip('Pause waterfall'), findsOneWidget);
+      }
+    }
     final level = tester.getSemantics(find.byType(LinearProgressIndicator));
     expect(level.label, contains('Input level'));
     handle.dispose();

@@ -12,6 +12,7 @@ import 'package:soundwave/engine/signal_metrics.dart';
 import 'package:soundwave/engine/frame_codec.dart';
 import 'package:soundwave/engine/frame_geometry.dart';
 import 'package:soundwave/engine/agc_processor.dart';
+import 'package:soundwave/dsp/constellation.dart';
 
 class DecodedMessage {
   final String text;
@@ -41,6 +42,8 @@ class RxEngine {
       StreamController<SignalMetrics>.broadcast();
   final StreamController<RxFrameEvent> _frameEventsController =
       StreamController<RxFrameEvent>.broadcast();
+  final StreamController<ConstellationFrame> _constellationController =
+      StreamController<ConstellationFrame>.broadcast();
 
   StreamSubscription<Float64List>? _audioSubscription;
 
@@ -65,6 +68,15 @@ class RxEngine {
   Stream<DecodedMessage> get messages => _messageStreamController.stream;
   Stream<SignalMetrics> get metrics => _metricsController.stream;
   Stream<RxFrameEvent> get frameEvents => _frameEventsController.stream;
+
+  /// Equalized OFDM constellation points of each frame that was decoded or
+  /// given up on. Only computed while someone listens (it costs one extra
+  /// demodulation per frame).
+  Stream<ConstellationFrame> get constellation =>
+      _constellationController.stream;
+
+  /// Cap on constellation points per frame.
+  static const int maxConstellationPoints = 4096;
 
   bool get isListening => _isListening;
   int get framesDetected => _framesDetected;
@@ -247,6 +259,13 @@ class RxEngine {
     if (frame != null) {
       _onFrameDecoded(frame);
       final consumed = geometry.samplesForFrameBytes(frame.frameLength);
+      // Up to one symbol of trailing audio: detection may place the frame
+      // start a few samples late and only whole symbols are demodulated.
+      final end = consumed + geometry.samplesPerSymbol - 1;
+      _emitConstellation(
+        end < n ? Float32List.sublistView(samples, 0, end) : samples,
+        decoded: true,
+      );
       _sampleBuffer.removeRange(0, consumed.clamp(0, _sampleBuffer.length));
       _pendingFrameSince = null;
       return true;
@@ -254,6 +273,7 @@ class RxEngine {
 
     if (reachedMax) {
       _onFrameError();
+      _emitConstellation(samples, decoded: false);
       _sampleBuffer.removeRange(
           0, geometry.preambleSamples.clamp(0, _sampleBuffer.length));
       _pendingFrameSince = null;
@@ -274,6 +294,35 @@ class RxEngine {
       return _configMap['modulation'] == 1
           ? native.ofdmDemodulate(samples, configPtr)
           : native.cssDemodulate(samples, configPtr);
+    } finally {
+      calloc.free(configPtr);
+    }
+  }
+
+  /// Publishes the equalized constellation of a frame-aligned OFDM frame.
+  void _emitConstellation(Float32List frameSamples, {required bool decoded}) {
+    if (!_constellationController.hasListener) return;
+    if (_configMap['modulation'] != 1) return;
+    final nat = native;
+    if (!nat.hasEqualizedSymbols) return;
+    final configPtr = SwConfig.fromMap(_configMap);
+    try {
+      final iq = nat.ofdmEqualizedSymbols(
+        frameSamples,
+        configPtr,
+        maxPoints: maxConstellationPoints,
+      );
+      if (iq.isEmpty) return;
+      final mapping = (_configMap['ofdm_modulation'] as num?)?.toInt() ?? 1;
+      _constellationController.add(ConstellationFrame(
+        iq: iq,
+        scheme: ConstellationScheme.fromOfdmModulation(mapping),
+        decoded: decoded,
+      ));
+    } on SwException {
+      // No usable constellation for this frame; nothing to show.
+    } catch (e) {
+      debugPrint('Constellation extraction failed: $e');
     } finally {
       calloc.free(configPtr);
     }

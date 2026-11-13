@@ -21,10 +21,17 @@ concurrency:
 
 jobs:
   build-android:
+    # Issues #87/#94: builds libsoundwave.so for arm64-v8a, armeabi-v7a and
+    # x86_64 via Gradle externalNativeBuild, then debug APK, per-ABI release
+    # APKs and an AAB. Release signing uses the ANDROID_KEYSTORE_* secrets
+    # when present, otherwise release builds are debug-signed.
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: soundwave_app
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -49,23 +56,120 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
+          cache: gradle
 
-      - name: Build APK
+      - name: Configure release signing
+        if: steps.check.outputs.has_pubspec == 'true' && env.HAS_KEYSTORE == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          {
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "storeFile=upload-keystore.jks"
+          } > android/key.properties
+
+      - name: Signing mode
+        if: steps.check.outputs.has_pubspec == 'true' && env.HAS_KEYSTORE != 'true'
+        run: echo "::notice::ANDROID_KEYSTORE_BASE64 not set; release APK/AAB are debug-signed (not for Play Store upload)."
+
+      - name: Build debug APK
         if: steps.check.outputs.has_pubspec == 'true'
-        run: flutter build apk --release
+        run: flutter build apk --debug
+
+      - name: Build release APKs (split per ABI)
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: flutter build apk --release --split-per-abi
 
       - name: Build AAB
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build appbundle --release
 
+      - name: Verify libsoundwave.so is packaged
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          set -euo pipefail
+          apk_dir=build/app/outputs/flutter-apk
+          aab=build/app/outputs/bundle/release/app-release.aab
+          abis="arm64-v8a armeabi-v7a x86_64"
+          fail=0
+          require() { # archive entry
+            if unzip -l "$1" | grep -E " $2\$" > /dev/null; then
+              echo "ok   $1 -> $2"
+            else
+              echo "::error::$2 missing from $1"
+              unzip -l "$1" | grep '\.so$' || true
+              fail=1
+            fi
+          }
+          for abi in $abis; do
+            require "$apk_dir/app-debug.apk" "lib/$abi/libsoundwave.so"
+            require "$apk_dir/app-$abi-release.apk" "lib/$abi/libsoundwave.so"
+            require "$aab" "base/lib/$abi/libsoundwave.so"
+          done
+          [ "$fail" = 0 ] || exit 1
+
+          # Exported FFI symbols and 16 KB ELF alignment (Play requirement).
+          tmp=$(mktemp -d)
+          for abi in $abis; do
+            unzip -p "$apk_dir/app-$abi-release.apk" "lib/$abi/libsoundwave.so" > "$tmp/$abi.so"
+            readelf -h "$tmp/$abi.so" | grep -E 'Class|Machine'
+            for sym in sw_version sw_audio_capture_start sw_audio_playback_start sw_css_modulate; do
+              if ! readelf --dyn-syms -W "$tmp/$abi.so" | grep -w "$sym" > /dev/null; then
+                echo "::error::$abi libsoundwave.so does not export $sym"; exit 1
+              fi
+            done
+            if [ "$abi" != "armeabi-v7a" ]; then
+              if ! readelf -lW "$tmp/$abi.so" | awk '$1=="LOAD" && $NF!="0x4000" { bad=1 } END { exit bad }'; then
+                echo "::error::$abi libsoundwave.so LOAD segments are not 16 KB aligned"
+                readelf -lW "$tmp/$abi.so"; exit 1
+              fi
+            fi
+          done
+          ls -l "$apk_dir" "$(dirname "$aab")"
+
+      - name: Verify signatures
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          set -euo pipefail
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          for apk in build/app/outputs/flutter-apk/*.apk; do
+            echo "== $apk"
+            # apksigner's exit status is the verification result; the cert
+            # summary is printed for the log only (its wording varies by
+            # build-tools version, so it must not be grepped as a gate).
+            "$bt/apksigner" verify --verbose --print-certs "$apk"
+          done
+          out=$(jarsigner -verify build/app/outputs/bundle/release/app-release.aab)
+          echo "$out" | tail -3
+          grep -q 'jar verified' <<<"$out"
+
       - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          name: android-release
-          path: |
-            soundwave_app/build/app/outputs/flutter-apk/app-release.apk
-            soundwave_app/build/app/outputs/bundle/release/app-release.aab
+          name: android-debug-apk
+          path: soundwave_app/build/app/outputs/flutter-apk/app-debug.apk
 
+      - uses: actions/upload-artifact@v7
+        if: steps.check.outputs.has_pubspec == 'true'
+        with:
+          name: android-release-apks
+          path: soundwave_app/build/app/outputs/flutter-apk/app-*-release.apk
+
+      - uses: actions/upload-artifact@v7
+        if: steps.check.outputs.has_pubspec == 'true'
+        with:
+          name: android-release-aab
+          path: soundwave_app/build/app/outputs/bundle/release/app-release.aab
+
+  # Desktop jobs (issue #95): build the app with libsoundwave bundled, assert
+  # the native library is present and loadable, then package. Packages here
+  # are unsigned; signing happens in release.yml (#35).
   build-windows:
     runs-on: windows-latest
     defaults:
@@ -95,11 +199,28 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build windows --release
 
+      - name: Verify bundled native library
+        if: steps.check.outputs.has_pubspec == 'true'
+        shell: pwsh
+        run: |
+          $rel = 'build\windows\x64\runner\Release'
+          Get-ChildItem -Recurse $rel | Select-Object FullName, Length | Format-Table -AutoSize
+          $dll = Join-Path $rel 'soundwave.dll'
+          if (-not (Test-Path $dll)) { throw "soundwave.dll not bundled next to soundwave.exe" }
+          python -c "import ctypes,sys; l=ctypes.CDLL(sys.argv[1]); l.sw_crc32; l.sw_version.restype=ctypes.c_char_p; print('loaded', sys.argv[1], l.sw_version().decode())" (Resolve-Path $dll).Path
+
+      - name: Package (zip + MSIX, unsigned)
+        if: steps.check.outputs.has_pubspec == 'true'
+        shell: pwsh
+        run: |
+          $version = ((Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)').Matches[0].Groups[1].Value -split '\+')[0]
+          ./windows/packaging/package.ps1 -ReleaseDir build\windows\x64\runner\Release -Version $version -OutDir dist
+
       - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: windows-release
-          path: soundwave_app/build/windows/x64/runner/Release/
+          path: soundwave_app/dist/
 
   build-macos:
     runs-on: macos-latest
@@ -119,24 +240,54 @@ jobs:
             echo "has_pubspec=true" >> $GITHUB_OUTPUT
           fi
 
+      # Flutter 3.47.8/3.47.9 gen_snapshot aborts on macOS ('Class with illegal
+      # cid' on _Rect in widgets/_window_macos.dart) for some app code, e.g.
+      # the mic permission gate (#87). 3.50.0 builds it. Unify all jobs on
+      # 3.50.0 once android/ uses AGP >= 9.1.1 (required by 3.50).
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.47.x'
+          flutter-version: '3.50.0'
           cache: true
 
       - name: Build macOS
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build macos --release
 
+      - name: Embed libsoundwave.dylib
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: bash macos/packaging/embed_native.sh build/macos/Build/Products/Release/soundwave.app
+
+      - name: Package DMG (ad-hoc signed)
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          version="$(sed -n 's/^version:[[:space:]]*\([^+]*\).*/\1/p' pubspec.yaml)"
+          mkdir -p dist
+          bash macos/packaging/sign_and_package.sh build/macos/Build/Products/Release/soundwave.app \
+            "dist/soundwave-${version}-macos-universal.dmg"
+
+      - name: Verify bundled native library
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          app=build/macos/Build/Products/Release/soundwave.app
+          ls -la "$app/Contents/MacOS" "$app/Contents/Frameworks"
+          lib="$app/Contents/Frameworks/libsoundwave.dylib"
+          test -f "$lib" || { echo "::error::libsoundwave.dylib not in Frameworks"; exit 1; }
+          lipo "$lib" -verify_arch arm64 x86_64
+          otool -l "$app/Contents/MacOS/soundwave" | grep -A2 LC_RPATH | grep -q '@executable_path/../Frameworks' \
+            || { echo "::error::Runner rpath lacks @executable_path/../Frameworks"; exit 1; }
+          /usr/libexec/PlistBuddy -c 'Print :NSMicrophoneUsageDescription' "$app/Contents/Info.plist"
+          python3 -c "import ctypes,sys; l=ctypes.CDLL(sys.argv[1]); l.sw_crc32; l.sw_version.restype=ctypes.c_char_p; print('loaded', sys.argv[1], l.sw_version().decode())" "$lib"
+
       - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: macos-release
-          path: soundwave_app/build/macos/Build/Products/Release/
+          path: soundwave_app/dist/
 
   build-linux:
-    runs-on: ubuntu-latest
+    # 22.04 (glibc 2.35) so the AppImage/.deb also run on older distros.
+    runs-on: ubuntu-22.04
     defaults:
       run:
         working-directory: soundwave_app
@@ -163,6 +314,9 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         run: |
           sudo apt-get update
+          # ubuntu-22.04 ships libunwind-14-dev, which conflicts with the
+          # libunwind-dev that libgstreamer1.0-dev depends on.
+          sudo apt-get remove -y libunwind-14-dev || true
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
@@ -171,8 +325,24 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build linux --release
 
+      - name: Verify bundled native library
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          bundle=build/linux/x64/release/bundle
+          find "$bundle" -maxdepth 2 -type f -exec ls -la {} + | grep -v flutter_assets
+          lib="$bundle/lib/libsoundwave.so"
+          test -f "$lib" || { echo "::error::libsoundwave.so not in bundle/lib"; exit 1; }
+          nm -D --defined-only "$lib" | grep -c ' T sw_'
+          python3 -c "import ctypes,sys; l=ctypes.CDLL(sys.argv[1]); l.sw_crc32; l.sw_version.restype=ctypes.c_char_p; print('loaded', sys.argv[1], l.sw_version().decode())" "$lib"
+
+      - name: Package (tar.gz + deb + AppImage)
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          version="$(sed -n 's/^version:[[:space:]]*\([^+]*\).*/\1/p' pubspec.yaml)"
+          bash linux/packaging/package.sh build/linux/x64/release/bundle "$version" dist
+
       - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: linux-release
-          path: soundwave_app/build/linux/x64/release/bundle/
+          path: soundwave_app/dist/
