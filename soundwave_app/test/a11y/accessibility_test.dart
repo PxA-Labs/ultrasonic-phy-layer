@@ -173,6 +173,8 @@ void main() {
     final selector = find.byKey(const Key('theme_mode_selector'));
     await tester.scrollUntilVisible(selector, 300,
         scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(selector);
+    await settle(tester);
     await tester.tap(find.text('Light'));
     await settle(tester);
     expect(prefs.themeMode, ThemeMode.light);

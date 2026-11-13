@@ -214,6 +214,8 @@ void main() {
       final tile = find.byKey(const Key('show_tutorial'));
       await tester.scrollUntilVisible(tile, 300,
           scrollable: find.byType(Scrollable).first);
+      await tester.ensureVisible(tile);
+      await settle(tester);
       await tester.tap(tile);
       await settle(tester);
       expect(find.text('Welcome to Soundwave'), findsOneWidget);
