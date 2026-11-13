@@ -26,14 +26,22 @@ int sync_real_to_analytic(const float* real, size_t len,
         fft_in[i].i = 0.0f;
     }
     kiss_fft(fwd, fft_in, fft_out);
-    // Zero negative frequencies, double positive
+    // Analytic spectrum Z[k] = X[k] (DC, and Nyquist for even N), 2 X[k] for
+    // 0 < k < N/2, 0 for the negative half, so that Re{z[n]} = x[n] exactly.
+    // Both parts of a positive bin must be doubled: scaling only .r gives
+    // Z[k] = 2 Re X[k] + j Im X[k], whose real part is
+    // 0.75 x[n] + 0.25 x[(-n) mod N] -- a 25 % time-reversed copy of the
+    // whole buffer superimposed on the signal (it capped the OFDM loopback
+    // EVM at ~28-45 %). Odd N has no Nyquist bin: k = (N-1)/2 is positive.
     for (int i = 0; i < N; i++) {
-        if (i == 0 || i == N / 2)
+        if (i == 0 || (N % 2 == 0 && i == N / 2)) {
             fft_out[i].i = 0.0f; // DC and Nyquist: real-only
-        else if (i < N / 2)
+        } else if (i <= (N - 1) / 2) {
             fft_out[i].r *= 2.0f; // positive freqs
-        else
+            fft_out[i].i *= 2.0f;
+        } else {
             fft_out[i].r = fft_out[i].i = 0.0f; // negative freqs
+        }
     }
     kiss_fft(inv, fft_out, fft_in);
     for (int i = 0; i < N; i++) {

@@ -36,6 +36,20 @@ void ofdm_dft_demodulate(const float* y, int N, int cp_length, kiss_fft_cpx* Y) 
     free(fft_cfg);
 }
 
+// Phase advance of the second preamble copy over the first,
+// angle(sum_k conj(Y1[k]) Y2[k]) over the given subcarriers; 0 if undefined.
+static float preamble_phase_advance(const kiss_fft_cpx* Y1, const kiss_fft_cpx* Y2,
+                                    const int* idx, int n) {
+    double re = 0.0, im = 0.0;
+    for (int i = 0; i < n; i++) {
+        int k = idx[i];
+        re += (double)Y1[k].r * Y2[k].r + (double)Y1[k].i * Y2[k].i;
+        im += (double)Y1[k].r * Y2[k].i - (double)Y1[k].i * Y2[k].r;
+    }
+    double a = atan2(im, re);
+    return isfinite(a) ? (float)a : 0.0f;
+}
+
 int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** decoded, size_t* out_len) {
     return ofdm_demodulate_ex(samples, len, cfg, decoded, out_len, NULL, 0, NULL);
 }
@@ -87,9 +101,6 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     kiss_fft_cpx* X_active = NULL;
     kiss_fft_cpx* H_active = NULL;
     kiss_fft_cpx* H = NULL;
-    kiss_fft_cpx* Y_p = NULL;
-    kiss_fft_cpx* X_p = NULL;
-    kiss_fft_cpx* H_p = NULL;
     kiss_fft_cpx* Y_sym = NULL;
     kiss_fft_cpx* X_hat = NULL;
     uint8_t* temp_bits = NULL;
@@ -181,7 +192,7 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
         goto cleanup;
     }
 
-    // 4. CFO Schmidl-Cox Estimation & Correction
+    // 4. Timing backoff, CFO estimation & correction
     // Need the two preamble symbols plus at least one data symbol after
     // frame_start; otherwise the reads below run past the sample buffer and
     // num_symbols underflows into a huge allocation.
@@ -191,26 +202,21 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
         goto cleanup;
     }
     size_t payload_len = len - frame_start;
-    float cfo = sync_schmidl_cox_cfo(samples + frame_start, 2 * ((size_t)N + (size_t)cp), N + cp, fs);
+
+    // FFT window placement (MATHEMATICAL_MODEL.md section 4.0): every symbol
+    // -- both preamble copies and all data symbols -- is sampled
+    // OFDM_TIMING_BACKOFF(cp) samples early, inside its cyclic prefix. An
+    // early window is a cyclic shift, i.e. the same linear phase ramp
+    // e^{-j 2 pi k b / N} on every symbol, which the preamble channel
+    // estimate absorbs exactly. A late window instead mixes in the next
+    // symbol's CP (ISI): the Schmidl-Cox peak can land a sample or two late,
+    // and a window one sample late already costs ~20 % EVM. The backoff makes
+    // the receiver ISI-free for timing errors in [-(cp - b), +b].
+    int fft_offset = cp - OFDM_TIMING_BACKOFF(cp);
 
     analytic_real = (float*)malloc(payload_len * sizeof(float));
     analytic_imag = (float*)malloc(payload_len * sizeof(float));
     corrected = (float*)malloc(payload_len * sizeof(float));
-    if (!analytic_real || !analytic_imag || !corrected) {
-        ret_code = SW_ERR_MEMORY;
-        goto cleanup;
-    }
-    if (sync_real_to_analytic(samples + frame_start, payload_len, analytic_real, analytic_imag) != 0) {
-        ret_code = SW_ERR_MEMORY;
-        goto cleanup;
-    }
-    sync_apply_cfo_correction(analytic_real, analytic_imag, payload_len, cfo, fs, corrected);
-
-    // Free analytic buffers early as they are no longer needed
-    free(analytic_real); analytic_real = NULL;
-    free(analytic_imag); analytic_imag = NULL;
-
-    // 5. Channel Estimation using preamble
     Y_pre1 = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
     Y_pre2 = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
     Y_pre = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
@@ -218,26 +224,53 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     X_active = (kiss_fft_cpx*)malloc(N_active * sizeof(kiss_fft_cpx));
     H_active = (kiss_fft_cpx*)malloc(N_active * sizeof(kiss_fft_cpx));
     H = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
-    Y_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
-    X_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
-    H_p = (kiss_fft_cpx*)malloc(num_pilots * sizeof(kiss_fft_cpx));
-
-    if (!Y_pre1 || !Y_pre2 || !Y_pre || !active_indices || !X_active || !H_active || !H || !Y_p || !X_p || !H_p) {
+    if (!analytic_real || !analytic_imag || !corrected || !Y_pre1 || !Y_pre2 ||
+        !Y_pre || !active_indices || !X_active || !H_active || !H) {
+        ret_code = SW_ERR_MEMORY;
+        goto cleanup;
+    }
+    for (int i = 0; i < N_active; i++) {
+        active_indices[i] = active_start + i;
+        X_active[i] = X_pre[active_start + i];
+    }
+    if (sync_real_to_analytic(samples + frame_start, payload_len, analytic_real, analytic_imag) != 0) {
         ret_code = SW_ERR_MEMORY;
         goto cleanup;
     }
 
-    ofdm_dft_demodulate(corrected, N, cp, Y_pre1);
-    ofdm_dft_demodulate(corrected + ((size_t)N + (size_t)cp), N, cp, Y_pre2);
+    // Schmidl-Cox CFO in the frequency domain (MATHEMATICAL_MODEL.md 3.3):
+    // the second preamble copy is the first delayed by sym_len samples, so on
+    // every active subcarrier Y2[k] = Y1[k] e^{j 2 pi cfo sym_len / fs}. Using
+    // the same backed-off FFT windows as the channel estimate keeps both
+    // windows inside the repeated preamble for any timing error the receiver
+    // tolerates, so a noiseless frame yields exactly cfo = 0. (A time-domain
+    // correlation over the full sym_len window spans |timing error| samples
+    // outside the repetition and turned a few samples of timing error into a
+    // spurious CFO.) The real signal's mirror image leaks into the band in
+    // proportion to the offset, so a second pass re-estimates the residual
+    // after the first correction, where that leakage is negligible.
+    float cfo = 0.0f;
+    const float* cfo_src = samples + frame_start;
+    for (int pass = 0; pass < 2; pass++) {
+        ofdm_dft_demodulate(cfo_src, N, fft_offset, Y_pre1);
+        ofdm_dft_demodulate(cfo_src + sym_len, N, fft_offset, Y_pre2);
+        float dphi = preamble_phase_advance(Y_pre1, Y_pre2, active_indices, N_active);
+        cfo += fs / (SW_TWO_PI * (float)sym_len) * dphi;
+        sync_apply_cfo_correction(analytic_real, analytic_imag, payload_len, cfo, fs, corrected);
+        cfo_src = corrected;
+    }
+
+    // Free analytic buffers early as they are no longer needed
+    free(analytic_real); analytic_real = NULL;
+    free(analytic_imag); analytic_imag = NULL;
+
+    // 5. Channel Estimation using preamble
+    ofdm_dft_demodulate(corrected, N, fft_offset, Y_pre1);
+    ofdm_dft_demodulate(corrected + sym_len, N, fft_offset, Y_pre2);
 
     for (int k = 0; k < N; k++) {
         Y_pre[k].r = 0.5f * (Y_pre1[k].r + Y_pre2[k].r);
         Y_pre[k].i = 0.5f * (Y_pre1[k].i + Y_pre2[k].i);
-    }
-
-    for (int i = 0; i < N_active; i++) {
-        active_indices[i] = active_start + i;
-        X_active[i] = X_pre[active_start + i];
     }
 
     // Perform Least-Squares (LS) estimation on active positions
@@ -246,19 +279,16 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     // Interpolate channel across all subcarriers (size N)
     chanest_linear_interp(H_active, active_indices, N_active, N, H);
 
-    for (int p = 0; p < num_pilots; p++) {
-        int idx = pilot_indices[p];
-        Y_p[p] = Y_pre[idx];
-        X_p[p].r = (p % 2 == 0) ? 1.0f : -1.0f; // BPSK alternating pilots
-        X_p[p].i = 0.0f;
-        H_p[p] = H[idx];
-    }
-    float snr_db = chanest_estimate_snr(Y_p, X_p, H_p, num_pilots);
-    // 1/SNR_linear = 10^(-SNR_dB/10), computed without a division: silent or
-    // garbage pilots give SNR = -inf/NaN, which used to divide by zero
-    // (libFuzzer + UBSan, issue #28). Clamp to the regularisation ceiling.
-    float inv_snr = isfinite(snr_db) ? powf(10.0f, -snr_db / 10.0f) : 10.0f;
-    if (!(inv_snr <= 10.0f)) inv_snr = 10.0f;
+    // MMSE regularisation sigma_n^2 / sigma_x^2 (eq. 22). Data symbols are
+    // unit-energy (sigma_x^2 = 1), and the noise variance per subcarrier comes
+    // from the two identical preamble copies (their difference is pure
+    // noise). The preamble carries ZC values, not the +/-1 data-symbol pilots,
+    // so a pilot-based estimate against +/-1 would read the preamble itself as
+    // noise (~0 dB SNR) and shrink every MMSE point by ~3x.
+    // Garbage input can make this non-finite (libFuzzer + UBSan, issue #28):
+    // clamp to the regularisation ceiling.
+    float inv_snr = chanest_noise_var_repeated(Y_pre1, Y_pre2, active_indices, N_active);
+    if (!(inv_snr >= 0.0f && inv_snr <= 10.0f)) inv_snr = 10.0f;
 
     // 6. Demodulate, Equalize & Demap each data symbol
     int num_symbols = (int)((payload_len - (size_t)2 * ((size_t)N + (size_t)cp)) / ((size_t)N + (size_t)cp));
@@ -285,7 +315,7 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     for (int s = 0; s < num_symbols; s++) {
         // DFT Demodulation
         float* sym_src = corrected + ((size_t)2 + (size_t)s) * ((size_t)N + (size_t)cp);
-        ofdm_dft_demodulate(sym_src, N, cp, Y_sym);
+        ofdm_dft_demodulate(sym_src, N, fft_offset, Y_sym);
 
         // Equalization
         if (cfg.equalizer == 1) {
@@ -340,9 +370,6 @@ cleanup:
     free(X_active);
     free(H_active);
     free(H);
-    free(Y_p);
-    free(X_p);
-    free(H_p);
     free(Y_sym);
     free(X_hat);
     free(temp_bits);

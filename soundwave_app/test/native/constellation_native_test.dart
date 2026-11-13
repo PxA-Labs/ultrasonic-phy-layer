@@ -18,6 +18,11 @@ import 'package:soundwave/native/soundwave_native.dart';
 
 import '../engine/mock_native.dart' show MockAudioService;
 
+// A noiseless TX -> RX loopback is exact up to float32 rounding; 1 % EVM
+// leaves platform headroom while catching any systematic impairment (one
+// sample of ISI costs ~20 %). See native/tests/test_constellation.c.
+const noiselessEvmMax = 0.01;
+
 Map<String, dynamic> ofdmConfig({int ofdmModulation = 1}) => {
       'sample_rate': 44100,
       'modulation': 1,
@@ -97,7 +102,7 @@ void main() {
         expect(iq[2 * k] < 0 ? 1 : 0, b2, reason: 'point $k I');
       }
       final evm = EvmResult.compute(iq, ConstellationScheme.qpsk)!;
-      expect(evm.rms, lessThan(0.7), reason: 'EVM ${evm.percent}%');
+      expect(evm.rms, lessThan(noiselessEvmMax), reason: 'EVM ${evm.percent}%');
     });
 
     test('BPSK frame: points carry the frame bits', () {
@@ -110,7 +115,7 @@ void main() {
         expect(iq[2 * k] > 0 ? 1 : 0, bit, reason: 'point $k');
       }
       final evm = EvmResult.compute(iq, ConstellationScheme.bpsk)!;
-      expect(evm.rms, lessThan(0.7), reason: 'EVM ${evm.percent}%');
+      expect(evm.rms, lessThan(noiselessEvmMax), reason: 'EVM ${evm.percent}%');
     });
 
     test('noise raises the EVM', () {
@@ -185,6 +190,9 @@ void main() {
     expect(frames, isNotEmpty);
     expect(frames.first.decoded, isTrue);
     expect(frames.first.scheme, ConstellationScheme.qpsk);
-    expect(frames.first.evm!.rms, lessThan(0.7));
+    // Uniform noise of amplitude 0.01 predicts sqrt(1.5 * 0.01^2 / 3) = 0.7 %
+    // EVM (data noise plus channel-estimate noise); the bound leaves room for
+    // finite-sample spread.
+    expect(frames.first.evm!.rms, lessThan(0.02));
   }, skip: skip);
 }
