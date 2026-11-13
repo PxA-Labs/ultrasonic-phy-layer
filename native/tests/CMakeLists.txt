@@ -38,6 +38,7 @@ sw_add_test(test_ber                 test_ber.c)
 sw_add_test(test_memsafety           test_memsafety.c)
 sw_add_test(test_xcorr               test_xcorr.c)
 sw_add_test(test_constellation       test_constellation.c)
+sw_add_test(diag_evm                 diag_evm.c)
 
 # Sanitizer canary (issue #28): deliberate memory errors that ASan must report.
 # A silently missing sanitizer prints no report, so the test fails.
