@@ -220,6 +220,8 @@ The `native/` project is built as an `ExternalProject` (not `add_subdirectory`) 
 | Linux | `ubuntu-22.04` (glibc 2.35 baseline) | `soundwave-<ver>-linux-x64.tar.gz`, `soundwave_<ver>_amd64.deb`, `Soundwave-<ver>-x86_64.AppImage` | `soundwave_app/linux/packaging/package.sh` (`tar`, `dpkg-deb` installing to `/opt/soundwave` + `/usr/bin/soundwave`, `appimagetool` 1.9.1) |
 | All | `ubuntu-latest` (`checksums` job) | `SHA256SUMS`, `SHA256SUMS.asc` (when GPG key set) | inline |
 
+**Flutter version:** macOS jobs pin Flutter `3.50.0`; Flutter 3.47.8/3.47.9 `gen_snapshot` aborts with `Class with illegal cid` (`_Rect` in `widgets/_window_macos.dart`) when building the app with the microphone permission gate (#87). Other jobs stay on `3.47.x` until `android/` moves to AGP ≥ 9.1.1 (required by Flutter 3.50); then all jobs should use one pinned version.
+
 `build.yml` produces the same desktop packages unsigned (macOS ad-hoc signed) on every `main` push / app PR, so packaging regressions surface before a tag.
 
 macOS microphone access: `Info.plist` has `NSMicrophoneUsageDescription`; `Release.entitlements` (applied when signing) has `com.apple.security.app-sandbox` and `com.apple.security.device.audio-input`. The packaging script fails if the signed app lacks the audio-input entitlement.
