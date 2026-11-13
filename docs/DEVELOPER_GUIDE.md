@@ -231,6 +231,31 @@ cd soundwave_app && flutter test
 
 ---
 
+### Android (NDK + AAudio)
+
+No separate native build step is needed: `soundwave_app/android/app/build.gradle.kts` points Gradle's `externalNativeBuild` at `native/CMakeLists.txt`, so `flutter build apk` / `flutter run` compiles `libsoundwave.so` with the NDK (`ndkVersion` comes from the Flutter SDK) for `arm64-v8a`, `armeabi-v7a` and `x86_64` and packages it under `lib/<abi>/`. Dart loads it with `DynamicLibrary.open('libsoundwave.so')`.
+
+Requirements: Android SDK with NDK and CMake 3.22+ (Gradle installs them on demand once the SDK licenses are accepted), JDK 17.
+
+```bash
+cd soundwave_app
+flutter build apk --debug                      # all ABIs, debug-signed
+flutter build apk --release --split-per-abi    # app-<abi>-release.apk
+flutter build appbundle --release              # app-release.aab (Play Store)
+unzip -l build/app/outputs/flutter-apk/app-arm64-v8a-release.apk | grep libsoundwave.so
+```
+
+Android specifics in the native build:
+
+- **Audio backend:** `audio_io.c` compiles only miniaudio's AAudio and OpenSL ES backends. AAudio is used on API 26+, OpenSL ES is the fallback. Both use the low-latency performance profile and the *unprocessed* input preset, because the default voice presets apply AGC, noise suppression and low-pass filtering that remove the 18–22 kHz band.
+- **SIMD:** NEON is required (`SW_REQUIRE_NEON`, a compile error otherwise) on `arm64-v8a` and `armeabi-v7a`. `x86_64` uses SSE4.2 and never AVX2, which the Android x86_64 ABI does not guarantee.
+- **Linking:** `m dl log`, a 16 KB page-aligned ELF (needed for Play Store uploads targeting Android 15+), and no versioned SONAME.
+- **Permissions:** the manifest declares `RECORD_AUDIO` and `MODIFY_AUDIO_SETTINGS`. On first launch, `MicPermissionGate` explains why the microphone is needed and then shows the system prompt. `NativeAudioService.startCapture()` checks the permission again and throws `MicrophonePermissionDenied` if it is missing.
+
+**Release signing:** create `soundwave_app/android/key.properties` (it is gitignored) with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. `storeFile` is relative to `android/app/`. Without that file, release builds are debug-signed. In CI, the `build-android` job in `build.yml` writes the file from the `ANDROID_KEYSTORE_BASE64` (base64 of the `.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` secrets when they are set. The job uploads `android-debug-apk`, `android-release-apks` and `android-release-aab`. It fails if `libsoundwave.so` is missing for any ABI, if the expected `sw_*` symbols are not exported, or if the 64-bit `.so` is not 16 KB aligned. To run it on a branch, use `gh workflow run build.yml --ref <branch>`.
+
+---
+
 ## 5. Testing & Debugging Framework
 
 ### Running Native C Unit Tests

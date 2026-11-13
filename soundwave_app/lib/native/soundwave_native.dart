@@ -284,6 +284,20 @@ class SoundwaveNative {
   static SoundwaveNative get instance => _instance ??= SoundwaveNative._();
 
   static DynamicLibrary _loadLibrary() {
+    // Android: libsoundwave.so is built by Gradle's externalNativeBuild
+    // (android/app/build.gradle.kts -> native/CMakeLists.txt) and packaged in
+    // the APK under lib/<abi>/, so the dynamic linker finds it by name.
+    if (Platform.isAndroid) {
+      try {
+        return DynamicLibrary.open('libsoundwave.so');
+      } on ArgumentError catch (e) {
+        throw UnsupportedError(
+          'Could not load libsoundwave.so from the APK (is the NDK build '
+          'enabled for this ABI?): $e',
+        );
+      }
+    }
+
     // SOUNDWAVE_LIB pins an exact library (CI, sanitizer builds, or when
     // several stale builds exist); it is tried before the relative paths.
     final override = Platform.environment['SOUNDWAVE_LIB'];
@@ -326,7 +340,6 @@ class SoundwaveNative {
       }
     }
 
-    if (Platform.isAndroid) return DynamicLibrary.open('libsoundwave.so');
     throw UnsupportedError(
       'Could not load native Soundwave library. Searched in: $searchPaths',
     );
