@@ -107,6 +107,9 @@ class ModemSettingsSchema {
     doubleIn('volume', (v) => v >= 0 && v <= 1.0);
     if (raw['enable_rs'] is bool) out['enable_rs'] = raw['enable_rs']!;
     if (raw['agc_enabled'] is bool) out['agc_enabled'] = raw['agc_enabled']!;
+    if (raw['arq_enabled'] is bool) out['arq_enabled'] = raw['arq_enabled']!;
+    intIn('arq_max_retries', (v) => v == 1 || v == 3 || v == 5);
+    intIn('arq_ack_timeout_ms', (v) => v >= 200 && v <= 2000);
     return out;
   }
 }

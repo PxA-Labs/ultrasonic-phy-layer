@@ -123,6 +123,9 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
+          _LinkLayerCard(state: state),
+          const SizedBox(height: 16),
+
           // Audio Hardware & Volume Card
           Card(
             child: Padding(
@@ -342,6 +345,67 @@ class _OfdmSettingsCard extends StatelessWidget {
                 selected: {state.equalizer},
                 onSelectionChanged: (v) => state.setEqualizer(v.first),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Link-layer reliability settings (#100).
+class _LinkLayerCard extends StatelessWidget {
+  final AppState state;
+  const _LinkLayerCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Link Layer & Retransmission (ARQ)',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              key: const Key('arq_toggle'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Automatic Retransmission (ARQ)'),
+              subtitle: const Text(
+                  'Wait for an ACK after each fragment and resend on loss. '
+                  'Both devices must enable it; turn off for one-way '
+                  'broadcast.'),
+              value: state.arqEnabled,
+              onChanged: state.setArqEnabled,
+            ),
+            DropdownButtonFormField<int>(
+              key: const Key('arq_retries'),
+              initialValue: state.arqMaxRetries,
+              decoration: const InputDecoration(labelText: 'Max Retries'),
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('1')),
+                DropdownMenuItem(value: 3, child: Text('3')),
+                DropdownMenuItem(value: 5, child: Text('5')),
+              ],
+              onChanged: state.arqEnabled
+                  ? (v) => state.setArqMaxRetries(v ?? 3)
+                  : null,
+            ),
+            const SizedBox(height: 16),
+            Text('ACK Timeout: ${state.arqAckTimeoutMs} ms '
+                '(added to frame airtime)'),
+            Slider(
+              key: const Key('arq_timeout'),
+              value: state.arqAckTimeoutMs.toDouble(),
+              min: 200,
+              max: 2000,
+              divisions: 18,
+              label: '${state.arqAckTimeoutMs} ms',
+              onChanged: state.arqEnabled
+                  ? (v) => state.setArqAckTimeoutMs(v.round())
+                  : null,
             ),
           ],
         ),

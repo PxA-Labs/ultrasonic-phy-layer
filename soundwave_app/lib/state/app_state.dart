@@ -3,7 +3,12 @@
 // Follows OpenSSF secure coding guidelines with robust bounds checks and lifecycle cleanup.
 
 import 'dart:async';
+import 'dart:io' show File;
 import 'package:flutter/foundation.dart';
+import 'package:soundwave/engine/arq.dart';
+import 'package:soundwave/engine/link_frame.dart';
+import 'package:soundwave/engine/link_receiver.dart';
+import 'package:soundwave/services/received_file_store.dart';
 import 'package:soundwave/engine/tx_engine.dart';
 import 'package:soundwave/engine/rx_engine.dart';
 import 'package:soundwave/engine/tx_queue.dart';
@@ -31,6 +36,10 @@ class AppState extends ChangeNotifier {
   bool _enableRs = true;
   double _volume = 0.8;
   bool _agcEnabled = true; // RX automatic gain control (#92)
+  // Link-layer ARQ (#100). Off by default so one-way broadcast just works.
+  bool _arqEnabled = false;
+  int _arqMaxRetries = 3;
+  int _arqAckTimeoutMs = 500;
 
   // Audio devices
   AudioDevice? _inputDevice;
@@ -53,6 +62,15 @@ class AppState extends ChangeNotifier {
   StreamSubscription<DecodedMessage>? _rxSubscription;
   StreamSubscription<RxFrameEvent>? _rxFrameEventsSubscription;
   StreamSubscription<TxMetrics>? _txMetricsSubscription;
+  final List<StreamSubscription<Object?>> _linkSubscriptions = [];
+
+  // File transfer (#89)
+  late final int nodeId;
+  final ReceivedFileSink _fileSink;
+  TxTransferProgress? _txTransfer;
+  RxTransferProgress? _rxTransfer;
+  String? _transferError;
+  final List<ReceivedFileRecord> _receivedFiles = [];
   Timer? _throughputTimer;
   bool _isDisposed = false;
 
@@ -79,16 +97,31 @@ class AppState extends ChangeNotifier {
     _configMap['enable_rs'] = _enableRs;
     _configMap['volume'] = _volume;
     _configMap['agc_enabled'] = _agcEnabled;
+    _configMap['arq_enabled'] = _arqEnabled;
+    _configMap['arq_max_retries'] = _arqMaxRetries;
+    _configMap['arq_ack_timeout_ms'] = _arqAckTimeoutMs;
   }
 
-  AppState({AudioService? audio, SettingsStore? store}) : _store = store {
+  AppState({
+    AudioService? audio,
+    SettingsStore? store,
+    ReceivedFileSink? fileSink,
+  })  : _store = store,
+        _fileSink = fileSink ?? DirectoryFileSink() {
     _configMap = {};
     _syncConfigMap();
     _audio = audio ?? AudioService.preferred(_configMap);
-    _txEngine =
-        TxEngine(audio: _audio, configMap: _configMap, useIsolates: false);
-    _rxEngine =
-        RxEngine(audio: _audio, configMap: _configMap, useIsolates: false);
+    nodeId = TxEngine.randomNodeId();
+    _txEngine = TxEngine(
+        audio: _audio,
+        configMap: _configMap,
+        useIsolates: false,
+        nodeId: nodeId);
+    _rxEngine = RxEngine(
+        audio: _audio,
+        configMap: _configMap,
+        useIsolates: false,
+        nodeId: nodeId);
     _txQueue = TxQueue(txEngine: _txEngine);
     _throughputCalculator =
         ThroughputCalculator(windowDuration: const Duration(seconds: 5));
@@ -103,6 +136,54 @@ class AppState extends ChangeNotifier {
     }
 
     _subscribeToEngineMetrics();
+    _subscribeToLinkLayer();
+  }
+
+  /// Wires the link layer: ACK/NACKs heard by RX go to the TX ARQ sender,
+  /// replies requested by RX are transmitted, received files are saved.
+  void _subscribeToLinkLayer() {
+    _linkSubscriptions.addAll([
+      _rxEngine.controlFrames.listen(_txEngine.onControlFrame),
+      _rxEngine.controlReplies.listen((frame) {
+        _txEngine.sendControl(frame).catchError((Object e) {
+          debugPrint('Failed to send $frame: $e');
+        });
+      }),
+      _rxEngine.files.listen(_onFileReceived),
+      _rxEngine.transfers.listen((p) {
+        _rxTransfer = p;
+        notifyListeners();
+      }),
+      _txEngine.transfers.listen((p) {
+        _txTransfer = p;
+        notifyListeners();
+      }),
+    ]);
+  }
+
+  Future<void> _onFileReceived(ReceivedFile file) async {
+    String? path;
+    String? error;
+    try {
+      path = await _fileSink.save(file.fileName, file.data);
+    } catch (e) {
+      error = '$e';
+      debugPrint('Failed to save received file: $e');
+    }
+    if (_isDisposed) return;
+    _receivedFiles.insert(
+      0,
+      ReceivedFileRecord(
+        fileName: file.fileName,
+        mimeType: file.mimeType,
+        size: file.data.length,
+        timestamp: file.timestamp,
+        savedPath: path,
+        error: error,
+      ),
+    );
+    if (_receivedFiles.length > 50) _receivedFiles.removeLast();
+    addMessage('File "${file.fileName}" (${file.data.length} B)', file.snr);
   }
 
   void _subscribeToEngineMetrics() {
@@ -204,6 +285,18 @@ class AppState extends ChangeNotifier {
   bool get enableRs => _enableRs;
   double get volume => _volume;
   bool get agcEnabled => _agcEnabled;
+  bool get arqEnabled => _arqEnabled;
+  int get arqMaxRetries => _arqMaxRetries;
+  int get arqAckTimeoutMs => _arqAckTimeoutMs;
+
+  /// Latest outgoing / incoming fragmented transfer, for progress display.
+  TxTransferProgress? get txTransfer => _txTransfer;
+  RxTransferProgress? get rxTransfer => _rxTransfer;
+
+  /// Error of the last failed outgoing file transfer, if any.
+  String? get transferError => _transferError;
+  List<ReceivedFileRecord> get receivedFiles =>
+      List.unmodifiable(_receivedFiles);
 
   AudioDevice? get inputDevice => _inputDevice;
   AudioDevice? get outputDevice => _outputDevice;
@@ -266,6 +359,9 @@ class AppState extends ChangeNotifier {
     _enableRs = v['enable_rs'] as bool? ?? _enableRs;
     _volume = v['volume'] as double? ?? _volume;
     _agcEnabled = v['agc_enabled'] as bool? ?? _agcEnabled;
+    _arqEnabled = v['arq_enabled'] as bool? ?? _arqEnabled;
+    _arqMaxRetries = v['arq_max_retries'] as int? ?? _arqMaxRetries;
+    _arqAckTimeoutMs = v['arq_ack_timeout_ms'] as int? ?? _arqAckTimeoutMs;
     // A cp from a different FFT size must still be a valid option.
     if (!cpOptionsFor(_numSubcarriers).contains(_cpLength)) {
       _cpLength = _numSubcarriers ~/ 8;
@@ -375,6 +471,23 @@ class AppState extends ChangeNotifier {
     _updateConfigField('agc_enabled', v);
   }
 
+  void setArqEnabled(bool v) {
+    _arqEnabled = v;
+    _updateConfigField('arq_enabled', v);
+  }
+
+  void setArqMaxRetries(int v) {
+    _arqMaxRetries = v;
+    _updateConfigField('arq_max_retries', v);
+  }
+
+  void setArqAckTimeoutMs(int v) {
+    _arqAckTimeoutMs = v < ArqConfig.minAckTimeoutMs
+        ? ArqConfig.minAckTimeoutMs
+        : (v > ArqConfig.maxAckTimeoutMs ? ArqConfig.maxAckTimeoutMs : v);
+    _updateConfigField('arq_ack_timeout_ms', _arqAckTimeoutMs);
+  }
+
   void setInputDevice(AudioDevice? device) {
     _inputDevice = device;
     notifyListeners();
@@ -450,6 +563,60 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Reads [path] and sends it as a file (#89).
+  Future<void> sendFile(String path) async {
+    final file = File(path.trim());
+    final Uint8List data;
+    try {
+      final length = await file.length();
+      if (length > LinkMessage.maxContentBytes) {
+        throw ArgumentError('file is $length bytes; the limit is '
+            '${LinkMessage.maxContentBytes}');
+      }
+      data = await file.readAsBytes();
+    } catch (e) {
+      _transferError = '$e';
+      notifyListeners();
+      return;
+    }
+    final name = file.uri.pathSegments.isEmpty
+        ? 'data.bin'
+        : file.uri.pathSegments.last;
+    await sendFileBytes(data, fileName: name);
+  }
+
+  /// Sends [data] as a file through the TX queue. With ARQ on, starts
+  /// listening first so the receiver's ACKs can be heard.
+  Future<void> sendFileBytes(Uint8List data,
+      {required String fileName, String? mimeType}) async {
+    _transferError = null;
+    if (_arqEnabled && !_isListening) toggleListening();
+    _isTransmitting = true;
+    _metrics = _metrics.copyWith(connectionState: ModemLinkState.transmitting);
+    _startThroughputTimer();
+    notifyListeners();
+    try {
+      await _txQueue.enqueueFile(data,
+          fileName: fileName,
+          mimeType: mimeType ?? mimeTypeForFileName(fileName));
+    } catch (e) {
+      _transferError = '$e';
+    } finally {
+      _isTransmitting = false;
+      _metrics = _metrics.copyWith(
+        connectionState:
+            _isListening ? ModemLinkState.listening : ModemLinkState.idle,
+      );
+      if (!_isListening) {
+        _stopThroughputTimer();
+      }
+      notifyListeners();
+    }
+  }
+
+  /// Aborts the outgoing fragmented transfer.
+  void cancelTransfer() => _txEngine.cancelTransfer();
 
   Future<void> emitTestTone() async {
     final samples =
@@ -563,6 +730,10 @@ class AppState extends ChangeNotifier {
     _rxSubscription?.cancel();
     _rxFrameEventsSubscription?.cancel();
     _txMetricsSubscription?.cancel();
+    for (final s in _linkSubscriptions) {
+      s.cancel();
+    }
+    _txEngine.cancelTransfer();
     _rxEngine.stopListening();
     super.dispose();
   }

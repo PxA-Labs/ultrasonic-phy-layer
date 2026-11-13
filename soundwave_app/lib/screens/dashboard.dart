@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
+import '../widgets/file_transfer_card.dart';
 import '../widgets/signal_status_bar.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -48,6 +49,8 @@ class DashboardScreen extends StatelessWidget {
           _QuickActionsRow(state: state),
           const SizedBox(height: 16),
           _MessagesLog(state: state),
+          const SizedBox(height: 16),
+          const FileTransferCard(),
         ],
       ),
     );

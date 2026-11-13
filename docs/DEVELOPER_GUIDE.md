@@ -101,6 +101,63 @@ sequenceDiagram
     end
 ```
 
+### Link Layer: Fragmentation, File Transfer & ARQ (#89, #100)
+
+Implemented in pure Dart (`soundwave_app/lib/engine/`): `link_frame.dart`
+(formats), `fragmentation.dart` (fragmenter/reassembler), `link_receiver.dart`
+(RX policy), `arq.dart` (stop-and-wait sender). It runs inside the PHY frame
+payload (`[CRC-32][payload <= 219 B][RS parity]`, see `frame_codec.dart`).
+
+**Payload discrimination.** A PHY payload whose first byte is `0xFA` is a link
+frame; anything else is legacy raw UTF-8 text (`0xFA` never occurs in UTF-8).
+Short text with ARQ off is still sent as a legacy frame, so old receivers keep
+working. Longer text, files, and everything sent with ARQ on use link frames.
+
+| Frame | Layout (little-endian) | Size |
+|-------|------------------------|------|
+| DATA | `FA 01 flags src:u16 msgId:u16 index:u16 count:u16 chunk` | 11 + 1..208 B |
+| ACK | `FA 02 00 src:u16 dst:u16 msgId:u16 index:u16` | 11 B |
+| NACK | `FA 03 reason src:u16 dst:u16 msgId:u16 index:u16` | 11 B |
+
+`flags` bit 0 = ACK requested. `src`/`dst` are random per-app 16-bit node ids;
+frames with `src` equal to the local id are the device hearing its own speaker
+and are ignored.
+
+**Message envelope** (what gets fragmented): `kind:u8 (1 text, 2 file) |
+length:u32 | crc32(content):u32 | [file: nameLen:u8 name mimeLen:u8 mime] |
+content`. Content is limited to 1 MiB (about 5,050 fragments). The
+reassembler delivers a message only when all `count` fragments are present
+and the envelope CRC-32 verifies.
+
+**Reassembly.** Fragments are buffered per `(src, msgId)` in any order.
+Duplicates are dropped, and ids that were already delivered are remembered
+for 10 minutes so retransmissions are not delivered twice. At most 8
+concurrent messages are kept (the least recently updated one is evicted).
+An incomplete message is abandoned after an idle timeout of
+30 s + (maxRetries + 2) x (2 x max-frame airtime + largest backoff), and the
+failure is reported on `RxEngine.transfers`.
+
+**ARQ (stop-and-wait).** Only one side can transmit at a time, and frames are
+long compared with the turnaround, so the sender waits for each fragment's ACK
+before sending the next. The wait is
+`airtime + responseAllowance + ackTimeout x 2^attempt (+ up to 10 % jitter)`.
+`responseAllowance` is the ACK's airtime plus the RX decode latency, computed
+from `FrameGeometry`. A NACK triggers an immediate retransmission. After
+`maxRetries` retransmissions of one fragment the transfer fails with
+`TxMaxRetriesError`. When a receiver sees a CRC/RS failure while exactly one
+ARQ transfer is in progress, it NACKs that transfer's lowest missing fragment.
+Otherwise it stays silent and the sender's timeout covers the loss. Identical
+replies within 150 ms are debounced, and a genuine retransmission is always
+ACKed again because it means the earlier ACK was lost.
+
+**Settings** (`arq_enabled` default off, `arq_max_retries` 1/3/5,
+`arq_ack_timeout_ms` 200-2000, added on top of the airtime). With ARQ off,
+fragments are broadcast once, paced by their airtime, and receivers never
+transmit. With ARQ on, **both** devices must enable it and listen. The app
+starts listening automatically before an ARQ file send. Received files are
+saved under `<app documents>/Soundwave/received/` with sanitized,
+non-overwriting names (`services/received_file_store.dart`).
+
 ---
 
 ## 3. FFI Memory Ownership Contracts & Buffer Lifecycle
