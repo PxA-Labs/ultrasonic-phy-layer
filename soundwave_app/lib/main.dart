@@ -68,7 +68,8 @@ class SoundwaveApp extends StatelessWidget {
 /// launches the gate explains and asks again only if access is still missing
 /// (and starting capture asks via MicPermission.ensureGranted as before).
 class AppRoot extends StatefulWidget {
-  /// Overrides the gate's platform detection (tests).
+  /// Overrides platform detection for the gate and the onboarding
+  /// permission button (tests).
   final bool? micGateEnabled;
   final Future<bool> Function() checkMicGranted;
   final Future<bool> Function() requestMic;
@@ -103,6 +104,9 @@ class _AppRootState extends State<AppRoot> {
       return OnboardingScreen(
         onFinished: () => _finishOnboarding(prefs),
         requestMicPermission: widget.requestMic,
+        // Same platform switch as the gate: no button where there is no
+        // runtime permission to ask for.
+        showMicPermissionButton: widget.micGateEnabled,
       );
     }
     if (_onboardedThisSession) return const MainShell();
