@@ -103,8 +103,9 @@ void main() {
     final state = await pumpApp(tester, textScale: 2.0);
     state.addMessage('a reasonably long message received over sound', 7.5);
     await settle(tester);
-    final title = find.text('Soundwave Dashboard');
-    expect(MediaQuery.textScalerOf(tester.element(title)).scale(10), 20);
+    // Body text scales fully (AppBar titles clamp their own scaling).
+    final body = find.text('Transmission Control');
+    expect(MediaQuery.textScalerOf(tester.element(body)).scale(10), 20);
     expect(tester.takeException(), isNull);
 
     for (final tab in tabs) {
