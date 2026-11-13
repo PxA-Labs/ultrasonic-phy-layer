@@ -54,7 +54,7 @@ jobs:
         run: |
           if ! dart format --set-exit-if-changed . ; then
             dart format . > /dev/null
-            git --no-pager diff
+            git --no-pager diff -- '*.dart'
             exit 1
           fi
 
@@ -253,6 +253,7 @@ jobs:
       - name: Generate coverage report
         working-directory: native
         run: |
+          mkdir -p build/coverage-html
           gcovr --root . --filter 'src/' \
             --exclude-unreachable-branches --exclude-throw-branches \
             --lcov build/coverage.lcov \

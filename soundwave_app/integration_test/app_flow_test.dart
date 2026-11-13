@@ -78,8 +78,8 @@ class LoopbackAudioService implements AudioService {
     }
     for (var i = 0; i < x.length; i += 2048) {
       if (_mic.isClosed) return;
-      _mic.add(Float64List.fromList(
-          Float64List.sublistView(x, i, min(i + 2048, x.length))));
+      final end = min(i + 2048, x.length);
+      _mic.add(Float64List.fromList(x.sublist(i, end)));
       await Future<void>.delayed(Duration.zero);
     }
   }
@@ -94,24 +94,23 @@ Future<void> settle(WidgetTester tester, {int frames = 5}) async {
 }
 
 /// Polls [condition] with real time passing (FFI work and audio delivery run
-/// between polls) until it holds or [timeout] expires.
-Future<bool> waitFor(WidgetTester tester, bool Function() condition,
-    {Duration timeout = const Duration(seconds: 60)}) async {
-  final deadline = DateTime.now().add(timeout);
+/// between polls) until it holds or 60 s pass.
+Future<bool> waitFor(WidgetTester tester, bool Function() condition) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 60));
   while (!condition()) {
     if (DateTime.now().isAfter(deadline)) return false;
-    await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.runAsync(() => Future<void>.delayed(_pollInterval));
     await tester.pump();
   }
   return true;
 }
 
+const _pollInterval = Duration(milliseconds: 100);
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets(
-      'first launch: onboarding -> dashboard -> message over real DSP loopback',
+  testWidgets('onboarding -> dashboard -> message over real DSP loopback',
       (tester) async {
     // The real library must load: this is the point of the test.
     expect(SoundwaveNative.instance, isNotNull);
@@ -120,9 +119,14 @@ void main() {
     final store = InMemorySettingsStore();
     final state = AppState(audio: audio, store: store);
     state.setMode(1); // OFDM: the fast, well-characterised mode.
+    // First launch: nothing persisted yet, so onboarding is due.
     final prefs = UiPreferences(store: InMemorySettingsStore());
+    await prefs.restore();
+    expect(prefs.isLoaded, isTrue);
+    expect(prefs.onboardingComplete, isFalse);
 
-    await tester.pumpWidget(SoundwaveApp(appState: state, uiPreferences: prefs));
+    final app = SoundwaveApp(appState: state, uiPreferences: prefs);
+    await tester.pumpWidget(app);
     await settle(tester);
 
     // --- Onboarding: every page, then "Get started". ---
