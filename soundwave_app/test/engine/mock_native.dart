@@ -61,6 +61,25 @@ class MockSoundwaveNative implements SoundwaveNative {
   @override
   void agcDestroy(Pointer<Void> handle) => agcDestroys++;
 
+  /// Mock equalized constellation: returns [equalizedSymbols] (default: four
+  /// ideal QPSK points). Set [hasEqualizedSymbols] false for an old library.
+  @override
+  bool hasEqualizedSymbols = true;
+  Float32List? equalizedSymbols;
+  int equalizedSymbolCalls = 0;
+
+  @override
+  Float32List ofdmEqualizedSymbols(
+    Float32List samples,
+    Pointer<SwConfig> config, {
+    int maxPoints = 4096,
+  }) {
+    equalizedSymbolCalls++;
+    const q = 0.70710678;
+    return equalizedSymbols ??
+        Float32List.fromList([q, q, -q, q, -q, -q, q, -q]);
+  }
+
   @override
   String get version => '1.0.0-mock';
 
