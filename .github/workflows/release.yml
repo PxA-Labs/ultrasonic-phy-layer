@@ -300,9 +300,13 @@ jobs:
           path: assets
           merge-multiple: true
 
+      # Release assets are uploaded flat (by basename), so checksum them flat;
+      # some artifacts (Android) keep build sub-directories.
       - name: Generate SHA256SUMS
-        working-directory: assets
         run: |
+          mkdir flat
+          find assets -type f -exec cp {} flat/ \;
+          cd flat
           ls -la
           sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS"
           mv "$RUNNER_TEMP/SHA256SUMS" SHA256SUMS
@@ -311,7 +315,7 @@ jobs:
 
       - name: GPG-sign SHA256SUMS
         if: env.HAS_GPG_KEY == 'true'
-        working-directory: assets
+        working-directory: flat
         env:
           GPG_KEY: ${{ secrets.LINUX_GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.LINUX_GPG_PASSPHRASE }}
@@ -331,9 +335,18 @@ jobs:
         with:
           name: checksums
           path: |
-            assets/SHA256SUMS
-            assets/SHA256SUMS.asc
+            flat/SHA256SUMS
+            flat/SHA256SUMS.asc
           if-no-files-found: error
+
+      # Exactly the files covered by SHA256SUMS; deploy-github-release
+      # publishes this set.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-assets
+          path: flat/
+          if-no-files-found: error
+          retention-days: 7
 
   deploy-android:
     runs-on: ubuntu-latest
@@ -382,16 +395,14 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: actions/download-artifact@v8
+        with:
+          name: release-assets
+          path: release-assets
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
-          files: |
-            android-release/*
-            windows-release/*
-            macos-release/*
-            linux-release/*
-            checksums/*
+          files: release-assets/*
           draft: true
           generate_release_notes: true
 

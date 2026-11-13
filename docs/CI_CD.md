@@ -236,7 +236,7 @@ macOS microphone access: `Info.plist` has `NSMicrophoneUsageDescription`; `Relea
 
 #### Publishing
 
-- `deploy-github-release` (needs every platform build + `checksums`, and `publish == 'true'`) creates a **draft** release with all platform assets and checksums.
+- `checksums` flattens all platform artifacts into one `release-assets` artifact plus `SHA256SUMS`; `deploy-github-release` (needs every platform build + `checksums`, and `publish == 'true'`) creates a **draft** release from exactly that set.
 - `deploy-android` (Play Store internal track) and the Snap publish step also require `publish == 'true'`.
 - Snap packaging runs only once `snap/snapcraft.yaml` exists (not yet added).
 
