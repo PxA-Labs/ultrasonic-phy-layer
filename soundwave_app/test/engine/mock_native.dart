@@ -8,6 +8,59 @@ import 'package:soundwave/native/bindings.dart';
 import 'package:soundwave/services/audio_service.dart';
 
 class MockSoundwaveNative implements SoundwaveNative {
+  /// When set, both demodulators return these bytes instead of the default
+  /// valid frame (e.g. garbage to exercise the frame-error path).
+  Uint8List? demodOutput;
+
+  /// Number of demodulate calls (CSS + OFDM).
+  int demodCalls = 0;
+
+  /// How many more detectFrame calls report a frame; afterwards detection
+  /// fails like the real library does on noise (SW_ERR_SYNC). Unlimited by
+  /// default so non-RX tests keep their old behaviour.
+  int framesToDetect = 1 << 30;
+
+  /// Default frame: CRC "6" (mock CRC = byte sum of [1, 2, 3]) + payload +
+  /// 32 bytes of dummy parity.
+  static Uint8List defaultFrame({bool withParity = true}) =>
+      Uint8List.fromList([
+        6, 0, 0, 0, // CRC of payload (sum of [1, 2, 3] = 6)
+        1, 2, 3, // payload
+        if (withParity) ...List.filled(32, 0xAA), // parity
+      ]);
+
+  /// Mock AGC: multiplies samples by [agcLinearGain] and reports
+  /// [agcReportedGainDb]. Set [hasAgc] false to simulate an old library.
+  @override
+  bool hasAgc = true;
+  double agcLinearGain = 1.0;
+  double agcReportedGainDb = 6.0;
+  int agcCreates = 0, agcProcessCalls = 0, agcDestroys = 0, agcResets = 0;
+
+  @override
+  Pointer<Void> agcCreate(int sampleRate, {double targetRms = 0.0}) {
+    agcCreates++;
+    return Pointer<Void>.fromAddress(0x1000 + agcCreates);
+  }
+
+  @override
+  void agcProcess(Pointer<Void> handle, Pointer<Float> samples, int len) {
+    agcProcessCalls++;
+    final v = samples.asTypedList(len);
+    for (var i = 0; i < len; i++) {
+      v[i] *= agcLinearGain;
+    }
+  }
+
+  @override
+  double agcGainDb(Pointer<Void> handle) => agcReportedGainDb;
+
+  @override
+  void agcReset(Pointer<Void> handle) => agcResets++;
+
+  @override
+  void agcDestroy(Pointer<Void> handle) => agcDestroys++;
+
   @override
   String get version => '1.0.0-mock';
 
@@ -36,12 +89,8 @@ class MockSoundwaveNative implements SoundwaveNative {
 
   @override
   Uint8List cssDemodulate(Float32List samples, Pointer<SwConfig> config) {
-    // Returns dummy CRC (4 bytes of 0x00) + payload + dummy parity (32 bytes of 0xAA)
-    final list = <int>[];
-    list.addAll([6, 0, 0, 0]); // CRC of payload (sum of [1, 2, 3] = 6)
-    list.addAll([1, 2, 3]); // payload
-    list.addAll(List.generate(32, (i) => 0xAA)); // Parity
-    return Uint8List.fromList(list);
+    demodCalls++;
+    return demodOutput ?? defaultFrame();
   }
 
   @override
@@ -51,16 +100,15 @@ class MockSoundwaveNative implements SoundwaveNative {
 
   @override
   Uint8List ofdmDemodulate(Float32List samples, Pointer<SwConfig> config) {
-    final list = <int>[];
-    list.addAll([6, 0, 0, 0]);
-    list.addAll([1, 2, 3]);
-    list.addAll(List.generate(32, (i) => 0xAA));
-    return Uint8List.fromList(list);
+    demodCalls++;
+    return demodOutput ?? defaultFrame();
   }
 
   @override
   Map<String, dynamic> detectFrame(
       Float32List samples, Pointer<SwConfig> config) {
+    if (framesToDetect <= 0) throw SwException(-4);
+    framesToDetect--;
     return {
       'frame_start': 0,
       'snr': 15.0,

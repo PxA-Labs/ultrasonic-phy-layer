@@ -61,6 +61,7 @@ set(SW_SOURCES
     src/api/soundwave_api.c
     src/api/ffi_helpers.c
     src/audio/audio_io.c
+    src/agc/agc.c
     src/chanest/chanest.c
     src/crc/crc32.c
     src/css/css_modulate.c

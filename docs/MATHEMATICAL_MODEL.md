@@ -208,3 +208,43 @@ where $\alpha$ is a primitive element of $GF(2^m)$ and $i_0$ is an integer offse
 Before encoding with RS, the payload is appended with a Cyclic Redundancy Check (CRC-32) checksum to verify frame integrity post-decoding. The CRC-32 generator polynomial is:
 
 $$G(x) = x^{32} + x^{26} + x^{23} + x^{22} + x^{16} + x^{12} + x^{11} + x^{10} + x^8 + x^7 + x^5 + x^4 + x^2 + x + 1$$
+
+---
+
+## 6. Automatic Gain Control (AGC)
+
+Microphone sensitivity, speaker volume and distance change the received level by tens of dB. The RX pipeline normalizes the level before frame detection (`native/src/agc/agc.c`, issue #92). For each input sample $x[n]$:
+
+### 6.1 Power Estimate
+A one-pole average of $x^2$ approximates a 10 ms RMS window:
+
+$$p[n] = p[n-1] + \alpha_{rms}\left(x[n]^2 - p[n-1]\right)$$
+
+### 6.2 Desired and Smoothed Gain
+
+$$g_d[n] = \operatorname{clamp}\!\left(\frac{A_{target}}{\sqrt{p[n] + \epsilon}},\; g_{min},\; g_{max}\right)$$
+
+$$g[n] = g[n-1] + \alpha\left(g_d[n] - g[n-1]\right), \qquad \alpha = \begin{cases} \alpha_{att} & g_d[n] < g[n-1] \text{ (attack)} \\ \alpha_{rel} & \text{otherwise (release)} \end{cases}$$
+
+Each one-pole coefficient follows from its time constant $\tau$:
+
+$$\alpha_k = 1 - e^{-1/(\tau_k f_s)}$$
+
+### 6.3 Peak Guard and Output
+A frame arriving after silence would otherwise be multiplied by the silence gain for the first milliseconds. The gain is therefore capped instantly on peaks:
+
+$$g[n] \leftarrow \min\!\left(g[n],\; \frac{L_{peak}}{|x[n]|}\right), \qquad y[n] = g[n]\, x[n], \quad |y[n]| \le L_{peak}$$
+
+Non-finite samples produce $y[n] = 0$ and leave $p$ and $g$ unchanged.
+
+### 6.4 Parameters
+
+| Symbol | Value | Meaning |
+|---|---|---|
+| $A_{target}$ | 0.25 (−12 dBFS) | Output RMS target |
+| $\tau_{rms}$ | 10 ms | Power-estimate window |
+| $\tau_{att}$ / $\tau_{rel}$ | 1 ms / 100 ms | Gain attack / release |
+| $[g_{min}, g_{max}]$ | [0.1, 40] = [−20, +32] dB | Gain range |
+| $L_{peak}$ | 1.0 | Output peak limit (full scale) |
+
+The reported gain is $G_{dB} = 20\log_{10} g$. Measured (`test_agc`): chirps 30 dB below to 10 dB above target settle within ±0.11 dB; convergence takes 10 ms after silence; cost is about 0.01 ms per 10 ms chunk.

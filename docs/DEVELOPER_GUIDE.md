@@ -158,10 +158,10 @@ try {
 
 | Platform | Required Toolchain | Native Build System |
 |---|---|---|
-| **macOS** | Xcode Command Line Tools, Clang, CMake $\ge 3.20$, Flutter 3.41 | CMake + AppleClang |
-| **Linux (Ubuntu/Debian)** | `build-essential`, `cmake`, `libasound2-dev`, Flutter 3.41 | CMake + GCC/Clang |
-| **Windows** | Visual Studio 2022 (Desktop C++), CMake $\ge 3.20$, Flutter 3.41 | CMake + MSVC |
-| **Android** | Android Studio, Android NDK (r26+), CMake $\ge 3.20$, Flutter 3.41 | CMake + NDK Clang |
+| **macOS** | Xcode Command Line Tools, Clang, CMake $\ge 3.20$, Flutter 3.47 | CMake + AppleClang |
+| **Linux (Ubuntu/Debian)** | `build-essential`, `cmake`, `libasound2-dev`, Flutter 3.47 | CMake + GCC/Clang |
+| **Windows** | Visual Studio 2022 (Desktop C++), CMake $\ge 3.20$, Flutter 3.47 | CMake + MSVC |
+| **Android** | Android Studio, Android NDK (r26+), CMake $\ge 3.20$, Flutter 3.47 | CMake + NDK Clang |
 
 ---
 
@@ -214,6 +214,17 @@ dart run ffigen
 flutter run -d macos    # macOS
 flutter run -d linux    # Linux
 flutter run -d windows  # Windows
+```
+
+---
+
+### Native library for Flutter tests
+
+`SoundwaveNative` loads `libsoundwave` from `native/build/` (then the legacy `build/`). Set `SOUNDWAVE_LIB=/abs/path/to/libsoundwave.{so,dylib,dll}` to pin a specific build, for example a sanitizer build or the one CI produces. `test/native/loopback_test.dart` runs real TX → audio → RX round trips (CSS and OFDM) against it. Locally it is skipped when no library loads, while CI sets `SOUNDWAVE_REQUIRE_NATIVE=1` so a missing library fails the job.
+
+```bash
+cmake -S native -B native/build -DSW_BUILD_TESTS=OFF && cmake --build native/build --target soundwave_shared
+cd soundwave_app && flutter test
 ```
 
 ---

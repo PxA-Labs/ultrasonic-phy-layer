@@ -26,7 +26,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.41.x'
+          flutter-version: '3.47.x'
           cache: true
 
       - uses: actions/setup-java@v6
@@ -73,7 +73,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.41.x'
+          flutter-version: '3.47.x'
           cache: true
 
       - name: Build Windows
@@ -107,7 +107,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.41.x'
+          flutter-version: '3.47.x'
           cache: true
 
       - name: Build macOS
@@ -141,7 +141,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.41.x'
+          flutter-version: '3.47.x'
           cache: true
 
       - name: Install Linux dependencies
@@ -149,7 +149,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
-            libgtk-3-dev liblzma-dev libstdc++-12-dev
+            libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
       - name: Build Linux
         if: steps.check.outputs.has_pubspec == 'true'
@@ -165,17 +166,21 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-android]
     if: always() && needs.build-android.result == 'success'
+    # The `secrets` context is not allowed in step-level `if:` expressions
+    # (GitHub rejects the whole workflow file). Expose presence flags via env.
+    env:
+      HAS_PLAY_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT != '' }}
     steps:
       - uses: actions/download-artifact@v8
         with:
           name: android-release
 
-      - name: Decode keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+      - name: Skip notice (no Play Store credentials)
+        if: env.HAS_PLAY_ACCOUNT != 'true'
+        run: echo "::notice::GOOGLE_PLAY_SERVICE_ACCOUNT not configured; skipping Play Store upload."
 
       - name: Deploy to Play Store
-        if: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT != '' }}
+        if: env.HAS_PLAY_ACCOUNT == 'true'
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
@@ -187,7 +192,14 @@ jobs:
   deploy-github-release:
     runs-on: ubuntu-latest
     needs: [build-android, build-windows, build-macos, build-linux]
-    if: always() && contains(needs.*.result, 'success')
+    # Publish only when every platform build succeeded, so a release never
+    # silently ships with missing platform assets.
+    if: >-
+      always() &&
+      needs.build-android.result == 'success' &&
+      needs.build-windows.result == 'success' &&
+      needs.build-macos.result == 'success' &&
+      needs.build-linux.result == 'success'
     permissions:
       contents: write
     steps:
@@ -210,19 +222,33 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-linux]
     if: always() && needs.build-linux.result == 'success'
+    env:
+      HAS_SNAP_TOKEN: ${{ secrets.SNAP_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check for snapcraft.yaml
+        id: snap
+        run: |
+          if [ -f snap/snapcraft.yaml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::snap/snapcraft.yaml not found; skipping Snap build (tracked in #95)."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/download-artifact@v8
+        if: steps.snap.outputs.present == 'true'
         with:
           name: linux-release
           path: snap/gui/
 
       - uses: snapcore/action-build@v1
+        if: steps.snap.outputs.present == 'true'
         id: snapcraft
 
       - uses: snapcore/action-publish@v1
-        if: ${{ secrets.SNAP_TOKEN != '' }}
+        if: steps.snap.outputs.present == 'true' && env.HAS_SNAP_TOKEN == 'true'
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_TOKEN }}
         with:

@@ -131,4 +131,27 @@ void main() {
       expect(rx.toString(), contains('15.2 dB'));
     });
   });
+
+  group('SignalMetrics AGC gain', () {
+    test('defaults to null and formats as ---', () {
+      final m = SignalMetrics();
+      expect(m.agcGainDb, isNull);
+      expect(m.formattedAgcGain, '---');
+    });
+
+    test('clamps to the native range and formats with sign', () {
+      expect(SignalMetrics(agcGainDb: 12.4).formattedAgcGain, '+12 dB');
+      expect(SignalMetrics(agcGainDb: -7.6).formattedAgcGain, '-8 dB');
+      expect(SignalMetrics(agcGainDb: 99).agcGainDb, 32.0);
+      expect(SignalMetrics(agcGainDb: -99).agcGainDb, -20.0);
+      expect(SignalMetrics(agcGainDb: double.nan).agcGainDb, isNull);
+    });
+
+    test('copyWith keeps, replaces or clears the gain', () {
+      final m = SignalMetrics(agcGainDb: 10);
+      expect(m.copyWith(snr: 5).agcGainDb, 10);
+      expect(m.copyWith(agcGainDb: 3).agcGainDb, 3);
+      expect(m.copyWith(clearAgcGain: true).agcGainDb, isNull);
+    });
+  });
 }

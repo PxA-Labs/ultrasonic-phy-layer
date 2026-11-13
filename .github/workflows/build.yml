@@ -4,6 +4,20 @@ on:
   push:
     branches: [main]
     tags: ['v**']
+  # Also build on PRs that touch the app or this workflow, so platform
+  # breakage is caught before it lands on main.
+  pull_request:
+    paths:
+      - 'soundwave_app/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-android:
@@ -27,7 +41,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.41.x'
+          flutter-version: '3.47.x'
           cache: true
 
       - uses: actions/setup-java@v6
@@ -74,7 +88,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.41.x'
+          flutter-version: '3.47.x'
           cache: true
 
       - name: Build Windows
@@ -108,7 +122,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.41.x'
+          flutter-version: '3.47.x'
           cache: true
 
       - name: Build macOS
@@ -142,7 +156,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.41.x'
+          flutter-version: '3.47.x'
           cache: true
 
       - name: Install Linux dependencies
@@ -150,7 +164,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
-            libgtk-3-dev liblzma-dev libstdc++-12-dev
+            libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
       - name: Build Linux
         if: steps.check.outputs.has_pubspec == 'true'

@@ -9,6 +9,7 @@ import 'package:soundwave/native/soundwave_native.dart';
 import 'package:soundwave/native/bindings.dart';
 import 'package:soundwave/services/audio_service.dart';
 import 'package:soundwave/engine/signal_metrics.dart';
+import 'package:soundwave/engine/frame_codec.dart';
 
 class TxEngine {
   final SoundwaveNative? _native;
@@ -40,21 +41,11 @@ class TxEngine {
 
   Future<void> sendMessage(String text) async {
     final payload = Uint8List.fromList(utf8.encode(text));
-
-    // Calculate CRC-32 of payload
-    final crc = native.crc32(payload);
-
-    // Frame layout: Prepend CRC-32 (4 bytes, little-endian)
-    final crcBytes = ByteData(4)..setUint32(0, crc, Endian.little);
-    final packet = Uint8List(4 + payload.length);
-    packet.setRange(0, 4, crcBytes.buffer.asUint8List());
-    packet.setRange(4, packet.length, payload);
-
-    // Apply Reed-Solomon encoding
-    final parity = native.rsEncode(packet);
-    final frame = Uint8List(packet.length + parity.length);
-    frame.setRange(0, packet.length, packet);
-    frame.setRange(packet.length, frame.length, parity);
+    // [CRC-32][payload][RS parity] — see FrameCodec. Honours enable_rs.
+    final frame = FrameCodec(native).encode(
+      payload,
+      enableRs: _configMap['enable_rs'] as bool? ?? true,
+    );
 
     // Modulate using compute/isolate to prevent UI lag
     final Float32List samples;
