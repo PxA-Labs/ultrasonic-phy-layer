@@ -82,8 +82,10 @@ void main() {
     ));
     audio.pushMockChunk(x);
     await tester.pump();
-    expect(find.text('Peak: 18.99 kHz'), findsOneWidget);
-    expect(find.textContaining('Level -15 dBFS'), findsOneWidget);
+    final level = tester.widget<Text>(find.textContaining('Level')).data;
+    final peak = tester.widget<Text>(find.textContaining('Peak:')).data;
+    expect(level, 'Level -15 dBFS');
+    expect(peak, 'Peak: 18.99 kHz');
 
     // Paused: new audio is not analysed.
     await tester.tap(find.byKey(const ValueKey('monitor-pause')));

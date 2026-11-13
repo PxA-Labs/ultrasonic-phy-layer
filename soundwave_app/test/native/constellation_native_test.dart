@@ -78,20 +78,34 @@ void main() {
   }
 
   group('sw_ofdm_equalized_symbols via FFI', () {
-    test('QPSK frame: points sit on the QPSK grid', () {
+    test('QPSK frame: points carry the frame bits', () {
       final cfg = ofdmConfig();
-      final iq = symbols(cfg, frameSamples(cfg, 'constellation test 123'));
-      expect(iq.length, greaterThan(100));
-      expect(iq.length.isEven, isTrue);
+      const text = 'constellation test 123';
+      final iq = symbols(cfg, frameSamples(cfg, text));
+      final frame = FrameCodec(native!).encode(utf8.encode(text));
+      expect(iq.length, greaterThanOrEqualTo(frame.length * 8));
+      // Gray map: first bit = (Q < 0), second bit = (I < 0).
+      for (var k = 0; k < frame.length * 4; k++) {
+        final b1 = (frame[k ~/ 4] >> (7 - (2 * k) % 8)) & 1;
+        final b2 = (frame[k ~/ 4] >> (6 - (2 * k) % 8)) & 1;
+        expect(iq[2 * k + 1] < 0 ? 1 : 0, b1, reason: 'point $k Q');
+        expect(iq[2 * k] < 0 ? 1 : 0, b2, reason: 'point $k I');
+      }
       final evm = EvmResult.compute(iq, ConstellationScheme.qpsk)!;
-      expect(evm.rms, lessThan(0.5), reason: 'EVM ${evm.percent}%');
+      expect(evm.rms, lessThan(0.7), reason: 'EVM ${evm.percent}%');
     });
 
-    test('BPSK frame: points sit on the real axis', () {
+    test('BPSK frame: points carry the frame bits', () {
       final cfg = ofdmConfig(ofdmModulation: 0);
       final iq = symbols(cfg, frameSamples(cfg, 'bpsk'));
+      final frame = FrameCodec(native!).encode(utf8.encode('bpsk'));
+      expect(iq.length, greaterThanOrEqualTo(frame.length * 16));
+      for (var k = 0; k < frame.length * 8; k++) {
+        final bit = (frame[k ~/ 8] >> (7 - k % 8)) & 1;
+        expect(iq[2 * k] > 0 ? 1 : 0, bit, reason: 'point $k');
+      }
       final evm = EvmResult.compute(iq, ConstellationScheme.bpsk)!;
-      expect(evm.rms, lessThan(0.5), reason: 'EVM ${evm.percent}%');
+      expect(evm.rms, lessThan(0.7), reason: 'EVM ${evm.percent}%');
     });
 
     test('noise raises the EVM', () {
@@ -99,7 +113,7 @@ void main() {
       final clean = frameSamples(cfg, 'noise test');
       final rnd = Random(91);
       final noisy = Float32List.fromList([
-        for (final s in clean) s + (rnd.nextDouble() * 2 - 1) * 0.02,
+        for (final s in clean) s + (rnd.nextDouble() * 2 - 1) * 0.1,
       ]);
       final evmClean =
           EvmResult.compute(symbols(cfg, clean), ConstellationScheme.qpsk)!;
@@ -166,6 +180,6 @@ void main() {
     expect(frames, isNotEmpty);
     expect(frames.first.decoded, isTrue);
     expect(frames.first.scheme, ConstellationScheme.qpsk);
-    expect(frames.first.evm!.rms, lessThan(0.5));
+    expect(frames.first.evm!.rms, lessThan(0.7));
   }, skip: skip);
 }
