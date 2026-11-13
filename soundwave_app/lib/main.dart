@@ -9,6 +9,7 @@ import 'state/settings_store.dart';
 import 'screens/dashboard.dart';
 import 'screens/monitor.dart';
 import 'screens/settings.dart';
+import 'widgets/mic_permission_gate.dart';
 
 void main() {
   runApp(const SoundwaveApp());
@@ -34,7 +35,7 @@ class SoundwaveApp extends StatelessWidget {
             secondary: Color(0xFF00BCD4),
           ),
         ),
-        home: const MainShell(),
+        home: const MicPermissionGate(child: MainShell()),
       ),
     );
   }
