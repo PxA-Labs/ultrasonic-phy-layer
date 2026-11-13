@@ -13,6 +13,8 @@ strict: true
 exclude_docs: |
   /requirements.txt
   /api/Doxyfile
+  /api/dart/**/*.md
+  /api/c/**/*.md
 
 theme:
   name: material

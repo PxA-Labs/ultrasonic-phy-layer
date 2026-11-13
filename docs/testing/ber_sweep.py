@@ -51,6 +51,7 @@ from array import array
 PAYLOAD_RE = re.compile(r"^SW(\d{4})\|")
 SNR_RE = re.compile(r"snr = (-?[0-9.]+|nan|inf|-inf) dB")
 CORR_RE = re.compile(r"Errors corrected: (\d+)")
+START_RE = re.compile(r"sw_detect_frame returned 0, frame_start = (\d+)")
 ALPHABET = string.ascii_letters + string.digits
 VERBOSE = False
 CLI_MAX_PAYLOAD = 217  # 223 RS data bytes - 4 CRC - 2 length (main.c)
@@ -159,6 +160,7 @@ def cli_demodulate(cli, params, wav_path):
         "payload": payload if res.returncode == 0 else b"",
         "corrected": int(corr.group(1)) if corr else None,
         "snr_db": float(snr.group(1)) if snr else None,
+        "frame_start": int(START_RE.search(err).group(1)) if START_RE.search(err) else None,
         "stderr": err.strip(),
     }
 
@@ -288,6 +290,15 @@ def decode_windows(cli, manifest, samples, rate, offset, first, count, tmp):
         path = os.path.join(tmp, f"win_{j:05d}.wav")
         write_wav16(path, seg, rate)
         res = cli_demodulate(cli, manifest["params"], path)
+        fs0 = res.get("frame_start")
+        if not res["ok"] and fs0:
+            # `demodulate` (CSS) locks onto the first correlation value above
+            # its threshold, so a frame preceded by more than a few ms of
+            # audio is often missed. sw_detect_frame (global peak) is printed
+            # in the same run: re-cut the window at that offset and retry.
+            start = max(0, start) + fs0
+            write_wav16(path, samples[start:start + win], rate)
+            res = cli_demodulate(cli, manifest["params"], path)
         res["window_start_s"] = round(max(0, start) / rate, 3)
         if VERBOSE:
             last = res["stderr"].splitlines()[-1] if res["stderr"] else ""
