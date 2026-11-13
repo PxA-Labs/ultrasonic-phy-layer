@@ -57,7 +57,12 @@ int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
 // Full frame modulation returning sw_signal
 sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg);
 
-// DFT demodulation: remove CP, FFT, normalize.
+// Receiver timing backoff b: the FFT window of every symbol starts b samples
+// before the end of its cyclic prefix (offset cp - b), so detection errors in
+// [-(cp - b), +b] samples stay ISI-free. See MATHEMATICAL_MODEL.md 4.0.
+#define OFDM_TIMING_BACKOFF(cp) ((cp) / 4)
+
+// DFT demodulation: skip cp_length samples (the FFT window offset), FFT, normalize.
 void ofdm_dft_demodulate(const float* y, int N, int cp_length, kiss_fft_cpx* Y);
 
 // Full frame demodulation (detect, FFT, equalize, demap). Returns SW_OK or error.
