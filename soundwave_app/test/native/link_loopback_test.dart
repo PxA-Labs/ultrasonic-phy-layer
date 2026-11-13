@@ -230,8 +230,7 @@ void main() {
       for (final d in dsubs) {
         await d.cancel();
       }
-      expect(texts, [text], reason: diag.join('
-'));
+      expect(texts, [text], reason: diag.join('; '));
       expect(a.tx.framesSent, greaterThan(1));
       expect(b.tx.framesSent, 0); // a pure listener never transmits
       expect(LinkFrame.maxChunk, lessThan(text.length));
