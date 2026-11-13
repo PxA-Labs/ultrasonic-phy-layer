@@ -287,8 +287,17 @@ class SoundwaveNative {
     // SOUNDWAVE_LIB pins an exact library (CI, sanitizer builds, or when
     // several stale builds exist); it is tried before the relative paths.
     final override = Platform.environment['SOUNDWAVE_LIB'];
+    // Packaged desktop builds ship the library inside the app bundle (see
+    // soundwave_app/{linux,windows}/CMakeLists.txt and
+    // soundwave_app/macos/packaging/embed_native.sh). Resolve it relative to
+    // the executable so it is found regardless of the working directory.
+    final exeDir = File(Platform.resolvedExecutable).parent.path;
+    final sep = Platform.pathSeparator;
     final searchPaths = [
       if (override != null && override.isNotEmpty) override,
+      if (Platform.isWindows) '$exeDir${sep}soundwave.dll',
+      if (Platform.isMacOS) '$exeDir/../Frameworks/libsoundwave.dylib',
+      if (Platform.isLinux) '$exeDir/lib/libsoundwave.so',
       if (Platform.isWindows) 'soundwave.dll',
       if (Platform.isMacOS) 'libsoundwave.dylib',
       if (Platform.isLinux) 'libsoundwave.so',
@@ -298,6 +307,10 @@ class SoundwaveNative {
       if (Platform.isMacOS) '../native/build/libsoundwave.dylib',
       if (Platform.isMacOS) '../native/build/asan/libsoundwave.dylib',
       if (Platform.isLinux) '../native/build/libsoundwave.so',
+      // native/CMakeLists.txt sets PREFIX "lib" on every platform, so a
+      // plain CMake build on Windows produces libsoundwave.dll.
+      if (Platform.isWindows) '../native/build/Release/libsoundwave.dll',
+      if (Platform.isWindows) '../native/build/Debug/libsoundwave.dll',
       if (Platform.isWindows) '../native/build/Release/soundwave.dll',
       if (Platform.isWindows) '../native/build/Debug/soundwave.dll',
       if (Platform.isMacOS) '../build/libsoundwave.dylib',

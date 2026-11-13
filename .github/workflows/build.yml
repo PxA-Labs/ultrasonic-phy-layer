@@ -66,6 +66,9 @@ jobs:
             soundwave_app/build/app/outputs/flutter-apk/app-release.apk
             soundwave_app/build/app/outputs/bundle/release/app-release.aab
 
+  # Desktop jobs (issue #95): build the app with libsoundwave bundled, assert
+  # the native library is present and loadable, then package. Packages here
+  # are unsigned; signing happens in release.yml (#35).
   build-windows:
     runs-on: windows-latest
     defaults:
@@ -95,11 +98,28 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build windows --release
 
+      - name: Verify bundled native library
+        if: steps.check.outputs.has_pubspec == 'true'
+        shell: pwsh
+        run: |
+          $rel = 'build\windows\x64\runner\Release'
+          Get-ChildItem -Recurse $rel | Select-Object FullName, Length | Format-Table -AutoSize
+          $dll = Join-Path $rel 'soundwave.dll'
+          if (-not (Test-Path $dll)) { throw "soundwave.dll not bundled next to soundwave.exe" }
+          python -c "import ctypes,sys; l=ctypes.CDLL(sys.argv[1]); l.sw_crc32; l.sw_version.restype=ctypes.c_char_p; print('loaded', sys.argv[1], l.sw_version().decode())" (Resolve-Path $dll).Path
+
+      - name: Package (zip + MSIX, unsigned)
+        if: steps.check.outputs.has_pubspec == 'true'
+        shell: pwsh
+        run: |
+          $version = ((Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)').Matches[0].Groups[1].Value -split '\+')[0]
+          ./windows/packaging/package.ps1 -ReleaseDir build\windows\x64\runner\Release -Version $version -OutDir dist
+
       - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: windows-release
-          path: soundwave_app/build/windows/x64/runner/Release/
+          path: soundwave_app/dist/
 
   build-macos:
     runs-on: macos-latest
@@ -129,14 +149,40 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build macos --release
 
+      - name: Embed libsoundwave.dylib
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: bash macos/packaging/embed_native.sh build/macos/Build/Products/Release/soundwave.app
+
+      - name: Package DMG (ad-hoc signed)
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          version="$(sed -n 's/^version:[[:space:]]*\([^+]*\).*/\1/p' pubspec.yaml)"
+          mkdir -p dist
+          bash macos/packaging/sign_and_package.sh build/macos/Build/Products/Release/soundwave.app \
+            "dist/soundwave-${version}-macos-universal.dmg"
+
+      - name: Verify bundled native library
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          app=build/macos/Build/Products/Release/soundwave.app
+          ls -la "$app/Contents/MacOS" "$app/Contents/Frameworks"
+          lib="$app/Contents/Frameworks/libsoundwave.dylib"
+          test -f "$lib" || { echo "::error::libsoundwave.dylib not in Frameworks"; exit 1; }
+          lipo "$lib" -verify_arch arm64 x86_64
+          otool -l "$app/Contents/MacOS/soundwave" | grep -A2 LC_RPATH | grep -q '@executable_path/../Frameworks' \
+            || { echo "::error::Runner rpath lacks @executable_path/../Frameworks"; exit 1; }
+          /usr/libexec/PlistBuddy -c 'Print :NSMicrophoneUsageDescription' "$app/Contents/Info.plist"
+          python3 -c "import ctypes,sys; l=ctypes.CDLL(sys.argv[1]); l.sw_crc32; l.sw_version.restype=ctypes.c_char_p; print('loaded', sys.argv[1], l.sw_version().decode())" "$lib"
+
       - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: macos-release
-          path: soundwave_app/build/macos/Build/Products/Release/
+          path: soundwave_app/dist/
 
   build-linux:
-    runs-on: ubuntu-latest
+    # 22.04 (glibc 2.35) so the AppImage/.deb also run on older distros.
+    runs-on: ubuntu-22.04
     defaults:
       run:
         working-directory: soundwave_app
@@ -171,8 +217,24 @@ jobs:
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build linux --release
 
+      - name: Verify bundled native library
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          bundle=build/linux/x64/release/bundle
+          find "$bundle" -maxdepth 2 -type f -exec ls -la {} + | grep -v flutter_assets
+          lib="$bundle/lib/libsoundwave.so"
+          test -f "$lib" || { echo "::error::libsoundwave.so not in bundle/lib"; exit 1; }
+          nm -D --defined-only "$lib" | grep -c ' T sw_'
+          python3 -c "import ctypes,sys; l=ctypes.CDLL(sys.argv[1]); l.sw_crc32; l.sw_version.restype=ctypes.c_char_p; print('loaded', sys.argv[1], l.sw_version().decode())" "$lib"
+
+      - name: Package (tar.gz + deb + AppImage)
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          version="$(sed -n 's/^version:[[:space:]]*\([^+]*\).*/\1/p' pubspec.yaml)"
+          bash linux/packaging/package.sh build/linux/x64/release/bundle "$version" dist
+
       - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: linux-release
-          path: soundwave_app/build/linux/x64/release/bundle/
+          path: soundwave_app/dist/

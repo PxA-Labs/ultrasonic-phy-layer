@@ -110,3 +110,33 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# === Soundwave native DSP core (libsoundwave) ===
+# Build native/ as an isolated ExternalProject (its object-library target is
+# also called "soundwave", which would clash with BINARY_NAME) and install the
+# DLL next to soundwave.exe, where lib/native/soundwave_native.dart looks for
+# it. native/ names the DLL libsoundwave.dll; it is shipped as soundwave.dll.
+set(SOUNDWAVE_NATIVE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../native")
+if(EXISTS "${SOUNDWAVE_NATIVE_SRC}/CMakeLists.txt")
+  include(ExternalProject)
+  set(SOUNDWAVE_NATIVE_BIN "${CMAKE_BINARY_DIR}/soundwave_native")
+  ExternalProject_Add(soundwave_native
+    SOURCE_DIR "${SOUNDWAVE_NATIVE_SRC}"
+    BINARY_DIR "${SOUNDWAVE_NATIVE_BIN}"
+    CMAKE_ARGS
+      -DSW_BUILD_TESTS=OFF
+      -DSW_BUILD_BENCHMARKS=OFF
+      -DSW_FUZZ_SMOKE=OFF
+    BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release
+      --target soundwave_shared
+    INSTALL_COMMAND ""
+    BUILD_ALWAYS ON
+  )
+  add_dependencies(${BINARY_NAME} soundwave_native)
+  install(FILES "${SOUNDWAVE_NATIVE_BIN}/Release/libsoundwave.dll"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    RENAME "soundwave.dll"
+    COMPONENT Runtime)
+else()
+  message(WARNING "native/ not found; soundwave.dll will not be bundled")
+endif()
