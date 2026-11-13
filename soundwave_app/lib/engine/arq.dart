@@ -49,7 +49,8 @@ class ArqConfig {
     final timeout = (cfg['arq_ack_timeout_ms'] as num?)?.toInt();
     return ArqConfig(
       enabled: cfg['arq_enabled'] as bool? ?? false,
-      maxRetries: retries != null && retries >= 0 && retries <= 16 ? retries : 3,
+      maxRetries:
+          retries != null && retries >= 0 && retries <= 16 ? retries : 3,
       ackTimeout: Duration(
           milliseconds: timeout != null &&
                   timeout >= minAckTimeoutMs &&
@@ -199,7 +200,8 @@ class ArqSender {
     w.complete(f.type == LinkFrameType.ack ? _Reply.ack : _Reply.nack);
   }
 
-  Future<void> _send(LinkMessage message, ArqConfig config, int maxChunk) async {
+  Future<void> _send(
+      LinkMessage message, ArqConfig config, int maxChunk) async {
     _cancelRequested = false;
     final msgId = _nextMsgId;
     _nextMsgId = (_nextMsgId + 1) & 0xFFFF;

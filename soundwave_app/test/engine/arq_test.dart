@@ -84,8 +84,7 @@ class SimChannel {
 }
 
 /// Runs [body] in virtual time and returns the outcome of its future.
-({bool done, Object? error}) run(
-    FakeAsync async, Future<void> Function() body,
+({bool done, Object? error}) run(FakeAsync async, Future<void> Function() body,
     {Duration limit = const Duration(hours: 1)}) {
   var done = false;
   Object? error;
@@ -107,9 +106,7 @@ LinkMessage fileOf(int n, int seed) {
 
 void main() {
   const arq = ArqConfig(
-      enabled: true,
-      maxRetries: 3,
-      ackTimeout: Duration(milliseconds: 200));
+      enabled: true, maxRetries: 3, ackTimeout: Duration(milliseconds: 200));
 
   group('ArqConfig', () {
     test('reads settings from the config map with safe fallbacks', () {
@@ -145,8 +142,7 @@ void main() {
       fakeAsync((async) {
         // First DATA transmission is corrupted; the receiver has a session
         // only after fragment 0, so lose fragment 1's first attempt.
-        final ch = SimChannel(async,
-            nackOnLoss: true, dropData: (n) => n == 1);
+        final ch = SimChannel(async, nackOnLoss: true, dropData: (n) => n == 1);
         final msg = LinkMessage.text('x' * 300); // 2 fragments
         final events = <TxTransferState>[];
         ch.sender.progress.listen((p) => events.add(p.state));
@@ -163,7 +159,10 @@ void main() {
         expect(ch.repliesSent[1].index, 1);
         // The NACK triggers the retransmission well before the ACK timeout.
         final gap = ch.dataSentAt[2] - ch.dataSentAt[1];
-        expect(gap, lessThan(airtime + const Duration(milliseconds: 60) + arq.ackTimeout));
+        expect(
+            gap,
+            lessThan(
+                airtime + const Duration(milliseconds: 60) + arq.ackTimeout));
         expect(ch.delivered.single.text, 'x' * 300);
         expect(ch.sender.retransmissions, 1);
         expect(events, contains(TxTransferState.retrying));
@@ -278,8 +277,8 @@ void main() {
       fakeAsync((async) {
         final ch = SimChannel(async, arqAtReceiver: false);
         final msg = fileOf(2000, 1);
-        final r = run(async,
-            () => ch.sender.send(msg, const ArqConfig(enabled: false)));
+        final r = run(
+            async, () => ch.sender.send(msg, const ArqConfig(enabled: false)));
         expect(r.done, isTrue);
         final n = PayloadFragmenter.fragmentCount(
             msg.encode().length, LinkFrame.maxChunk);
@@ -306,9 +305,7 @@ void main() {
       fakeAsync((async) {
         final ch = SimChannel(async, dropData: (n) => n == 0);
         Object? error;
-        ch.sender
-            .send(fileOf(1000, 2), arq)
-            .then((_) {}, onError: (Object e) {
+        ch.sender.send(fileOf(1000, 2), arq).then((_) {}, onError: (Object e) {
           error = e;
         });
         async.elapse(const Duration(milliseconds: 150));
@@ -334,14 +331,16 @@ void main() {
         }
         async.elapse(const Duration(minutes: 1));
         expect(finished, 3);
-        expect(ch.delivered.map((m) => m.text).toList(), ['one', 'two', 'three']);
+        expect(
+            ch.delivered.map((m) => m.text).toList(), ['one', 'two', 'three']);
       });
     });
   });
 
   group('ARQ over a lossy channel (seeded)', () {
     for (final seed in [1, 2, 3]) {
-      test('30 % DATA + 30 % ACK loss: multi-fragment file arrives intact '
+      test(
+          '30 % DATA + 30 % ACK loss: multi-fragment file arrives intact '
           '(seed $seed)', () {
         fakeAsync((async) {
           final ch = SimChannel(async,
@@ -375,11 +374,8 @@ void main() {
           for (var i = 0; i < 100; i++) {
             run(
                 async,
-                () => ch.sender.send(
-                    LinkMessage.text('message $i'),
-                    withArq
-                        ? arq
-                        : const ArqConfig(enabled: false)),
+                () => ch.sender.send(LinkMessage.text('message $i'),
+                    withArq ? arq : const ArqConfig(enabled: false)),
                 limit: const Duration(minutes: 1));
           }
           ok = ch.delivered.length;
@@ -408,15 +404,15 @@ void main() {
           chunk: Uint8List(3),
           ackRequested: true);
       final o1 = rx.handle(own, t0, arqEnabled: true);
-      expect([o1.message, o1.reply, o1.control, o1.progress], everyElement(isNull));
+      expect([o1.message, o1.reply, o1.control, o1.progress],
+          everyElement(isNull));
       final other = LinkFrame.ack(src: 6, dst: 7, msgId: 1, index: 0);
       expect(rx.handle(other, t0, arqEnabled: true).control, isNull);
       final mine = LinkFrame.ack(src: 6, dst: 5, msgId: 1, index: 0);
       expect(rx.handle(mine, t0, arqEnabled: true).control, same(mine));
     });
 
-    test('debounces identical replies but re-ACKs genuine retransmissions',
-        () {
+    test('debounces identical replies but re-ACKs genuine retransmissions', () {
       final rx = LinkReceiver(nodeId: 5);
       final f = PayloadFragmenter(maxChunk: 4).fragment(
           LinkMessage.text('abcdefgh'),
@@ -425,12 +421,14 @@ void main() {
           ackRequested: true)[0];
       expect(rx.handle(f, t0, arqEnabled: true).reply, isNotNull);
       expect(
-          rx.handle(f, t0.add(const Duration(milliseconds: 50)),
+          rx
+              .handle(f, t0.add(const Duration(milliseconds: 50)),
                   arqEnabled: true)
               .reply,
           isNull);
       expect(
-          rx.handle(f, t0.add(const Duration(seconds: 1)), arqEnabled: true)
+          rx
+              .handle(f, t0.add(const Duration(seconds: 1)), arqEnabled: true)
               .reply,
           isNotNull);
     });
@@ -438,8 +436,8 @@ void main() {
     test('NACKs only when exactly one ARQ transfer is in progress', () {
       final rx = LinkReceiver(nodeId: 5);
       expect(rx.onFrameError(t0, arqEnabled: true), isNull); // no context
-      List<LinkFrame> frags(int src) => PayloadFragmenter(maxChunk: 4)
-          .fragment(LinkMessage.text('abcdefgh'),
+      List<LinkFrame> frags(int src) =>
+          PayloadFragmenter(maxChunk: 4).fragment(LinkMessage.text('abcdefgh'),
               src: src, msgId: 1, ackRequested: true);
       rx.handle(frags(6)[0], t0, arqEnabled: true);
       rx.handle(frags(6)[1], t0, arqEnabled: true);
@@ -448,8 +446,8 @@ void main() {
       expect([nack.type, nack.dst, nack.msgId, nack.index],
           [LinkFrameType.nack, 6, 1, 2]);
       rx.handle(frags(7)[0], t0, arqEnabled: true);
-      expect(rx.onFrameError(t0.add(const Duration(seconds: 1)),
-              arqEnabled: true),
+      expect(
+          rx.onFrameError(t0.add(const Duration(seconds: 1)), arqEnabled: true),
           isNull); // ambiguous: two senders
     });
   });

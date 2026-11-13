@@ -72,14 +72,13 @@ class LinkReceiver {
     }
 
     final r = reassembler.add(f, now);
-    final ack = arqEnabled &&
-            f.ackRequested &&
-            r.status != FragmentStatus.rejected
-        ? _debounced(
-            LinkFrame.ack(
-                src: nodeId, dst: f.src, msgId: f.msgId, index: f.index),
-            now)
-        : null;
+    final ack =
+        arqEnabled && f.ackRequested && r.status != FragmentStatus.rejected
+            ? _debounced(
+                LinkFrame.ack(
+                    src: nodeId, dst: f.src, msgId: f.msgId, index: f.index),
+                now)
+            : null;
     final state = switch (r.status) {
       FragmentStatus.completed => RxTransferState.completed,
       FragmentStatus.rejected => RxTransferState.failed,
@@ -109,7 +108,8 @@ class LinkReceiver {
     if (!arqEnabled) return null;
     final active = [
       for (final s in reassembler.sessions)
-        if (s.ackRequested && now.difference(s.lastUpdate) < reassembler.timeout)
+        if (s.ackRequested &&
+            now.difference(s.lastUpdate) < reassembler.timeout)
           s,
     ];
     if (active.length != 1) return null;

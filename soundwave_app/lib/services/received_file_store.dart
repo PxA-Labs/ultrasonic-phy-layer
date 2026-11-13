@@ -37,8 +37,7 @@ class DirectoryFileSink implements ReceivedFileSink {
 
   static Future<Directory> _defaultDirectory() async {
     final docs = await getApplicationDocumentsDirectory();
-    return Directory(
-        '${docs.path}${Platform.pathSeparator}Soundwave'
+    return Directory('${docs.path}${Platform.pathSeparator}Soundwave'
         '${Platform.pathSeparator}received');
   }
 

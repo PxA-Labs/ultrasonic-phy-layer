@@ -580,9 +580,8 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final name = file.uri.pathSegments.isEmpty
-        ? 'data.bin'
-        : file.uri.pathSegments.last;
+    final name =
+        file.uri.pathSegments.isEmpty ? 'data.bin' : file.uri.pathSegments.last;
     await sendFileBytes(data, fileName: name);
   }
 

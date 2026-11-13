@@ -67,7 +67,8 @@ class _FileTransferCardState extends State<FileTransferCard> {
                       ? null
                       : () => state.sendFile(_path.text),
                   icon: const Icon(Icons.upload_file),
-                  label: Text(state.arqEnabled ? 'Send File (ARQ)' : 'Send File'),
+                  label:
+                      Text(state.arqEnabled ? 'Send File (ARQ)' : 'Send File'),
                 ),
                 if (txActive)
                   OutlinedButton.icon(

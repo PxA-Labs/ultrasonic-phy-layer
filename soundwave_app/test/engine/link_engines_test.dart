@@ -92,7 +92,8 @@ void main() {
       expect(frames.every((f) => f.src == 0x0A0A && !f.ackRequested), isTrue);
       final rx = LinkReceiver(nodeId: 1);
       final out = [
-        for (final f in frames.reversed) rx.handle(f, DateTime.now(), arqEnabled: false),
+        for (final f in frames.reversed)
+          rx.handle(f, DateTime.now(), arqEnabled: false),
       ];
       expect(out.last.message!.text, text);
       expect(progress.last.state, TxTransferState.completed);
@@ -117,7 +118,8 @@ void main() {
         expect(done, isTrue);
         expect(native.frames, hasLength(5));
         expect(tx.retransmissions, 0);
-        final f0 = LinkFrame.decode(CapturingNative.payloadOf(native.frames[0]))!;
+        final f0 =
+            LinkFrame.decode(CapturingNative.payloadOf(native.frames[0]))!;
         expect(f0.ackRequested, isTrue);
       });
     });

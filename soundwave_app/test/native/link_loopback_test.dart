@@ -146,7 +146,7 @@ void main() {
     /// whether B misses it. Each mic also hears its own speaker.
     void connect({required bool arq, bool Function(int n)? dropAtoB}) {
       a = Device(0x0A0A, ofdmConfig(arq: arq), native!);
-      b = Device(0x0B0B, ofdmConfig(arq: arq), native!);
+      b = Device(0x0B0B, ofdmConfig(arq: arq), native);
       rnd = Random(89100);
       final g = FrameGeometry.fromConfig(a.config);
       trailing = 2 * RxEngine.retryStepSymbols * g.samplesPerSymbol;
@@ -178,7 +178,8 @@ void main() {
       final progress = <TxTransferProgress>[];
       final psub = a.tx.transfers.listen(progress.add);
 
-      final data = Uint8List.fromList(List.generate(600, (i) => (i * 31) % 251));
+      final data =
+          Uint8List.fromList(List.generate(600, (i) => (i * 31) % 251));
       await a.tx
           .sendBinary(data, fileName: 'e2e.bin')
           .timeout(const Duration(seconds: 90));
@@ -194,8 +195,10 @@ void main() {
       expect(progress.last.fragmentCount, greaterThanOrEqualTo(3));
       expect(a.tx.retransmissions, greaterThanOrEqualTo(1));
       // B ACKed; A never ACKed its own echoes.
-      expect(b.tx.framesSent, greaterThanOrEqualTo(progress.last.fragmentCount));
-      expect(a.tx.framesSent, progress.last.fragmentCount + a.tx.retransmissions);
+      expect(
+          b.tx.framesSent, greaterThanOrEqualTo(progress.last.fragmentCount));
+      expect(
+          a.tx.framesSent, progress.last.fragmentCount + a.tx.retransmissions);
     }, timeout: const Timeout(Duration(minutes: 3)));
 
     test('broadcast (ARQ off): long text is fragmented and reassembled',
@@ -203,8 +206,8 @@ void main() {
       connect(arq: false);
       final texts = <String>[];
       final sub = b.rx.messages.listen((m) => texts.add(m.text));
-      final text = List.generate(450, (i) => String.fromCharCode(0x41 + i % 26))
-          .join();
+      final text =
+          List.generate(450, (i) => String.fromCharCode(0x41 + i % 26)).join();
       await a.tx.sendMessage(text);
       // Fragments are paced by airtime; give the receiver time to drain.
       for (var i = 0; i < 100 && texts.isEmpty; i++) {

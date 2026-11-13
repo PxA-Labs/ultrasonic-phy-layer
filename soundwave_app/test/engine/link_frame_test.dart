@@ -17,7 +17,8 @@ void main() {
 
   group('LinkFrame', () {
     test('DATA round-trips and fits one PHY frame', () {
-      final chunk = Uint8List.fromList(List.generate(LinkFrame.maxChunk, (i) => i));
+      final chunk =
+          Uint8List.fromList(List.generate(LinkFrame.maxChunk, (i) => i));
       final f = LinkFrame.data(
           src: 0xBEEF,
           msgId: 0x1234,
@@ -41,8 +42,7 @@ void main() {
     test('ACK and NACK round-trip', () {
       final ack = LinkFrame.decode(
           LinkFrame.ack(src: 1, dst: 2, msgId: 3, index: 4).encode())!;
-      expect(
-          [ack.type, ack.src, ack.dst, ack.msgId, ack.index],
+      expect([ack.type, ack.src, ack.dst, ack.msgId, ack.index],
           [LinkFrameType.ack, 1, 2, 3, 4]);
       final nack = LinkFrame.decode(
           LinkFrame.nack(src: 9, dst: 8, msgId: 7, index: 6).encode())!;
@@ -73,7 +73,8 @@ void main() {
       // ACK with trailing bytes
       final ack = LinkFrame.ack(src: 1, dst: 2, msgId: 3, index: 4).encode();
       expect(LinkFrame.decode(Uint8List.fromList([...ack, 0])), isNull);
-      expect(() => LinkFrame.data(
+      expect(
+          () => LinkFrame.data(
               src: 1, msgId: 1, index: 0, count: 1, chunk: Uint8List(0)),
           throwsArgumentError);
       expect(() => LinkFrame.ack(src: 0x10000, dst: 0, msgId: 0, index: 0),
@@ -103,9 +104,9 @@ void main() {
     });
 
     test('detects corruption, truncation and bad lengths', () {
-      final e = LinkMessage.file(Uint8List.fromList([1, 2, 3, 4]),
-              fileName: 'a.bin')
-          .encode();
+      final e =
+          LinkMessage.file(Uint8List.fromList([1, 2, 3, 4]), fileName: 'a.bin')
+              .encode();
       final flipped = Uint8List.fromList(e)..[e.length - 1] ^= 0x01;
       expect(() => LinkMessage.decode(flipped), throwsFormatException);
       expect(() => LinkMessage.decode(e.sublist(0, e.length - 1)),

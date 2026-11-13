@@ -131,7 +131,8 @@ void main() {
       final arrivals = <LinkFrame>[];
       for (var src = 1; src <= 3; src++) {
         for (var id = 0; id < 2; id++) {
-          final m = LinkMessage.file(randomBytes(rnd, 500), fileName: '$src-$id');
+          final m =
+              LinkMessage.file(randomBytes(rnd, 500), fileName: '$src-$id');
           msgs['$src-$id'] = m;
           arrivals.addAll(
               PayloadFragmenter(maxChunk: 50).fragment(m, src: src, msgId: id));
