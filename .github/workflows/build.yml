@@ -140,9 +140,14 @@ jobs:
           bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           for apk in build/app/outputs/flutter-apk/*.apk; do
             echo "== $apk"
-            "$bt/apksigner" verify --print-certs "$apk" | grep -E 'Signer #1 certificate (DN|SHA-256)'
+            # apksigner's exit status is the verification result; the cert
+            # summary is printed for the log only (its wording varies by
+            # build-tools version, so it must not be grepped as a gate).
+            "$bt/apksigner" verify --verbose --print-certs "$apk"
           done
-          jarsigner -verify build/app/outputs/bundle/release/app-release.aab | tail -1
+          out=$(jarsigner -verify build/app/outputs/bundle/release/app-release.aab)
+          echo "$out" | tail -3
+          grep -q 'jar verified' <<<"$out"
 
       - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
