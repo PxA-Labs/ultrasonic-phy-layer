@@ -117,7 +117,7 @@ void main() {
       expect(find.textContaining('not granted'), findsOneWidget);
       expect(
         tester.getSemantics(result),
-        containsSemantics(isLiveRegion: true),
+        isSemantics(isLiveRegion: true),
       );
       handle.dispose();
     });

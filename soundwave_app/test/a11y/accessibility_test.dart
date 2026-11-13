@@ -124,7 +124,7 @@ void main() {
 
     state.addMessage('ping', 9.0);
     await settle(tester);
-    expect(tester.getSemantics(region), containsSemantics(isLiveRegion: true));
+    expect(tester.getSemantics(region), isSemantics(isLiveRegion: true));
     expect(tester.getSemantics(region).label, contains('"ping"'));
 
     state.addMessage('pong', 9.0);
