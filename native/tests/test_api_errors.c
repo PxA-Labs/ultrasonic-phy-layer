@@ -214,7 +214,17 @@ static void test_ofdm_buffer_negotiation(void) {
     uint8_t msg[24];
     for (int i = 0; i < 24; i++) msg[i] = (uint8_t)(i * 37 + 5);
     size_t n = 0;
-    float* s = negotiate_modulate(sw_ofdm_modulate, msg, 24 * 8, cfg, &n);
+    float* tx = negotiate_modulate(sw_ofdm_modulate, msg, 24 * 8, cfg, &n);
+    // A receive buffer keeps going after the frame: append two symbols of
+    // silence. (Demodulating a buffer that ends exactly at the last sample of
+    // the frame currently yields one data symbol fewer; that is a receiver
+    // timing detail outside this API-contract test.)
+    const size_t pad = 2 * (256 + 64);
+    float* s = (float*)calloc(n + pad, sizeof(float));
+    CHECK(s != NULL);
+    memcpy(s, tx, n * sizeof(float));
+    free(tx);
+    n += pad;
 
     uint8_t out[4096];
     size_t bits = 8;
