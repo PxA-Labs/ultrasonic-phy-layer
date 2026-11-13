@@ -55,7 +55,10 @@ CONTROL
 DEB="${OUT}/soundwave_${VERSION}_amd64.deb"
 dpkg-deb --root-owner-group -Zxz --build "${DEBROOT}" "${DEB}"
 dpkg-deb --info "${DEB}"
-dpkg-deb --contents "${DEB}" | grep -q "./opt/soundwave/lib/libsoundwave.so" \
+# Capture first: `grep -q` closing the pipe early would SIGPIPE dpkg-deb and
+# trip pipefail.
+DEB_CONTENTS="$(dpkg-deb --contents "${DEB}")"
+grep -E '\./opt/soundwave/lib/libsoundwave\.so$' <<<"${DEB_CONTENTS}" \
   || { echo "::error::libsoundwave.so missing from .deb"; exit 1; }
 
 # ---- AppImage ---------------------------------------------------------------
