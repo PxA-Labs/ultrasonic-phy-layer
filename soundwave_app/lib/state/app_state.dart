@@ -7,7 +7,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:soundwave/dsp/constellation.dart';
 import 'package:soundwave/engine/arq.dart';
-import 'package:soundwave/engine/link_frame.dart';
 import 'package:soundwave/engine/link_receiver.dart';
 import 'package:soundwave/services/received_file_store.dart';
 import 'package:soundwave/engine/tx_engine.dart';
