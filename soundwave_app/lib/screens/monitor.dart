@@ -182,6 +182,10 @@ class _MonitorScreenState extends State<MonitorScreen> {
   Widget build(BuildContext context) {
     // Map dbfs (-60..0) to level indicator progress (0..1)
     final double levelProgress = (_dbfs + 60.0) / 60.0;
+    final onSurfaceVariant = Theme.of(context).colorScheme.onSurfaceVariant;
+    final peakLabel = _peakFreqHz > 0
+        ? 'Peak: ${(_peakFreqHz / 1000).toStringAsFixed(2)} kHz'
+        : 'Peak: -- kHz';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Real-Time Signal Monitor')),
@@ -202,12 +206,16 @@ class _MonitorScreenState extends State<MonitorScreen> {
                       style: Theme.of(context)
                           .textTheme
                           .bodySmall
-                          ?.copyWith(color: Colors.grey),
+                          ?.copyWith(color: onSurfaceVariant),
                     ),
                     Expanded(
-                      child: CustomPaint(
-                        painter: _WaveformPainter(samples: _waveformSamples),
-                        size: Size.infinite,
+                      child: Semantics(
+                        container: true,
+                        label: 'Live waveform of the microphone input',
+                        child: CustomPaint(
+                          painter: _WaveformPainter(samples: _waveformSamples),
+                          size: Size.infinite,
+                        ),
                       ),
                     ),
                   ],
@@ -230,14 +238,19 @@ class _MonitorScreenState extends State<MonitorScreen> {
                       style: Theme.of(context)
                           .textTheme
                           .bodySmall
-                          ?.copyWith(color: Colors.grey),
+                          ?.copyWith(color: onSurfaceVariant),
                     ),
                     Expanded(
-                      child: ClipRect(
-                        child: CustomPaint(
-                          painter:
-                              _WaterfallPainter(history: _waterfallHistory),
-                          size: Size.infinite,
+                      child: Semantics(
+                        container: true,
+                        label: 'Waterfall spectrogram',
+                        value: peakLabel,
+                        child: ClipRect(
+                          child: CustomPaint(
+                            painter:
+                                _WaterfallPainter(history: _waterfallHistory),
+                            size: Size.infinite,
+                          ),
                         ),
                       ),
                     ),
@@ -253,10 +266,15 @@ class _MonitorScreenState extends State<MonitorScreen> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  const Text('Level (dBFS):'),
+                  // Flexible labels wrap at large text scales instead of
+                  // overflowing the row.
+                  const Flexible(child: Text('Level (dBFS):')),
                   const SizedBox(width: 8),
                   Expanded(
+                    flex: 2,
                     child: LinearProgressIndicator(
+                      semanticsLabel: 'Input level',
+                      semanticsValue: '${_dbfs.toStringAsFixed(0)} dBFS',
                       value: levelProgress,
                       backgroundColor: Colors.grey.shade800,
                       valueColor: AlwaysStoppedAnimation<Color>(
@@ -269,14 +287,15 @@ class _MonitorScreenState extends State<MonitorScreen> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Text(
-                    _peakFreqHz > 0
-                        ? 'Peak: ${(_peakFreqHz / 1000).toStringAsFixed(2)} kHz'
-                        : 'Peak: -- kHz',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  Flexible(
+                    child: Text(
+                      peakLabel,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                   const SizedBox(width: 16),
                   IconButton(
+                    tooltip: _paused ? 'Resume monitor' : 'Pause monitor',
                     icon: Icon(_paused ? Icons.play_arrow : Icons.pause),
                     onPressed: () {
                       setState(() {

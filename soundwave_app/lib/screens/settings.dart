@@ -3,7 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../onboarding/onboarding_screen.dart';
 import '../state/app_state.dart';
+import '../state/ui_preferences.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -106,6 +108,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const Divider(),
                   DropdownButtonFormField<double>(
+                    isExpanded: true,
                     initialValue: state.codingRate,
                     decoration: const InputDecoration(
                         labelText: 'Convolutional Coding Rate'),
@@ -134,6 +137,7 @@ class SettingsScreen extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: state.inputDevice?.name,
                     decoration: const InputDecoration(
                         labelText: 'Capture Device (Microphone)'),
@@ -149,6 +153,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: state.outputDevice?.name,
                     decoration: const InputDecoration(
                         labelText: 'Playback Device (Speaker)'),
@@ -164,13 +169,16 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text('Playback Volume: ${(state.volume * 100).toInt()}%'),
-                  Slider(
-                    value: state.volume,
-                    min: 0.0,
-                    max: 1.0,
-                    divisions: 10,
-                    label: '${(state.volume * 100).toInt()}%',
-                    onChanged: (v) => state.setVolume(v),
+                  Semantics(
+                    label: 'Playback volume',
+                    child: Slider(
+                      value: state.volume,
+                      min: 0.0,
+                      max: 1.0,
+                      divisions: 10,
+                      label: '${(state.volume * 100).toInt()}%',
+                      onChanged: (v) => state.setVolume(v),
+                    ),
                   ),
                   SwitchListTile(
                     key: const Key('agc_toggle'),
@@ -186,8 +194,94 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          const _AppearanceCard(),
           const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+}
+
+/// Theme mode and tutorial replay (issue #93).
+class _AppearanceCard extends StatelessWidget {
+  const _AppearanceCard();
+
+  /// Null when the screen is hosted without UI preferences, e.g. in
+  /// isolated screen tests; the theme selector is then omitted.
+  UiPreferences? _maybePrefs(BuildContext context) {
+    try {
+      return context.watch<UiPreferences>();
+    } on ProviderNotFoundException {
+      return null;
+    }
+  }
+
+  void _openTutorial(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (route) => OnboardingScreen(
+          onFinished: () => Navigator.of(route).pop(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = _maybePrefs(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Appearance & Help',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            if (prefs != null) ...[
+              const SizedBox(height: 12),
+              const Text('Theme'),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<ThemeMode>(
+                  key: const Key('theme_mode_selector'),
+                  segments: const [
+                    ButtonSegment(
+                      value: ThemeMode.system,
+                      icon: Icon(Icons.brightness_auto),
+                      label: Text('System'),
+                    ),
+                    ButtonSegment(
+                      value: ThemeMode.light,
+                      icon: Icon(Icons.light_mode),
+                      label: Text('Light'),
+                    ),
+                    ButtonSegment(
+                      value: ThemeMode.dark,
+                      icon: Icon(Icons.dark_mode),
+                      label: Text('Dark'),
+                    ),
+                  ],
+                  selected: {prefs.themeMode},
+                  onSelectionChanged: (v) => prefs.setThemeMode(v.first),
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            ListTile(
+              key: const Key('show_tutorial'),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.school),
+              title: const Text('Show tutorial'),
+              subtitle: const Text('Replay the introduction to Soundwave'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _openTutorial(context),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -209,24 +303,30 @@ class _CssSettingsCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             Text('Spreading Factor (SF): ${state.sf}'),
-            Slider(
-              value: state.sf.toDouble(),
-              min: 7,
-              max: 12,
-              divisions: 5,
-              label: 'SF ${state.sf}',
-              onChanged: (v) => state.setSf(v.toInt()),
+            Semantics(
+              label: 'Spreading factor',
+              child: Slider(
+                value: state.sf.toDouble(),
+                min: 7,
+                max: 12,
+                divisions: 5,
+                label: 'SF ${state.sf}',
+                onChanged: (v) => state.setSf(v.toInt()),
+              ),
             ),
             const SizedBox(height: 12),
             Text(
                 'Chirp/Symbol Duration: ${(state.symbolDuration * 1000).toInt()} ms'),
-            Slider(
-              value: state.symbolDuration,
-              min: 0.01,
-              max: 0.1,
-              divisions: 9,
-              label: '${(state.symbolDuration * 1000).toInt()} ms',
-              onChanged: (v) => state.setSymbolDuration(v),
+            Semantics(
+              label: 'Chirp symbol duration',
+              child: Slider(
+                value: state.symbolDuration,
+                min: 0.01,
+                max: 0.1,
+                divisions: 9,
+                label: '${(state.symbolDuration * 1000).toInt()} ms',
+                onChanged: (v) => state.setSymbolDuration(v),
+              ),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -269,6 +369,7 @@ class _OfdmSettingsCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
+              isExpanded: true,
               initialValue: state.numSubcarriers,
               decoration:
                   const InputDecoration(labelText: 'FFT Subcarriers Size'),
@@ -295,6 +396,7 @@ class _OfdmSettingsCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
+              isExpanded: true,
               // Keyed by FFT size: the options change with it, and a stale
               // selection outside the new item list would assert.
               key: ValueKey('cp_${state.numSubcarriers}'),
@@ -319,6 +421,7 @@ class _OfdmSettingsCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
+              isExpanded: true,
               initialValue: state.numPilots,
               decoration:
                   const InputDecoration(labelText: 'Pilot Subcarriers Count'),
