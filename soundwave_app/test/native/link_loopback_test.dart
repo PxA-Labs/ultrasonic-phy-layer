@@ -144,7 +144,8 @@ void main() {
 
     /// Connects A and B; [dropAtoB] decides (per A transmission, 0-based)
     /// whether B misses it. Each mic also hears its own speaker.
-    void connect({required bool arq, bool Function(int n)? dropAtoB}) {
+    Future<void> connect(
+        {required bool arq, bool Function(int n)? dropAtoB}) async {
       a = Device(0x0A0A, ofdmConfig(arq: arq), native!);
       b = Device(0x0B0B, ofdmConfig(arq: arq), native);
       rnd = Random(89100);
@@ -163,6 +164,9 @@ void main() {
       };
       a.rx.startListening();
       b.rx.startListening();
+      // Capture subscriptions are attached asynchronously; audio sent before
+      // that would be lost.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
     }
 
     tearDown(() async {
@@ -172,7 +176,7 @@ void main() {
 
     test('ARQ: multi-fragment file survives a lost fragment', () async {
       // A's 2nd transmission (fragment 1, first attempt) never reaches B.
-      connect(arq: true, dropAtoB: (n) => n == 1);
+      await connect(arq: true, dropAtoB: (n) => n == 1);
       final files = <ReceivedFile>[];
       final sub = b.rx.files.listen(files.add);
       final progress = <TxTransferProgress>[];
@@ -203,7 +207,7 @@ void main() {
 
     test('broadcast (ARQ off): long text is fragmented and reassembled',
         () async {
-      connect(arq: false);
+      await connect(arq: false);
       final texts = <String>[];
       final sub = b.rx.messages.listen((m) => texts.add(m.text));
       final text =

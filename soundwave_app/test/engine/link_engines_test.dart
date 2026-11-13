@@ -58,16 +58,20 @@ void main() {
     late Map<String, dynamic> config;
     late TxEngine tx;
 
+    // Engines must be created inside fakeAsync zones when used there: futures
+    // created in another zone schedule their callbacks on real microtasks.
+    TxEngine build() => TxEngine(
+        native: native,
+        audio: audio,
+        configMap: config,
+        useIsolates: false,
+        nodeId: 0x0A0A);
+
     setUp(() {
       native = CapturingNative();
       audio = MockAudioService();
       config = {'modulation': 0, 'sample_rate': 44100};
-      tx = TxEngine(
-          native: native,
-          audio: audio,
-          configMap: config,
-          useIsolates: false,
-          nodeId: 0x0A0A);
+      tx = build();
     });
 
     test('short text without ARQ stays a single legacy frame', () async {
@@ -82,6 +86,7 @@ void main() {
       final progress = <TxTransferProgress>[];
       final sub = tx.transfers.listen(progress.add);
       await tx.sendMessage(text);
+      await Future<void>.delayed(Duration.zero); // deliver broadcast events
       await sub.cancel();
 
       final frames = [
@@ -102,6 +107,7 @@ void main() {
 
     test('sendBinary with ARQ waits for each ACK', () {
       fakeAsync((async) {
+        tx = build();
         config['arq_enabled'] = true;
         native.onFrame = (frame) {
           final f = LinkFrame.decode(CapturingNative.payloadOf(frame))!;
@@ -126,6 +132,7 @@ void main() {
 
     test('TxQueue.enqueueFile reports TxMaxRetriesError', () {
       fakeAsync((async) {
+        tx = build();
         config
           ..['arq_enabled'] = true
           ..['arq_max_retries'] = 1;
