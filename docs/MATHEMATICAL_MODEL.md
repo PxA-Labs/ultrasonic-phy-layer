@@ -124,7 +124,9 @@ $$x[n] = \frac{1}{\sqrt{N}} \sum_{k=0}^{N-1} X_k e^{j \frac{2\pi k n}{N}}, \quad
 
 And demodulation extracts the subcarriers via the Discrete Fourier Transform (DFT) at the receiver:
 
-$$Y_k = \frac{1}{\sqrt{N}} \sum_{n=0}^{N-1} y[n + N_{cp}] e^{-j \frac{2\pi k n}{N}}$$
+$$Y_k = \frac{1}{\sqrt{N}} \sum_{n=0}^{N-1} y[n + N_{cp} - b] e^{-j \frac{2\pi k n}{N}}, \quad b = \lfloor N_{cp} / 4 \rfloor$$
+
+The FFT window starts $b$ samples inside the cyclic prefix rather than at its end (see section 4.0 for why).
 
 ---
 
@@ -159,18 +161,41 @@ Using Schmidl-Cox sync with two identical consecutive training symbols of period
 
 $$\Delta \hat{f}_c = \frac{f_s}{2\pi N} \angle \left( \sum_{n=0}^{N-1} y^*[n] y[n + N] \right)$$
 
+In the OFDM receiver the two training symbols are the two identical preamble symbols, each with its cyclic prefix, so the repetition period is $L = N + N_{cp}$. The receiver evaluates the correlation in the frequency domain, on the same FFT windows that the channel estimate uses (section 4.0):
+
+$$\Delta \hat{f}_c = \frac{f_s}{2\pi L} \angle \left( \sum_{k \in K_a} Y_1^*[k] \, Y_2[k] \right)$$
+
+A frequency offset rotates each active subcarrier of the second copy by $e^{j 2\pi \Delta f_c L / f_s}$ relative to the first. Both windows lie inside the repeated preamble for every timing error the receiver tolerates, so a noiseless frame gives exactly $\Delta \hat{f}_c = 0$. The time-domain sum over a full window of $L$ samples does not have this property. With a timing error of $\delta$ samples, $|\delta|$ samples of that window fall outside the repetition and bias the estimate. Because the signal is real, its mirror-image spectrum leaks into the active band, and the leakage grows with the offset. The estimate is therefore run twice: the second pass estimates the small residual left after correcting with the first estimate, and the two are added.
+
+The received audio is real, so the timing metric and the CFO correction run on its analytic signal $z[n]$. It is formed over a buffer of length $M$ with the DFT:
+
+$$Z[k] = \begin{cases} X[k], & k = 0 \text{ or } k = M/2 \ (M \text{ even}) \\ 2X[k], & 0 < k < M/2 \\ 0, & M/2 < k < M \end{cases}$$
+
+so that $\text{Re}\{z[n]\} = x[n]$ exactly, and the CFO-corrected real signal is $\text{Re}\{z[n] e^{-j 2\pi \Delta\hat{f}_c n / f_s}\}$. Both the real and imaginary parts of each positive-frequency bin must be doubled. Doubling only the real part gives $Z[k] = 2\,\text{Re}\,X[k] + j\,\text{Im}\,X[k]$, whose real part is $\tfrac{3}{4}x[n] + \tfrac{1}{4}x[(-n) \bmod M]$. That adds a 25 % time-reversed copy of the whole buffer to the signal, which held the noiseless OFDM loopback EVM at about 28 to 45 %.
+
 ---
 
 ## 4. Demodulation & Channel Equalization
 
+### 4.0 Receiver Timing and FFT Window Placement
+Let the detected frame start be off by $\delta$ samples, so that each symbol's FFT window starts at $N_{cp} - b + \delta$ into the symbol. While $-(N_{cp} - b) \le \delta \le b$, the window stays inside the current symbol plus its own cyclic prefix. It is then a cyclic shift of the transmitted block (ignoring multipath for this argument):
+
+$$Y_k = H_k X_k \, e^{-j \frac{2\pi k (b - \delta)}{N}}$$
+
+The ramp is the same for the preamble and every data symbol, so it is part of the channel estimate $\hat{H}[k]$ and is removed exactly by equalization. If $\delta > b$ (the window is late), it takes $\delta - b$ samples from the next symbol's cyclic prefix. That causes ISI and inter-carrier interference that no equalizer can remove: in a noiseless loopback, a window just one sample late already gives about 20 % EVM. The Schmidl-Cox timing peak of section 3 can land one or two samples off, so the receiver samples $b = \lfloor N_{cp}/4 \rfloor$ samples early. The cost is that the multipath delay spread the CP can absorb drops from $N_{cp}$ to $N_{cp} - b$.
+
 ### 4.1 Channel Estimation
-Pilot subcarriers are embedded in the OFDM grid at predefined indices $K_p$. Let $X_p$ be the known pilot symbol transmitted. The Least Squares (LS) estimate of the channel at pilot subcarriers is:
+The channel is estimated from the two identical Zadoff-Chu preamble symbols (section 3.2), which occupy every active subcarrier $k \in K_a$. Let $Y_1[k]$ and $Y_2[k]$ be their DFTs and $X_{ZC}[k]$ the known preamble values. The Least Squares (LS) estimate averages the two copies:
 
-$$\hat{H}_{LS}[k] = \frac{Y[k]}{X_p[k]}, \quad k \in K_p$$
+$$\hat{H}_{LS}[k] = \frac{Y_1[k] + Y_2[k]}{2 X_{ZC}[k]}, \quad k \in K_a$$
 
-For the remaining subcarriers, the channel frequency response is estimated using linear or cubic spline interpolation:
+Data subcarriers lie inside $K_a$, so they need no interpolation. Linear interpolation (`chanest_linear_interp`) only extends $\hat{H}$ to the guard and null bins:
 
-$$\hat{H}[k] = \text{Interpolate}\left(\hat{H}_{LS}[k_p]\right)$$
+$$\hat{H}[k] = \text{Interpolate}\left(\hat{H}_{LS}[k_a]\right)$$
+
+The two copies differ only by noise, $Y_1 - Y_2 = W_1 - W_2$, which gives the per-subcarrier noise variance:
+
+$$\hat{\sigma}_n^2 = \frac{1}{2|K_a|} \sum_{k \in K_a} \left| Y_1[k] - Y_2[k] \right|^2$$
 
 ### 4.2 Equalization
 To recover the transmitted data symbol $X_k$, we apply equalization to correct for the channel frequency response $\hat{H}[k]$:
@@ -181,7 +206,7 @@ To recover the transmitted data symbol $X_k$, we apply equalization to correct f
 - **Minimum Mean Square Error (MMSE) Equalizer** (balances noise enhancement and channel distortion):
   $$\hat{X}_k = \frac{Y_k \hat{H}^*[k]}{|\hat{H}[k]|^2 + \frac{\sigma_n^2}{\sigma_s^2}}$$
 
-  where $\frac{\sigma_n^2}{\sigma_s^2}$ is the inverse Signal-to-Noise Ratio ($\text{SNR}^{-1}$).
+  where $\frac{\sigma_n^2}{\sigma_s^2}$ is the inverse Signal-to-Noise Ratio ($\text{SNR}^{-1}$). The BPSK and QPSK data symbols have unit energy ($\sigma_s^2 = 1$), so the receiver uses $\hat{\sigma}_n^2$ from section 4.1, clamped to $[0, 10]$. In a noiseless channel MMSE therefore reduces to ZF.
 
 ---
 

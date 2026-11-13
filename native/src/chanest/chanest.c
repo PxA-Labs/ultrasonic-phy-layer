@@ -58,3 +58,16 @@ float chanest_estimate_snr(const kiss_fft_cpx* Y, const kiss_fft_cpx* X_p,
     if (P_noise < 1e-12) return 100.0f;
     return 10.0f * log10f((float)(P_signal / P_noise));
 }
+
+float chanest_noise_var_repeated(const kiss_fft_cpx* Y1, const kiss_fft_cpx* Y2,
+                                 const int* indices, int num) {
+    if (!Y1 || !Y2 || !indices || num <= 0) return 0.0f;
+    double acc = 0.0;
+    for (int i = 0; i < num; i++) {
+        int k = indices[i];
+        double dr = (double)Y1[k].r - (double)Y2[k].r;
+        double di = (double)Y1[k].i - (double)Y2[k].i;
+        acc += dr * dr + di * di;
+    }
+    return (float)(acc / (2.0 * (double)num));
+}
