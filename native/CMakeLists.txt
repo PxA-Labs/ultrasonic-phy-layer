@@ -80,7 +80,21 @@ if(SW_BUILD_COVERAGE AND (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang"))
 endif()
 
 # SIMD architecture options
-if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
+if(ANDROID)
+    # Android ABIs (issue #87). Never assume AVX2 here: the x86_64 Android ABI
+    # only guarantees SSE4.2, and most emulator images lack AVX2.
+    if(ANDROID_ABI STREQUAL "arm64-v8a")
+        # NEON is mandatory on AArch64; fail the build if the NEON path in
+        # simd_util.h is not selected.
+        add_compile_definitions(SW_REQUIRE_NEON=1)
+    elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+        # NDK r21+ enables NEON for armv7 by default (ANDROID_ARM_NEON=ON).
+        add_compile_definitions(SW_REQUIRE_NEON=1)
+    elseif(ANDROID_ABI STREQUAL "x86_64")
+        add_compile_options(-msse4.2)
+    endif()
+    message(STATUS "soundwave: Android ABI=${ANDROID_ABI} platform=${ANDROID_PLATFORM}")
+elseif(CMAKE_C_COMPILER_ID MATCHES "MSVC")
     add_compile_options(/arch:AVX2)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
     add_compile_options(-mavx2 -mfma)
@@ -148,11 +162,17 @@ add_library(soundwave_shared SHARED $<TARGET_OBJECTS:soundwave>)
 set_target_properties(soundwave_shared PROPERTIES
     OUTPUT_NAME "soundwave"
     PREFIX "lib"
-    SOVERSION 1
-    VERSION ${PROJECT_VERSION}
     PUBLIC_HEADER "include/soundwave_api.h"
     WINDOWS_EXPORT_ALL_SYMBOLS ON
 )
+if(NOT ANDROID)
+    # Android loads libraries by plain file name (System.loadLibrary /
+    # DynamicLibrary.open("libsoundwave.so")), so no versioned SONAME there.
+    set_target_properties(soundwave_shared PROPERTIES
+        SOVERSION 1
+        VERSION ${PROJECT_VERSION}
+    )
+endif()
 target_include_directories(soundwave_shared PUBLIC include)
 target_compile_definitions(soundwave_shared PRIVATE SW_BUILD_DLL)
 target_link_libraries(soundwave_shared PRIVATE kiss_fft miniaudio)
@@ -178,6 +198,15 @@ elseif(APPLE)
     target_link_libraries(soundwave PRIVATE m)
     target_link_libraries(soundwave_static PRIVATE m)
     target_link_libraries(soundwave_shared PRIVATE m)
+elseif(ANDROID)
+    # pthread is part of Bionic libc. miniaudio dlopen()s libaaudio.so
+    # (API 26+) and falls back to libOpenSLES.so, so neither is linked here.
+    target_link_libraries(soundwave PRIVATE m dl log)
+    target_link_libraries(soundwave_static PRIVATE m dl log)
+    target_link_libraries(soundwave_shared PRIVATE m dl log)
+    # 16 KB page alignment, required for Play Store uploads targeting
+    # Android 15+ devices (default only from NDK r28).
+    target_link_options(soundwave_shared PRIVATE "-Wl,-z,max-page-size=16384")
 elseif(UNIX AND NOT APPLE)
     target_link_libraries(soundwave PRIVATE m pthread dl)
     target_link_libraries(soundwave_static PRIVATE m pthread dl)
@@ -200,12 +229,13 @@ if(SW_ENABLE_FUZZER OR (SW_BUILD_TESTS AND SW_FUZZ_SMOKE))
     add_subdirectory(Fuzzing)
 endif()
 
-# Standalone CLI Developer Tool
-add_executable(soundwave_cli
-    tools/soundwave_cli/main.c
-    tools/soundwave_cli/wav_util.c
-)
-target_link_libraries(soundwave_cli PRIVATE soundwave_static)
-target_include_directories(soundwave_cli PRIVATE tools/soundwave_cli)
-set_target_properties(soundwave_cli PROPERTIES OUTPUT_NAME "soundwave-cli")
-
+# Standalone CLI Developer Tool (host-only; not useful inside an APK)
+if(NOT ANDROID)
+    add_executable(soundwave_cli
+        tools/soundwave_cli/main.c
+        tools/soundwave_cli/wav_util.c
+    )
+    target_link_libraries(soundwave_cli PRIVATE soundwave_static)
+    target_include_directories(soundwave_cli PRIVATE tools/soundwave_cli)
+    set_target_properties(soundwave_cli PROPERTIES OUTPUT_NAME "soundwave-cli")
+endif()

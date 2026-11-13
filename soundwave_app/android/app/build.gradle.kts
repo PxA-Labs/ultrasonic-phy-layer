@@ -4,6 +4,18 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Release signing (issue #94). CI writes android/key.properties from the
+// ANDROID_KEYSTORE_* secrets; without it, release builds are debug-signed so
+// they still install for testing.
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties =
+    java.util.Properties().apply {
+        if (keystorePropertiesFile.exists()) {
+            keystorePropertiesFile.inputStream().use { load(it) }
+        }
+    }
+val hasReleaseKeystore = keystorePropertiesFile.exists()
+
 android {
     namespace = "com.pxalabs.soundwave"
     compileSdk = flutter.compileSdkVersion
@@ -27,13 +39,50 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // libsoundwave.so (issue #87): the C DSP core is built by the NDK for
+        // every packaged ABI (the Flutter plugin restricts ABIs to its target
+        // platforms: arm64-v8a, armeabi-v7a, x86_64) and loaded from Dart via
+        // DynamicLibrary.open("libsoundwave.so").
+        externalNativeBuild {
+            cmake {
+                arguments +=
+                    listOf(
+                        "-DSW_BUILD_TESTS=OFF",
+                        "-DSW_BUILD_BENCHMARKS=OFF",
+                        "-DSW_FUZZ_SMOKE=OFF",
+                        "-DANDROID_ARM_NEON=ON",
+                    )
+                targets += listOf("soundwave_shared")
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("../../../native/CMakeLists.txt")
+        }
+    }
+
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig =
+                if (hasReleaseKeystore) {
+                    signingConfigs.getByName("release")
+                } else {
+                    signingConfigs.getByName("debug")
+                }
         }
     }
 }

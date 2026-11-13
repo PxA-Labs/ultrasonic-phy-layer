@@ -16,12 +16,20 @@
 #if defined(__AVX2__)
     #include <immintrin.h>
     #define SW_SIMD_AVX2 1
+    #define SW_SIMD_SSE 0
 #elif defined(__SSE4_1__)
     #include <smmintrin.h>
+    #define SW_SIMD_AVX2 0
     #define SW_SIMD_SSE 1
 #else
     #define SW_SIMD_AVX2 0
     #define SW_SIMD_SSE 0
+#endif
+
+// Set by CMake for ARM Android ABIs (issue #87): guarantees the NEON kernels
+// are actually compiled in rather than silently falling back to scalar code.
+#if defined(SW_REQUIRE_NEON) && !SW_SIMD_NEON
+    #error "SW_REQUIRE_NEON is set but the compiler does not target ARM NEON"
 #endif
 
 // Scalar fallback dot product
