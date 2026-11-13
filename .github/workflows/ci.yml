@@ -80,7 +80,7 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         run: |
           python3 ../.github/scripts/coverage_report.py report \
-            --name "Flutter app" --lcov coverage/lcov.info --include '(^|/)lib/' \
+            --name "Flutter app" --lcov coverage/lcov.info --include '(^|/)lib/' --worst 40 \
             --min-line "$FLUTTER_MIN_LINE" \
             --flutter-json build/flutter-test-results.json \
             --json-out coverage/summary-flutter.json
@@ -264,7 +264,7 @@ jobs:
         run: |
           python3 .github/scripts/coverage_report.py report \
             --name "Native DSP core" --lcov native/build/coverage.lcov \
-            --include '(^|/)src/' \
+            --include '(^|/)src/' --worst 40 \
             --min-line "$NATIVE_MIN_LINE" --min-branch "$NATIVE_MIN_BRANCH" \
             --junit native/build/ctest-results.xml \
             --json-out native/build/summary-native.json
@@ -315,9 +315,12 @@ jobs:
           INTEGRATION_RESULT: ${{ needs.flutter-integration.result }}
         run: |
           set +e
+          # Artifact roots differ (native/build vs soundwave_app), so locate
+          # the summaries instead of hard-coding nested paths.
+          native=$(find reports -name summary-native.json | head -1)
+          flutter=$(find reports -name summary-flutter.json | head -1)
           python3 .github/scripts/coverage_report.py dashboard \
-            reports/coverage-native/summary-native.json \
-            reports/coverage-flutter/summary-flutter.json
+            "${native:-summary-native.json}" "${flutter:-summary-flutter.json}"
           rc=$?
           {
             echo ""
