@@ -101,6 +101,8 @@ jobs:
           S=docs/testing/ber_sweep.py
           python3 $S generate --mode css --frames 3 --payload-bytes 12 --gap 0.5 \
             --lead-in 1.0 --verify --out out/css
+          # Clean playlist first (alignment only), then a shifted noisy copy.
+          python3 $S -v decode --manifest out/css/manifest.json --recording out/css/playlist.wav --out out/css/clean
           # Fake "recording": 0.37 s extra lead-in, then mild AWGN.
           python3 - <<'EOF'
           import sys; sys.path.insert(0, "docs/testing")
@@ -109,7 +111,7 @@ jobs:
           b.write_wav16("out/css/shifted.wav", [0.0] * int(0.37 * r) + s, r)
           EOF
           "$SOUNDWAVE_CLI" simulate --input out/css/shifted.wav --snr 20 --output out/css/rec.wav
-          python3 $S decode --manifest out/css/manifest.json --recording out/css/rec.wav \
+          python3 $S -v decode --manifest out/css/manifest.json --recording out/css/rec.wav \
             --label ci-smoke --out out/css/result
           python3 -c "import json,sys; s=json.load(open('out/css/result/summary.json')); sys.exit(0 if s['frames_delivered']==s['frames_sent'] else 'not all frames decoded')"
           python3 $S simulate --manifest out/css/manifest.json --snr 0,10,20 \

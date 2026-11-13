@@ -52,6 +52,7 @@ PAYLOAD_RE = re.compile(r"^SW(\d{4})\|")
 SNR_RE = re.compile(r"snr = (-?[0-9.]+|nan|inf|-inf) dB")
 CORR_RE = re.compile(r"Errors corrected: (\d+)")
 ALPHABET = string.ascii_letters + string.digits
+VERBOSE = False
 CLI_MAX_PAYLOAD = 217  # 223 RS data bytes - 4 CRC - 2 length (main.c)
 RS_PARITY = 32
 CLI_HEADER = 6  # CRC-32 + 16-bit length
@@ -288,6 +289,10 @@ def decode_windows(cli, manifest, samples, rate, offset, first, count, tmp):
         write_wav16(path, seg, rate)
         res = cli_demodulate(cli, manifest["params"], path)
         res["window_start_s"] = round(max(0, start) / rate, 3)
+        if VERBOSE:
+            last = res["stderr"].splitlines()[-1] if res["stderr"] else ""
+            print(f"  window {j} @ {res['window_start_s']:.2f} s: "
+                  f"{'ok' if res['ok'] else 'fail'} | {last}", file=sys.stderr)
         out.append(res)
     return out
 
@@ -432,7 +437,11 @@ def main(argv=None):
                    help="exit non-zero if fewer frames are delivered at or above SNR_DB")
     s.set_defaults(func=cmd_simulate)
 
+    p.add_argument("-v", "--verbose", action="store_true",
+                   help="print the CLI's last stderr line for every decoded window")
     a = p.parse_args(argv)
+    global VERBOSE
+    VERBOSE = a.verbose
     if shutil.which(a.cli) is None and not os.path.isfile(a.cli):
         sys.exit(f"soundwave-cli not found: {a.cli} (pass --cli or set SOUNDWAVE_CLI)")
     a.func(a)
