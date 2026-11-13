@@ -411,7 +411,12 @@ class _StorageCardState extends State<StorageCard> {
     };
   }
 
-  void _refresh() => setState(() => _usage = _loadUsage());
+  void _refresh() {
+    final usage = _loadUsage();
+    setState(() {
+      _usage = usage;
+    });
+  }
 
   Future<void> _confirmClear(StorageArea area, String label) async {
     final state = context.read<AppState>();
