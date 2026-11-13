@@ -1,0 +1,23 @@
+name: tmp-format-frag-arq
+on:
+  push:
+    branches: [feat/fragmentation-arq-issues-89-100]
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: soundwave_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.x'
+          channel: stable
+      - run: flutter pub get
+      - run: dart format . || true
+      - run: git diff > fmt.patch; cat fmt.patch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fmt-patch
+          path: soundwave_app/fmt.patch
