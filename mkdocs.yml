@@ -1,0 +1,127 @@
+site_name: Soundwave
+site_description: Ultrasonic physical-layer modem (C DSP core + Flutter app) for short-range data transfer over sound.
+site_url: https://pxa-labs.github.io/ultrasonic-phy-layer/
+repo_url: https://github.com/PxA-Labs/ultrasonic-phy-layer
+repo_name: PxA-Labs/ultrasonic-phy-layer
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 PxA Labs. Licensed under the Apache License 2.0.
+
+docs_dir: docs
+strict: true
+
+# Build-time only inputs that live under docs/ but are not pages.
+exclude_docs: |
+  /requirements.txt
+  /api/Doxyfile
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+# Every warning (broken link, missing anchor, page not in nav) fails the
+# strict build.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+plugins:
+  - search
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      # GitHub-compatible heading ids, so in-page links work both on
+      # github.com and on the site.
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Build from source: getting-started/build.md
+      - Using the app: getting-started/user-guide.md
+      - CLI guide: CLI_GUIDE.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Signal chain & parameters: architecture/signal-chain.md
+      - Developer guide: DEVELOPER_GUIDE.md
+      - Mathematical model: MATHEMATICAL_MODEL.md
+  - API:
+      - C API: API_REFERENCE.md
+      - Dart API: api/dart-api.md
+  - Signal Lab: lab/index.md
+  - Testing:
+      - Field test plan: testing/FIELD_TEST_PLAN.md
+      - Hardware profiling plan: testing/HARDWARE_PROFILING_PLAN.md
+  - Project:
+      - Contributing: development/contributing.md
+      - CI/CD: CI_CD.md
+      - Tech stack (planning): TECH_STACK.md
+      - PRD: PRD.md
+      - Roadmap: ROADMAP.md
+      - Changelog: development/changelog.md
+  - Legal & store (drafts):
+      - Privacy policy: legal/PRIVACY_POLICY.md
+      - Terms of service: legal/TERMS_OF_SERVICE.md
+      - Play Store listing: store/PLAY_STORE_LISTING.md
+      - Play data safety: store/DATA_SAFETY.md

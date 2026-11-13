@@ -38,3 +38,8 @@ soundwave_app/coverage/
 # Local agent workflow rules
 AGENTS.md
 
+
+# Documentation site build output (mkdocs, Doxygen, dart doc)
+site/
+docs/api/c/
+docs/api/dart/
