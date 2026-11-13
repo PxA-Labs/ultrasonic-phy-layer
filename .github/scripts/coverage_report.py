@@ -112,10 +112,27 @@ def write_summary(text):
 
 
 def short_name(path):
-    for marker in ("/native/", "/soundwave_app/"):
+    # soundwave_app first: the app itself has a lib/native/ directory.
+    for marker in ("/soundwave_app/", "/native/"):
         if marker in path:
             return path.split(marker, 1)[1]
     return path
+
+
+def ranges(numbers):
+    """[1, 2, 3, 7, 9, 10] -> "1-3,7,9-10"."""
+    out, start, prev = [], None, None
+    for n in sorted(numbers):
+        if start is None:
+            start = prev = n
+        elif n == prev + 1:
+            prev = n
+        else:
+            out.append(f"{start}-{prev}" if prev != start else f"{start}")
+            start = prev = n
+    if start is not None:
+        out.append(f"{start}-{prev}" if prev != start else f"{start}")
+    return ",".join(out)
 
 
 def cmd_report(args):
@@ -189,6 +206,17 @@ def cmd_report(args):
         worst = [f"{p:.1f}% {name} ({f_lh}/{f_lf} lines, {f_bh}/{f_bf} branches)"
                  for p, name, f_lh, f_lf, f_bh, f_bf in rows[:args.worst]]
         print(f"::notice title={args.name} least-covered files::" + "%0A".join(worst))
+    if args.uncovered:
+        # Uncovered line numbers of the files with the most missed lines.
+        by_missed = sorted(files.items(), key=lambda kv: -sum(
+            1 for h in kv[1]["lines"].values() if h == 0))
+        detail = []
+        for name, rec in by_missed[:args.uncovered]:
+            missed = [ln for ln, h in rec["lines"].items() if h == 0]
+            if missed:
+                detail.append(f"{short_name(name)}: {ranges(missed)}")
+        if detail:
+            print(f"::notice title={args.name} uncovered lines::" + "%0A".join(detail))
 
     for failure in failures:
         print(f"::error::{args.name}: {failure}")
@@ -234,6 +262,8 @@ def main():
     rep.add_argument("--flutter-json")
     rep.add_argument("--json-out")
     rep.add_argument("--worst", type=int, default=10)
+    rep.add_argument("--uncovered", type=int, default=0,
+                     help="annotate uncovered lines of the N files missing most")
     dash = sub.add_parser("dashboard")
     dash.add_argument("summaries", nargs="+")
     args = parser.parse_args()

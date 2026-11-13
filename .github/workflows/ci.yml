@@ -80,7 +80,7 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         run: |
           python3 ../.github/scripts/coverage_report.py report \
-            --name "Flutter app" --lcov coverage/lcov.info --include '(^|/)lib/' --worst 40 \
+            --name "Flutter app" --lcov coverage/lcov.info --include '(^|/)lib/' --worst 40 --uncovered 25 \
             --min-line "$FLUTTER_MIN_LINE" \
             --flutter-json build/flutter-test-results.json \
             --json-out coverage/summary-flutter.json
@@ -264,7 +264,7 @@ jobs:
         run: |
           python3 .github/scripts/coverage_report.py report \
             --name "Native DSP core" --lcov native/build/coverage.lcov \
-            --include '(^|/)src/' --worst 40 \
+            --include '(^|/)src/' --worst 40 --uncovered 25 \
             --min-line "$NATIVE_MIN_LINE" --min-branch "$NATIVE_MIN_BRANCH" \
             --junit native/build/ctest-results.xml \
             --json-out native/build/summary-native.json
