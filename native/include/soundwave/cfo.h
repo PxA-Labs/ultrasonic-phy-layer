@@ -7,11 +7,13 @@
 #include <stddef.h>
 
 // Convert real passband to complex analytic signal via Hilbert FFT.
-void sync_real_to_analytic(const float* real, size_t len,
+// Returns 0 on success, -1 on bad arguments or allocation failure.
+int  sync_real_to_analytic(const float* real, size_t len,
                            float* analytic_real, float* analytic_imag);
 
 // Schmidl-Cox CFO estimation: Delta_f = fs/(2pi*N) * angle(sum y*[n] * y[n+N]).
 // Returns CFO in Hz. Estimation range: |CFO| <= fs/(2*N).
+// Returns 0.0f when no estimate is possible (N <= 0, len < 2N, bad fs).
 float sync_schmidl_cox_cfo(const float* y, size_t len, int N, float fs);
 
 // Generate CFO correction phasor: corr[n] = exp(-j*2pi*Delta_f/fs*n).
@@ -25,6 +27,7 @@ void sync_apply_cfo_correction(const float* y_real, const float* y_imag,
 
 // Timing metric: M(d) = |P(d)|^2 / R(d)^2 (Schmidl-Cox timing).
 void sync_schmidl_cox_timing(const float* y, size_t len, int N, float* M);
+// Returns 0 on success, -1 on bad arguments.
 int  sync_find_timing_peak(const float* M, size_t len, size_t* timing_idx);
 
 #endif // SOUNDWAVE_CFO_H

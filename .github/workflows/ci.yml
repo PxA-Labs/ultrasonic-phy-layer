@@ -193,6 +193,116 @@ jobs:
           fail_ci_if_error: false
         continue-on-error: true
 
+  # ---------------------------------------------------------------------------
+  # Memory safety (issue #28)
+  # ---------------------------------------------------------------------------
+  dsp-sanitizers:
+    name: dsp-sanitizers (${{ matrix.sanitizer }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [asan, ubsan]
+    env:
+      ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build
+
+      - name: Configure (${{ matrix.sanitizer }})
+        run: |
+          cmake -S native -B native/build-${{ matrix.sanitizer }} -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DSW_ENABLE_ASAN=${{ matrix.sanitizer == 'asan' && 'ON' || 'OFF' }} \
+            -DSW_ENABLE_UBSAN=${{ matrix.sanitizer == 'ubsan' && 'ON' || 'OFF' }}
+
+      - name: Build
+        run: cmake --build native/build-${{ matrix.sanitizer }}
+
+      - name: Run all tests, sanitizer canaries and fuzz smoke tests
+        run: ctest --test-dir native/build-${{ matrix.sanitizer }} --output-on-failure -j "$(nproc)"
+
+  dsp-fuzz:
+    name: dsp-fuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [fuzz_crc, fuzz_rs, fuzz_css, fuzz_ofdm, fuzz_packet, fuzz_fec, fuzz_api]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install LLVM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm cmake ninja-build
+          sudo apt-get install -y libclang-rt-dev || true
+          echo 'int LLVMFuzzerTestOneInput(const char*d,unsigned long n){return 0;}' > probe.c
+          clang -fsanitize=fuzzer probe.c -o probe && echo "libFuzzer available"
+
+      - name: Configure libFuzzer + ASan + UBSan build
+        run: |
+          cmake -S native -B native/build-fuzz -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DSW_BUILD_TESTS=OFF \
+            -DSW_ENABLE_FUZZER=ON -DSW_ENABLE_ASAN=ON -DSW_ENABLE_UBSAN=ON
+
+      - name: Build ${{ matrix.target }}
+        run: cmake --build native/build-fuzz --target ${{ matrix.target }}
+
+      - name: Fuzz ${{ matrix.target }} for 60 s
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+          LSAN_OPTIONS: suppressions=${{ github.workspace }}/native/Fuzzing/lsan.supp
+        run: |
+          mkdir -p corpus artifacts
+          ./native/build-fuzz/Fuzzing/${{ matrix.target }} corpus \
+            -max_total_time=60 -max_len=16384 -rss_limit_mb=2048 -timeout=25 \
+            -print_final_stats=1 -artifact_prefix=artifacts/
+
+      - name: Upload crash reproducers
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: crash-${{ matrix.target }}
+          path: artifacts/
+          if-no-files-found: ignore
+
+  dsp-static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install analyzers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck clang clang-tidy cmake ninja-build
+
+      - name: cppcheck
+        run: |
+          cppcheck --version
+          cppcheck --enable=warning,portability --std=c11 --inline-suppr \
+            --suppressions-list=native/.cppcheck-suppressions \
+            --error-exitcode=1 --quiet \
+            -I native/include native/src native/Fuzzing native/tests/test_memsafety.c
+
+      - name: clang-tidy
+        run: |
+          cmake -S native -B native/build-tidy -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DSW_BUILD_TESTS=OFF
+          clang-tidy --version
+          find native/src -name '*.c' -print0 | \
+            xargs -0 -n1 -P "$(nproc)" clang-tidy -p native/build-tidy --quiet
+
   docs-lint:
     runs-on: ubuntu-latest
     steps:

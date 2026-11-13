@@ -35,6 +35,29 @@ sw_add_test(test_agc                 test_agc.c)
 sw_add_test(test_e2e                 test_e2e.c)
 sw_add_test(integration_loopback     integration_loopback.c)
 sw_add_test(test_ber                 test_ber.c)
+sw_add_test(test_memsafety           test_memsafety.c)
+sw_add_test(test_xcorr               test_xcorr.c)
+
+# Sanitizer canary (issue #28): deliberate memory errors that ASan must report.
+# A silently missing sanitizer prints no report, so the test fails.
+if(SW_ENABLE_ASAN)
+    add_executable(test_asan_trigger test_asan_trigger.c)
+    target_compile_definitions(test_asan_trigger PRIVATE SW_TEST_ASAN_TRIGGER)
+    set(SW_ASAN_TRIGGER_MODES overflow use-after-free)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        list(APPEND SW_ASAN_TRIGGER_MODES leak) # LeakSanitizer is Linux-only
+    endif()
+    foreach(mode ${SW_ASAN_TRIGGER_MODES})
+        add_test(NAME asan_trigger_${mode} COMMAND test_asan_trigger ${mode})
+        # Pass only if the sanitizer actually reported the error. abort_on_error=0
+        # makes ASan exit instead of raising SIGABRT (CTest counts signals as
+        # failures), and PASS_REGULAR_EXPRESSION ignores the exit code.
+        set_tests_properties(asan_trigger_${mode} PROPERTIES
+            ENVIRONMENT "ASAN_OPTIONS=abort_on_error=0:detect_leaks=1"
+            PASS_REGULAR_EXPRESSION "ERROR: (AddressSanitizer|LeakSanitizer)"
+            LABELS "sanitizer")
+    endforeach()
+endif()
 
 # Catch2 C++ Test Runner Target
 add_executable(catch_tests main.cpp)

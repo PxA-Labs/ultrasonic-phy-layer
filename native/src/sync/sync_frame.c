@@ -12,6 +12,9 @@
 
 void sync_matched_filter(const float* y, size_t y_len,
                          const float* s, size_t s_len, float* R) {
+    // R must hold y_len - s_len + 1 outputs; y_len < s_len would wrap the
+    // unsigned bound and run far past both buffers.
+    if (!y || !s || !R || s_len == 0 || y_len < s_len) return;
     for (size_t m = 0; m <= y_len - s_len; m++) {
         R[m] = simd_dot_product(y + m, s, s_len);
     }
@@ -20,6 +23,7 @@ void sync_matched_filter(const float* y, size_t y_len,
 int sync_detect_preamble(const float* R, size_t R_len,
                          float threshold, float noise_var,
                          size_t* frame_start) {
+    if (!R || !frame_start || R_len == 0) return 0;
     size_t peak_idx = 0;
     float peak_val = R[0];
     for (size_t i = 1; i < R_len; i++) {
@@ -99,15 +103,14 @@ int sync_detect_frame(const float* samples, size_t len,
             return 0;
         }
         
-        for (size_t m = 0; m < max_search; m++) {
-            float corr_up = 0.0f;
-            float corr_down = 0.0f;
-            for (size_t n = 0; n < N_pre; n++) {
-                corr_up += samples[m + n] * pre_up.data[n];
-                corr_down += samples[m + n] * pre_down.data[n];
-            }
-            power_up[m] = corr_up * corr_up;
-            power_down[m] = corr_down * corr_down;
+        // Matched-filter power via FFT correlation (see sync_xcorr.c).
+        if (sync_xcorr_power_fft(samples, len, pre_up.data, N_pre,
+                                 power_up, max_search) != 0 ||
+            sync_xcorr_power_fft(samples, len, pre_down.data, N_pre,
+                                 power_down, max_search) != 0) {
+            free(power_up); free(power_down);
+            free(pre_up.data); free(pre_down.data);
+            return 0;
         }
         
         float max_score = 0.0f;
@@ -165,7 +168,10 @@ int sync_detect_frame(const float* samples, size_t len,
             free(ar); free(ai);
             return 0;
         }
-        sync_real_to_analytic(samples, len, ar, ai);
+        if (sync_real_to_analytic(samples, len, ar, ai) != 0) {
+            free(ar); free(ai);
+            return 0;
+        }
         
         size_t max_d = len - 2 * N_period;
         float* M = (float*)calloc(max_d + 1, sizeof(float));

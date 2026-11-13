@@ -43,6 +43,28 @@ SW_API const char* sw_version(void);
 // --- CRC-32 Checksum ---
 
 /**
+ * @brief Validate a modem configuration before it reaches the DSP core.
+ *
+ * Every sw_* function that takes an sw_config_t calls this first, so invalid
+ * settings are rejected with SW_ERR_BAD_PARAM instead of driving allocation
+ * sizes or loop bounds. A zero value means "use the module default".
+ *
+ * Accepted ranges (0 = default):
+ *  - modulation: 0 (CSS) or 1 (OFDM); equalizer, ofdm_modulation: 0 or 1
+ *  - sample_rate: 8000..192000 Hz
+ *  - all float fields finite; threshold, carrier_freq, bandwidth,
+ *    symbol_duration >= 0; amplitude in [0, 1]
+ *  - CSS: sf 6..12; carrier_freq and bandwidth <= sample_rate / 2;
+ *    symbol_duration <= 1 s
+ *  - OFDM: num_subcarriers a power of two in 16..4096;
+ *    cp_length <= num_subcarriers; num_pilots <= num_subcarriers / 2
+ *
+ * @param cfg Configuration to check.
+ * @return SW_OK if valid, SW_ERR_BAD_PARAM otherwise.
+ */
+SW_API int sw_config_validate(sw_config_t cfg);
+
+/**
  * @brief Computes IEEE 802.3 CRC-32 checksum over input data bytes.
  * @param data Pointer to input data buffer.
  * @param len Byte length of data buffer.
