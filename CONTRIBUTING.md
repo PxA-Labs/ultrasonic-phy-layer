@@ -39,7 +39,7 @@ ctest --output-on-failure
 ```bash
 cd soundwave_app
 flutter pub get
-dart run ffigen            # Regenerate FFI bindings if soundwave_api.h changed
+# Bindings in lib/native/ are hand-written; update them if soundwave_api.h changes
 flutter test               # Run Flutter unit and widget tests
 flutter run -d macos       # Run desktop app (macos, linux, or windows)
 ```

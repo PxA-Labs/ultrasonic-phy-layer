@@ -14,7 +14,16 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --target soundwave_cli
 ```
 
-This will produce the `soundwave-cli` executable inside the build folder.
+This will produce the `soundwave-cli` executable inside the build folder (with MSVC, in `Release/` or `Debug/`). The CLI is not built for Android.
+
+### Notes on the current implementation
+
+- **Frame format.** `modulate` wraps the text as `[CRC-32][length u16][payload][RS parity 32 B]`. This is **not** the app's frame format (the app has no length field), so CLI WAVs cannot be decoded by the app's *Import Signal*, and app recordings cannot be decoded by `demodulate`. See [Architecture](architecture/overview.md#frame-formats).
+- **`--sf` has no effect** on the CSS waveform: CSS sends one bit per chirp. The CLI has no option for the chirp duration (fixed at 20 ms) or for BPSK (OFDM is always QPSK here).
+- **`--freq` / `--bw` affect CSS only.** The OFDM band is set by `--fft` and the sample rate.
+- `demodulate` decodes the **first** frame found in the file. It prints the payload on stdout and diagnostics on stderr, including a `DEBUG: sw_detect_frame ... snr = X dB` line with an uncalibrated SNR estimate. The exit code is 0 only if RS decoding and the CRC succeed.
+- `simulate` sets the noise power from the average power of the **whole file**, including any silence. It uses an unseeded C `rand()`, so every run adds the same noise sequence.
+- For repeated measurements over many frames (field recordings or AWGN sweeps), use [`docs/testing/ber_sweep.py`](testing/ber_sweep.py), described in the [field test plan](testing/FIELD_TEST_PLAN.md).
 
 ---
 
@@ -79,7 +88,7 @@ soundwave-cli demodulate --mode <css|ofdm> --input <filename.wav> [options]
 ```bash
 ./soundwave-cli demodulate --mode css --input css_frame.wav
 ```
-*Output:*
+*Output (stdout, then the last stderr line):*
 ```text
 Hello Soundwave
 Demodulation successful! (Errors corrected: 0)

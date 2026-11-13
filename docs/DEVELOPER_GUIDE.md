@@ -8,98 +8,51 @@ Welcome to the Soundwave Physical Layer (PHY) developer guide! This document pro
 
 ```
 ultrasonic-phy-layer/
-├── docs/                        # Specifications & Mathematical Models
-│   ├── MATHEMATICAL_MODEL.md    # PHY equations (GF(2^8), Chirp, OFDM, ZC)
-│   ├── PRD.md                   # Product Requirements Document
-│   ├── ROADMAP.md               # Implementation Roadmap & Milestones
-│   ├── TECH_STACK.md            # Technology stack details
-│   ├── DEVELOPER_GUIDE.md       # Architecture & Developer Guide (This file)
-│   └── API_REFERENCE.md         # Comprehensive C/C++ & FFI API Reference
-├── native/                      # C/C++ PHY Core DSP Library
-│   ├── include/                 # Public C headers
-│   │   ├── soundwave_api.h      # Public C FFI boundary API
-│   │   └── soundwave/           # Module headers (rs, crc, css, ofdm, sync, audio)
-│   ├── src/                     # C DSP source code
-│   │   ├── rs/                  # GF(2^8) & Reed-Solomon Codec
-│   │   ├── crc/                 # CRC-32 IEEE 802.3 Checksum
-│   │   ├── css/                 # Chirp Spread Spectrum Modulator/Demodulator
-│   │   ├── ofdm/                # OFDM Modulator/Demodulator & FFT
-│   │   ├── sync/                # Timing Sync & Schmidl-Cox CFO Estimation
-│   │   ├── audio/               # miniaudio I/O & Thread-Safe Ring Buffer
-│   │   └── api/                 # C API implementation & FFI helpers
-│   ├── vendor/                  # Vendored dependencies (KissFFT v131, miniaudio)
-│   ├── tests/                   # CTest & Catch2 Unit / Integration Tests
-│   └── benchmarks/              # Microbenchmarks & Performance Harness
-├── soundwave_app/               # Flutter UI & Cross-Platform Host Application
-│   ├── lib/                     # Dart source code
-│   │   ├── bridge/              # dart:ffi C bindings wrapper (SoundwaveBridge)
-│   │   ├── features/            # UI screens (TX, RX, Settings, Spectrum)
-│   │   └── services/            # Audio Service & Frame Pipeline
-│   └── test/                    # Flutter widget and unit tests
-└── .github/                     # Workflows, Codeowners & PR Templates
+├── docs/                        # Documentation site sources (MkDocs, see mkdocs.yml)
+│   ├── getting-started/ architecture/ api/ lab/ testing/ legal/ store/ development/
+│   ├── MATHEMATICAL_MODEL.md    # PHY equations
+│   ├── API_REFERENCE.md         # C API reference (soundwave_api.h)
+│   ├── DEVELOPER_GUIDE.md       # This file
+│   └── CLI_GUIDE.md, CI_CD.md, PRD.md, ROADMAP.md, TECH_STACK.md
+├── native/                      # C11 DSP core library (CMake)
+│   ├── include/
+│   │   ├── soundwave_api.h      # Public C ABI used by dart:ffi
+│   │   └── soundwave/           # Module headers (types, css, ofdm, sync, cfo, chanest, rs, crc, agc, audio, ...)
+│   ├── src/                     # api/ css/ ofdm/ sync/ chanest/ equalizer/ rs/ crc/ fec/ packet/ agc/ audio/
+│   ├── vendor/                  # Vendored KissFFT and miniaudio
+│   ├── tests/                   # CTest executables + Catch2 runner
+│   ├── Fuzzing/                 # libFuzzer harnesses, regression inputs
+│   ├── benchmarks/              # Micro-benchmarks (SW_BUILD_BENCHMARKS)
+│   └── tools/soundwave_cli/     # soundwave-cli developer tool
+├── soundwave_app/               # Flutter app (Android, Windows, macOS, Linux)
+│   ├── lib/
+│   │   ├── native/              # dart:ffi bindings (SoundwaveNative, SwConfig), hand-written
+│   │   ├── engine/              # FrameCodec, TxEngine, RxEngine, link layer, ARQ, AGC wrapper
+│   │   ├── dsp/                 # Visualization DSP (FFT, spectrum, waterfall, constellation)
+│   │   ├── export/              # WAV recording/import, offline decoder, exporters, storage
+│   │   ├── services/            # AudioService, microphone permission, received-file store
+│   │   ├── state/               # AppState, settings persistence, UI preferences
+│   │   ├── screens/ widgets/ onboarding/ theme/
+│   │   └── main.dart
+│   ├── test/                    # Unit, widget, a11y and native loopback tests
+│   └── android/ windows/ macos/ linux/   # Runners and packaging scripts
+└── .github/                     # Workflows, CODEOWNERS, PR template
 ```
 
 ---
 
 ## 2. PHY Frame Architecture & Data Flow
 
-Soundwave transmits data over ultrasound (18 kHz – 20 kHz) by encapsulating payloads into structured PHY frames.
-
-### Ultrasonic PHY Frame Structure
+The app's PHY frame (`soundwave_app/lib/engine/frame_codec.dart`) is modulated by CSS or OFDM after a mode-specific preamble. CSS uses 8 up-chirps and 2 down-chirps; OFDM uses two identical Zadoff-Chu symbols.
 
 ```mermaid
 graph LR
-    subgraph PHY Frame Layout
-        A[Zadoff-Chu Preamble<br/>Sync & CFO] --> B[Frame Header<br/>Mode, Length, Flags]
-        B --> C[Payload<br/>Data Bytes]
-        C --> D[CRC-32 Checksum<br/>4 Bytes Integrity]
-        D --> E[Reed-Solomon Parity<br/>2t Parity Bytes]
-    end
+    P[Preamble<br/>CSS: 8 up + 2 down chirps<br/>OFDM: 2 x ZC symbol] --> C[CRC-32 LE<br/>4 bytes, over payload]
+    C --> D[Payload<br/>1..219 bytes]
+    D --> R[RS parity<br/>32 bytes, optional]
 ```
 
-### End-to-End Transmit & Receive Sequence Flow
-
-The diagram below illustrates the multi-tier interaction between the Flutter UI, Dart FFI Bridge, Native C DSP Core, and OS Audio Hardware (`miniaudio`):
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant UI as Flutter UI / User
-    participant Bridge as SoundwaveBridge (Dart FFI)
-    participant Core as C DSP Core (libsoundwave)
-    participant Audio as miniaudio / Audio Hardware
-
-    %% Transmission Path
-    rect rgb(235, 245, 255)
-    note right of UI: Transmit Path (TX)
-    UI->>Bridge: transmitText("Hello World", config)
-    Bridge->>Core: sw_rs_encode(payload, &parity)
-    Core-->>Bridge: Encoded Codeword + RS Parity
-    Bridge->>Core: sw_crc32(codeword, &crc)
-    Bridge->>Core: sw_css_modulate(bits, config, &samples)
-    Core-->>Bridge: PCM Audio Samples (float32, 44.1 kHz)
-    Bridge->>Audio: sw_audio_playback_write(handle, samples)
-    Audio->>Audio: Stream to Speaker / Speaker Output
-    end
-
-    %% Receive Path
-    rect rgb(245, 255, 235)
-    note right of UI: Receive Path (RX)
-    Audio->>Audio: Microphone Capture (DMA Buffer)
-    Audio->>Bridge: sw_audio_capture_read(handle, &buffer)
-    Bridge->>Core: sw_detect_frame(buffer, config, &offset, &snr)
-    alt Preamble Detected
-        Bridge->>Core: sw_estimate_cfo(buffer, config, &cfo_hz)
-        Bridge->>Core: sw_css_demodulate(buffer, config, &bits)
-        Core->>Core: sw_rs_decode(data, parity, &errors)
-        Core->>Core: sw_crc32_verify(data)
-        Core-->>Bridge: Decoded Text Payload
-        Bridge-->>UI: Display Decoded Message & Metrics (SNR/CFO)
-    else No Frame Detected
-        Core-->>Bridge: SW_ERR_NOT_FOUND
-    end
-    end
-```
+There is no length field. The receiver tries candidate lengths until RS decoding and the CRC-32 both verify. `soundwave-cli` uses a different layout with a 16-bit length field, so the two are not interchangeable. The TX/RX sequence diagrams, threading and persistence are described in the [architecture overview](architecture/overview.md). Band, rate and airtime per configuration are in [Signal chain & parameters](architecture/signal-chain.md).
 
 ### Link Layer: Fragmentation, File Transfer & ARQ (#89, #100)
 
@@ -167,7 +120,7 @@ When calling C code from Dart via `dart:ffi`, managing memory safely across the 
 ### Memory Rules
 
 1. **Caller Allocates, Callee Fills**:
-   - The Dart caller (`SoundwaveBridge`) MUST allocate memory buffers using `ffi.calloc` or `ffi.malloc` before passing pointers to C functions.
+   - The Dart caller (`SoundwaveNative`) MUST allocate memory buffers using `ffi.calloc` or `ffi.malloc` before passing pointers to C functions.
    - Native C functions write into pre-allocated memory buffers and return written lengths via output parameter pointers (`size_t*`).
 
 2. **Caller Frees**:
@@ -176,13 +129,14 @@ When calling C code from Dart via `dart:ffi`, managing memory safely across the 
 
 3. **Buffer Length Estimation Formulas**:
    - **RS Parity Allocation**: $N_{\text{parity}} = 2t = N_{\text{block}} - K_{\text{data}}$ bytes (default 32 bytes for $RS(255, 223)$).
-   - **CSS Audio Samples**: $N_{\text{samples}} = N_{\text{bits}} \times T_{\text{symbol}} \times f_s$ floats (where $f_s = 44100\text{ Hz}$).
-   - **OFDM Audio Samples**: $N_{\text{samples}} = \lceil N_{\text{bits}} / (\text{subcarriers} \times \text{bits\_per\_symbol}) \rceil \times (N_{\text{fft}} + N_{\text{cp}})$.
+   - **CSS Audio Samples**: $N_{\text{samples}} = (10 + N_{\text{bits}}) \times \text{round}(T_{\text{symbol}} f_s)$ floats (10-chirp preamble, one chirp per bit).
+   - **OFDM Audio Samples**: $N_{\text{samples}} = (2 + \lceil N_{\text{bits}} / B_{\text{sym}} \rceil) \times (N_{\text{fft}} + N_{\text{cp}})$, where $B_{\text{sym}}$ is data subcarriers times bits per subcarrier.
+   - In practice, call once with a too-small capacity: the API returns `SW_ERR_OVERFLOW` and writes the required length.
 
 ### Memory Ownership Pattern Example (Dart FFI)
 
 ```dart
-// Example: Safe FFI Allocation in SoundwaveBridge
+// Example: safe FFI allocation (pattern used in lib/native/soundwave_native.dart)
 Pointer<Uint8> dataPtr = calloc<Uint8>(dataLen);
 Pointer<Uint8> parityPtr = calloc<Uint8>(32);
 Pointer<Size> parityLenPtr = calloc<Size>();
@@ -225,7 +179,7 @@ try {
 ### Step 1: Building the Native C/C++ Core Library
 
 ```bash
-# 1. Clone repository with submodules
+# 1. Clone repository (dependencies are vendored; no submodules)
 git clone https://github.com/PxA-Labs/ultrasonic-phy-layer.git
 cd ultrasonic-phy-layer
 
@@ -266,8 +220,8 @@ cd soundwave_app
 # 2. Fetch Dart dependencies
 flutter pub get
 
-# 3. Regenerate FFI bindings (if soundwave_api.h changed)
-dart run ffigen
+# 3. Bindings in lib/native/ are hand-written: update soundwave_native.dart
+#    and bindings.dart by hand if soundwave_api.h changes.
 
 # 4. Run app on local desktop target
 flutter run -d macos    # macOS
@@ -318,7 +272,8 @@ Android specifics in the native build:
 ### Running Native C Unit Tests
 
 ```bash
-cd build
+cd native/build            # test executables are in tests/ (MSVC: tests/Release/)
+ctest -R test_ofdm --output-on-failure   # run a subset by name
 ./tests/test_crc           # Test CRC-32 checksums
 ./tests/test_rs_encoder    # Test GF(2^8) & Reed-Solomon encoder
 ./tests/test_rs_decoder    # Test BMA, Chien search & Forney decoder
