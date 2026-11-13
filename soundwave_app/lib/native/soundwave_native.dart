@@ -112,6 +112,21 @@ typedef OfdmDemodulateDart = int Function(
   Pointer<IntPtr> bitLen,
 );
 
+typedef EqSymbolsCNative = Int32 Function(
+  Pointer<Float> samples,
+  IntPtr sampleLen,
+  SwConfig cfg,
+  Pointer<Float> iq,
+  Pointer<IntPtr> numPoints,
+);
+typedef EqSymbolsDart = int Function(
+  Pointer<Float> samples,
+  int sampleLen,
+  SwConfig cfg,
+  Pointer<Float> iq,
+  Pointer<IntPtr> numPoints,
+);
+
 typedef DetectFrameCNative = Int32 Function(
   Pointer<Float> samples,
   IntPtr len,
@@ -372,6 +387,47 @@ class SoundwaveNative {
   void agcDestroy(Pointer<Void> handle) {
     final ret = _agcDestroy(handle);
     if (ret != 0) throw SwException(ret);
+  }
+
+  // Resolved lazily, like the AGC symbols, so an older library still loads.
+  static const _eqSymbolsName = 'sw_ofdm_equalized_symbols';
+  late final EqSymbolsDart _eqSymbols =
+      _lib.lookupFunction<EqSymbolsCNative, EqSymbolsDart>(_eqSymbolsName);
+
+  /// Whether the loaded library exports [ofdmEqualizedSymbols].
+  bool get hasEqualizedSymbols => _lib.providesSymbol(_eqSymbolsName);
+
+  /// Demodulates a frame-aligned OFDM frame and returns its equalized
+  /// data-subcarrier points as interleaved I/Q pairs (at most [maxPoints]
+  /// points, in symbol order). Throws [SwException] on native errors.
+  Float32List ofdmEqualizedSymbols(
+    Float32List samples,
+    Pointer<SwConfig> config, {
+    int maxPoints = 4096,
+  }) {
+    if (samples.isEmpty || maxPoints <= 0) throw SwException(-1);
+    final samplesPtr = calloc<Float>(samples.length);
+    final iqPtr = calloc<Float>(2 * maxPoints);
+    final countPtr = calloc<IntPtr>();
+    try {
+      samplesPtr.asTypedList(samples.length).setAll(0, samples);
+      countPtr.value = maxPoints;
+      final ret = _eqSymbols(
+        samplesPtr,
+        samples.length,
+        config.ref,
+        iqPtr,
+        countPtr,
+      );
+      if (ret != 0) throw SwException(ret);
+      final count = countPtr.value;
+      if (count < 0 || count > maxPoints) throw SwException(_errOverflow);
+      return Float32List.fromList(iqPtr.asTypedList(2 * count));
+    } finally {
+      calloc.free(samplesPtr);
+      calloc.free(iqPtr);
+      calloc.free(countPtr);
+    }
   }
 
   String get version => _version().toDartString();

@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:soundwave/dsp/constellation.dart';
 import 'package:soundwave/engine/tx_engine.dart';
 import 'package:soundwave/engine/rx_engine.dart';
 import 'package:soundwave/engine/tx_queue.dart';
@@ -538,6 +539,9 @@ class AppState extends ChangeNotifier {
   }
 
   Stream<Float64List> get audioStream => _audio.audioStream;
+
+  /// Equalized OFDM constellation of received frames (while listening).
+  Stream<ConstellationFrame> get constellationStream => _rxEngine.constellation;
   bool get isAudioCapturing => _audio.isCapturing;
 
   Future<void> startAudioCapture() async {

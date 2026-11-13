@@ -67,4 +67,11 @@ int ofdm_demodulate_frame(const float* samples, size_t len,
 // Top-level demodulation. Returns SW_OK or error.
 int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** decoded, size_t* out_len);
 
+// Same as ofdm_demodulate, and additionally copies up to eq_cap equalized
+// data-subcarrier points (symbol-major, data-subcarrier order) into eq_out;
+// *eq_count receives the number written. eq_out/eq_count may be NULL.
+int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
+                       uint8_t** decoded, size_t* out_len,
+                       kiss_fft_cpx* eq_out, size_t eq_cap, size_t* eq_count);
+
 #endif
