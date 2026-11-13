@@ -46,8 +46,7 @@ void main() {
       expect(spectrum[100], lessThan(-120));
     });
 
-    test('an off-bin tone peaks at the nearest bin within Hann scalloping',
-        () {
+    test('an off-bin tone peaks at the nearest bin within Hann scalloping', () {
       final spectrum = a.analyze(tone(19000, 1.0, 1024));
       expect(argMax(spectrum), a.binForFrequency(19000));
       // Worst-case Hann scalloping loss is 1.42 dB.

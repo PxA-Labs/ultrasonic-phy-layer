@@ -34,10 +34,10 @@ void main() {
     });
 
     test('maps the native ofdm_modulation setting', () {
-      expect(ConstellationScheme.fromOfdmModulation(0),
-          ConstellationScheme.bpsk);
-      expect(ConstellationScheme.fromOfdmModulation(1),
-          ConstellationScheme.qpsk);
+      expect(
+          ConstellationScheme.fromOfdmModulation(0), ConstellationScheme.bpsk);
+      expect(
+          ConstellationScheme.fromOfdmModulation(1), ConstellationScheme.qpsk);
     });
 
     test('nearest() makes hard decisions', () {
