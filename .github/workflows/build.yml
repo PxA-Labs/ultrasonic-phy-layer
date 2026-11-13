@@ -41,7 +41,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.47.x'
+          flutter-version: '3.50.0'
           cache: true
 
       - uses: actions/setup-java@v6
@@ -91,7 +91,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.47.x'
+          flutter-version: '3.50.0'
           cache: true
 
       - name: Build Windows
@@ -142,7 +142,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.47.x'
+          flutter-version: '3.50.0'
           cache: true
 
       - name: Build macOS
@@ -202,7 +202,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.47.x'
+          flutter-version: '3.50.0'
           cache: true
 
       - name: Install Linux dependencies

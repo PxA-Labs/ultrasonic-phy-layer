@@ -66,7 +66,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.x'
+          flutter-version: '3.50.0'
           channel: stable
           cache: true
 
@@ -118,7 +118,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.x'
+          flutter-version: '3.50.0'
           cache: true
       - uses: actions/setup-java@v4
         with:
@@ -141,7 +141,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.x'
+          flutter-version: '3.50.0'
           cache: true
       - name: Build Windows
         run: flutter build windows --release
@@ -156,7 +156,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.x'
+          flutter-version: '3.50.0'
           cache: true
       - name: Build macOS
         run: flutter build macos --release
@@ -171,7 +171,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.x'
+          flutter-version: '3.50.0'
           cache: true
       - name: Install Linux dependencies
         run: |
