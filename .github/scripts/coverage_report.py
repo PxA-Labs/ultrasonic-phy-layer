@@ -177,6 +177,19 @@ def cmd_report(args):
                        "min_line": args.min_line, "min_branch": args.min_branch,
                        "files": len(rows), "tests": tests, "status": status}, fh, indent=2)
 
+    # Annotation: the headline numbers also show on the run page and via the
+    # checks API (step summaries are not exposed there).
+    notice = [f"lines {fmt(line_pct)} ({lh}/{lf})"]
+    if bf:
+        notice.append(f"branches {fmt(branch_pct)} ({bh}/{bf})")
+    if tests:
+        notice.append(f"tests {tests['passed']}/{tests['total']} passed")
+    print(f"::notice title={args.name} coverage::" + ", ".join(notice))
+    if args.worst and rows:
+        worst = [f"{p:.1f}% {name} ({f_lh}/{f_lf} lines, {f_bh}/{f_bf} branches)"
+                 for p, name, f_lh, f_lf, f_bh, f_bf in rows[:args.worst]]
+        print(f"::notice title={args.name} least-covered files::" + "%0A".join(worst))
+
     for failure in failures:
         print(f"::error::{args.name}: {failure}")
     return 1 if failures else 0
