@@ -1,8 +1,10 @@
 // First-launch microphone permission flow (issue #87).
 //
 // On Android/iOS, explains why the microphone is needed and then shows the
-// system prompt. Denial is not fatal: transmit still works, and capture asks
-// again (see MicPermission.ensureGranted) when the user starts receiving.
+// system prompt. On first launch the onboarding tutorial's microphone page
+// does this instead and AppRoot skips the gate for that session. Denial is
+// not fatal: transmit still works, and capture asks again (see
+// MicPermission.ensureGranted) when the user starts receiving.
 
 import 'package:flutter/material.dart';
 
@@ -15,7 +17,17 @@ class MicPermissionGate extends StatefulWidget {
   /// [MicPermission.isRequired].
   final bool? enabled;
 
-  const MicPermissionGate({super.key, required this.child, this.enabled});
+  /// Injected for tests; default to the platform permission service.
+  final Future<bool> Function() checkGranted;
+  final Future<bool> Function() requestPermission;
+
+  const MicPermissionGate({
+    super.key,
+    required this.child,
+    this.enabled,
+    this.checkGranted = MicPermission.isGranted,
+    this.requestPermission = MicPermission.request,
+  });
 
   @override
   State<MicPermissionGate> createState() => _MicPermissionGateState();
@@ -31,7 +43,7 @@ class _MicPermissionGateState extends State<MicPermissionGate> {
   }
 
   Future<void> _requestIfNeeded() async {
-    if (await MicPermission.isGranted()) return;
+    if (await widget.checkGranted()) return;
     if (!mounted) return;
 
     final proceed = await showDialog<bool>(
@@ -59,7 +71,7 @@ class _MicPermissionGateState extends State<MicPermissionGate> {
     );
     if (proceed != true) return;
 
-    final granted = await MicPermission.request();
+    final granted = await widget.requestPermission();
     if (granted || !mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       const SnackBar(

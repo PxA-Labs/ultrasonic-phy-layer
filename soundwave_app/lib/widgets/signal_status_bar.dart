@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../engine/signal_metrics.dart';
 import '../state/app_state.dart';
+import '../theme/soundwave_theme.dart';
 
 /// Interactive and animated signal status bar mounted at the top of the dashboard.
 class SignalStatusBar extends StatefulWidget {
@@ -37,32 +38,45 @@ class _SignalStatusBarState extends State<SignalStatusBar>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Honour the platform "reduce motion" setting: no pulsing dot.
+    if (MediaQuery.of(context).disableAnimations) {
+      _pulseController.stop();
+    } else if (!_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+    }
+  }
+
+  @override
   void dispose() {
     _pulseController.dispose();
     super.dispose();
   }
 
-  Color _getStatusColor(ModemLinkState state, BuildContext context) {
+  // Theme-aware colors: each is >= 4.5:1 against the card in both the
+  // light and dark theme, since they are also used for text.
+  Color _getStatusColor(ModemLinkState state, ThemeData theme) {
+    final colors = SignalColors.of(context);
     switch (state) {
       case ModemLinkState.receiving:
-        return const Color(0xFF00E676); // Vibrant Green
+        return colors.success;
       case ModemLinkState.transmitting:
-        return const Color(0xFF2979FF); // Vibrant Blue
+        return theme.colorScheme.primary;
       case ModemLinkState.listening:
-        return const Color(0xFF00E5FF); // Cyan
+        return colors.info;
       case ModemLinkState.error:
-        return const Color(0xFFFF5252); // Coral Red
+        return colors.danger;
       case ModemLinkState.idle:
-        return Colors.grey.shade500;
+        return colors.neutral;
     }
   }
 
-  Color _getSnrColor(double snr) {
-    if (snr <= 0.0) return Colors.grey.shade600;
-    if (snr < 6.0) return const Color(0xFFFF5252); // Low SNR - Red
-    if (snr < 12.0)
-      return const Color(0xFFFFD600); // Moderate SNR - Amber/Yellow
-    return const Color(0xFF00E676); // Good SNR - Green
+  Color _getSnrColor(double snr, SignalColors colors) {
+    if (snr <= 0.0) return colors.neutral;
+    if (snr < 6.0) return colors.danger; // Low SNR
+    if (snr < 12.0) return colors.warning; // Moderate SNR
+    return colors.success; // Good SNR
   }
 
   @override
@@ -70,8 +84,9 @@ class _SignalStatusBarState extends State<SignalStatusBar>
     final state = context.watch<AppState>();
     final metrics = state.metrics;
     final theme = Theme.of(context);
-    final statusColor = _getStatusColor(metrics.connectionState, context);
-    final snrColor = _getSnrColor(metrics.snr);
+    final signal = SignalColors.of(context);
+    final statusColor = _getStatusColor(metrics.connectionState, theme);
+    final snrColor = _getSnrColor(metrics.snr, signal);
 
     return Card(
       elevation: 2,
@@ -148,8 +163,7 @@ class _SignalStatusBarState extends State<SignalStatusBar>
                                     ? '18–20 kHz band active'
                                     : 'Ready',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.textTheme.bodySmall?.color
-                              ?.withValues(alpha: 0.7),
+                          color: theme.colorScheme.onSurfaceVariant,
                           fontSize: 11,
                         ),
                       ),
@@ -193,27 +207,29 @@ class _SignalStatusBarState extends State<SignalStatusBar>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF5252).withValues(alpha: 0.15),
+                        color: signal.danger.withValues(
+                          alpha: SignalColors.badgeAlpha,
+                        ),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: const Color(0xFFFF5252).withValues(alpha: 0.4),
+                          color: signal.danger.withValues(alpha: 0.4),
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.error_outline,
                             size: 14,
-                            color: Color(0xFFFF5252),
+                            color: signal.danger,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             'Err: ${metrics.frameErrors}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFFFF5252),
+                              color: signal.danger,
                             ),
                           ),
                         ],
@@ -227,27 +243,29 @@ class _SignalStatusBarState extends State<SignalStatusBar>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF00E676).withValues(alpha: 0.15),
+                        color: signal.success.withValues(
+                          alpha: SignalColors.badgeAlpha,
+                        ),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: const Color(0xFF00E676).withValues(alpha: 0.4),
+                          color: signal.success.withValues(alpha: 0.4),
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.check_circle_outline,
                             size: 14,
-                            color: Color(0xFF00E676),
+                            color: signal.success,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             'Rx: ${metrics.framesReceived}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF00E676),
+                              color: signal.success,
                             ),
                           ),
                         ],
@@ -315,8 +333,8 @@ class _SignalStatusBarState extends State<SignalStatusBar>
                     ),
                   ),
                   const SizedBox(width: 8),
-                  SizedBox(
-                    width: 54,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 54),
                     child: Text(
                       metrics.formattedSnr,
                       textAlign: TextAlign.end,
