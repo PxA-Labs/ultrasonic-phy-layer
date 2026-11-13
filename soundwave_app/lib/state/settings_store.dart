@@ -33,16 +33,20 @@ class InMemorySettingsStore implements SettingsStore {
 }
 
 class SharedPreferencesSettingsStore implements SettingsStore {
-  static const String _prefix = 'soundwave.modem.';
+  /// Key namespace, so independent stores (modem settings, UI preferences)
+  /// never overwrite each other's values.
+  final String prefix;
+
+  SharedPreferencesSettingsStore({this.prefix = 'soundwave.modem.'});
 
   @override
   Future<Map<String, Object>> load() async {
     final prefs = await SharedPreferences.getInstance();
     final out = <String, Object>{};
     for (final key in prefs.getKeys()) {
-      if (!key.startsWith(_prefix)) continue;
+      if (!key.startsWith(prefix)) continue;
       final v = prefs.get(key);
-      if (v != null) out[key.substring(_prefix.length)] = v;
+      if (v != null) out[key.substring(prefix.length)] = v;
     }
     return out;
   }
@@ -51,7 +55,7 @@ class SharedPreferencesSettingsStore implements SettingsStore {
   Future<void> save(Map<String, Object> values) async {
     final prefs = await SharedPreferences.getInstance();
     for (final e in values.entries) {
-      final key = '$_prefix${e.key}';
+      final key = '$prefix${e.key}';
       final v = e.value;
       if (v is bool) {
         await prefs.setBool(key, v);

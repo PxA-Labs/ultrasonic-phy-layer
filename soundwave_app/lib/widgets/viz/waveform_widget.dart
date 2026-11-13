@@ -60,7 +60,8 @@ class WaveformWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Waveform',
+      container: true,
+      label: 'Waveform of the microphone input',
       child: RepaintBoundary(
         child: CustomPaint(
           painter: WaveformPainter(

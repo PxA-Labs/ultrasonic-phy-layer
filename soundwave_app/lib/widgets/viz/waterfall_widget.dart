@@ -241,7 +241,8 @@ class _WaterfallPlotState extends State<WaterfallPlot> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Semantics(
-      label: 'Waterfall spectrogram',
+      container: true,
+      label: 'Waterfall spectrogram: frequency content over time',
       child: MouseRegion(
         onHover: (e) => _setPointer(e.localPosition),
         onExit: (_) => _setPointer(null),
@@ -439,7 +440,6 @@ class _WaterfallViewState extends State<WaterfallView> {
         DropdownButton<WaterfallColormap>(
           key: const ValueKey('waterfall-colormap'),
           value: c.colormap,
-          isDense: true,
           onChanged: (v) {
             if (v != null) c.setColormap(v);
           },
@@ -451,7 +451,6 @@ class _WaterfallViewState extends State<WaterfallView> {
         DropdownButton<WaterfallRange>(
           key: const ValueKey('waterfall-range'),
           value: _range,
-          isDense: true,
           onChanged: (v) {
             if (v != null) setState(() => _range = v);
           },
@@ -471,6 +470,7 @@ class _WaterfallViewState extends State<WaterfallView> {
             SizedBox(
               width: 200,
               child: RangeSlider(
+                semanticFormatterCallback: (v) => '${v.round()} dB',
                 key: const ValueKey('waterfall-db-range'),
                 min: WaterfallController.rangeFloorDb,
                 max: WaterfallController.rangeCeilDb,

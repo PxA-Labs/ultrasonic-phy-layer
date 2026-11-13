@@ -309,21 +309,27 @@ class _LevelBar extends StatelessWidget {
               final khz = peak * spectrum.binWidthHz / 1000;
               peakText = '${khz.toStringAsFixed(2)} kHz';
             }
+            // Flexible labels wrap at large text scales instead of
+            // overflowing the row.
             return Row(
               children: [
-                Text('Level ${db.toStringAsFixed(0)} dBFS'),
+                Flexible(child: Text('Level ${db.toStringAsFixed(0)} dBFS')),
                 const SizedBox(width: 8),
                 Expanded(
+                  flex: 2,
                   child: LinearProgressIndicator(
+                    semanticsLabel: 'Input level',
                     value: progress,
                     backgroundColor: colors.surfaceContainerHighest,
                     valueColor: AlwaysStoppedAnimation<Color>(meter),
                   ),
                 ),
                 const SizedBox(width: 16),
-                Text(
-                  'Peak: $peakText',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                Flexible(
+                  child: Text(
+                    'Peak: $peakText',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             );
