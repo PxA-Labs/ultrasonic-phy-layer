@@ -1,10 +1,52 @@
 name: Release
 
+# Tag pushes (v*) build, sign (when secrets exist) and publish a draft GitHub
+# release. workflow_dispatch defaults to a dry run: everything is built,
+# packaged, signed-if-possible and checksummed, and uploaded only as workflow
+# artifacts -- no GitHub release, store upload or tag is created.
 on:
   push:
     tags: ['v**']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build and package only; do not publish anything'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
 
 jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      # 'true' only for a tag push, or a manual non-dry run on a tag ref.
+      publish: ${{ steps.v.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve version and publish mode
+        id: v
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            base="$(sed -n 's/^version:[[:space:]]*\([^+]*\).*/\1/p' soundwave_app/pubspec.yaml)"
+            version="${base:-0.0.0}-dryrun.${GITHUB_RUN_NUMBER}"
+          fi
+          publish=false
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            if [[ "$GITHUB_EVENT_NAME" == "push" || "$DRY_RUN" == "false" ]]; then
+              publish=true
+            fi
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "### Release ${version} (publish=${publish})" >> "$GITHUB_STEP_SUMMARY"
+
   build-android:
     runs-on: ubuntu-latest
     defaults:
@@ -51,101 +93,165 @@ jobs:
             soundwave_app/build/app/outputs/flutter-apk/app-release.apk
             soundwave_app/build/app/outputs/bundle/release/app-release.aab
 
+  # ---- Desktop (issues #95, #35) ------------------------------------------
+  # Signing steps run only when the corresponding secrets exist; otherwise the
+  # packages are produced unsigned (macOS: ad-hoc signed, not notarized).
+  # `secrets` is not allowed in step-level `if:`, so presence flags are
+  # exposed as job-level env.
   build-windows:
     runs-on: windows-latest
+    needs: [meta]
     defaults:
       run:
         working-directory: soundwave_app
+    env:
+      HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 != '' }}
+      VERSION: ${{ needs.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v7
 
-      - name: Check for Flutter project
-        id: check
-        shell: bash
-        run: |
-          if [ ! -f pubspec.yaml ]; then
-            echo "::notice::No pubspec.yaml found. Skipping Flutter build."
-            echo "has_pubspec=false" >> $GITHUB_OUTPUT
-          else
-            echo "has_pubspec=true" >> $GITHUB_OUTPUT
-          fi
-
       - uses: subosito/flutter-action@v2
-        if: steps.check.outputs.has_pubspec == 'true'
         with:
           flutter-version: '3.47.x'
           cache: true
 
       - name: Build Windows
-        if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build windows --release
 
+      - name: Verify bundled native library
+        shell: pwsh
+        run: |
+          $rel = 'build\windows\x64\runner\Release'
+          Get-ChildItem -Recurse $rel | Select-Object FullName, Length | Format-Table -AutoSize
+          $dll = Join-Path $rel 'soundwave.dll'
+          if (-not (Test-Path $dll)) { throw "soundwave.dll not bundled next to soundwave.exe" }
+          python -c "import ctypes,sys; l=ctypes.CDLL(sys.argv[1]); l.sw_crc32; l.sw_version.restype=ctypes.c_char_p; print('loaded', sys.argv[1], l.sw_version().decode())" (Resolve-Path $dll).Path
+
+      - name: Decode code-signing certificate
+        if: env.HAS_WINDOWS_CERT == 'true'
+        shell: pwsh
+        env:
+          CERT_B64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+        run: |
+          $p = Join-Path $env:RUNNER_TEMP 'codesign.pfx'
+          [IO.File]::WriteAllBytes($p, [Convert]::FromBase64String($env:CERT_B64))
+          "WINDOWS_CERT_PATH=$p" >> $env:GITHUB_ENV
+
+      - name: Sign and package (zip + MSIX)
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+        run: ./windows/packaging/package.ps1 -ReleaseDir build\windows\x64\runner\Release -Version $env:VERSION -OutDir dist
+
+      - name: Remove certificate
+        if: always() && env.HAS_WINDOWS_CERT == 'true'
+        shell: pwsh
+        run: Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $env:RUNNER_TEMP 'codesign.pfx')
+
       - uses: actions/upload-artifact@v7
-        if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: windows-release
-          path: soundwave_app/build/windows/x64/runner/Release/
+          path: soundwave_app/dist/
+          if-no-files-found: error
 
   build-macos:
     runs-on: macos-latest
+    needs: [meta]
     defaults:
       run:
         working-directory: soundwave_app
+    env:
+      HAS_MACOS_CERT: ${{ secrets.MACOS_CERTIFICATE_BASE64 != '' }}
+      VERSION: ${{ needs.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v7
 
-      - name: Check for Flutter project
-        id: check
-        run: |
-          if [ ! -f pubspec.yaml ]; then
-            echo "::notice::No pubspec.yaml found. Skipping Flutter build."
-            echo "has_pubspec=false" >> $GITHUB_OUTPUT
-          else
-            echo "has_pubspec=true" >> $GITHUB_OUTPUT
-          fi
-
       - uses: subosito/flutter-action@v2
-        if: steps.check.outputs.has_pubspec == 'true'
         with:
           flutter-version: '3.47.x'
           cache: true
 
       - name: Build macOS
-        if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build macos --release
 
+      - name: Embed libsoundwave.dylib
+        run: bash macos/packaging/embed_native.sh build/macos/Build/Products/Release/soundwave.app
+
+      - name: Import Developer ID certificate
+        if: env.HAS_MACOS_CERT == 'true'
+        env:
+          CERT_B64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          kc_pass="$(openssl rand -hex 24)"
+          echo "$CERT_B64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$kc_pass" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$kc_pass" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kc_pass" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          identity="$(security find-identity -v -p codesigning "$keychain" | grep 'Developer ID Application' | head -1 | sed 's/.*"\(.*\)"/\1/')"
+          if [ -z "$identity" ]; then
+            echo "::error::No 'Developer ID Application' identity in MACOS_CERTIFICATE_BASE64"
+            exit 1
+          fi
+          echo "MACOS_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "MACOS_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+      - name: Sign, package DMG, notarize
+        env:
+          APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_APP_PASSWORD }}
+        run: |
+          mkdir -p dist
+          bash macos/packaging/sign_and_package.sh build/macos/Build/Products/Release/soundwave.app \
+            "dist/soundwave-${VERSION}-macos-universal.dmg"
+
+      - name: Verify bundled native library
+        run: |
+          app=build/macos/Build/Products/Release/soundwave.app
+          ls -la "$app/Contents/MacOS" "$app/Contents/Frameworks"
+          lib="$app/Contents/Frameworks/libsoundwave.dylib"
+          test -f "$lib" || { echo "::error::libsoundwave.dylib not in Frameworks"; exit 1; }
+          lipo "$lib" -verify_arch arm64 x86_64
+          otool -l "$app/Contents/MacOS/soundwave" | grep -A2 LC_RPATH | grep -q '@executable_path/../Frameworks' \
+            || { echo "::error::Runner rpath lacks @executable_path/../Frameworks"; exit 1; }
+          /usr/libexec/PlistBuddy -c 'Print :NSMicrophoneUsageDescription' "$app/Contents/Info.plist"
+          python3 -c "import ctypes,sys; l=ctypes.CDLL(sys.argv[1]); l.sw_crc32; l.sw_version.restype=ctypes.c_char_p; print('loaded', sys.argv[1], l.sw_version().decode())" "$lib"
+
+      - name: Delete signing keychain
+        if: always() && env.HAS_MACOS_CERT == 'true'
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+
       - uses: actions/upload-artifact@v7
-        if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: macos-release
-          path: soundwave_app/build/macos/Build/Products/Release/
+          path: soundwave_app/dist/
+          if-no-files-found: error
 
   build-linux:
-    runs-on: ubuntu-latest
+    # 22.04 (glibc 2.35) so the AppImage/.deb also run on older distros.
+    runs-on: ubuntu-22.04
+    needs: [meta]
     defaults:
       run:
         working-directory: soundwave_app
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v7
 
-      - name: Check for Flutter project
-        id: check
-        run: |
-          if [ ! -f pubspec.yaml ]; then
-            echo "::notice::No pubspec.yaml found. Skipping Flutter build."
-            echo "has_pubspec=false" >> $GITHUB_OUTPUT
-          else
-            echo "has_pubspec=true" >> $GITHUB_OUTPUT
-          fi
-
       - uses: subosito/flutter-action@v2
-        if: steps.check.outputs.has_pubspec == 'true'
         with:
           flutter-version: '3.47.x'
           cache: true
 
       - name: Install Linux dependencies
-        if: steps.check.outputs.has_pubspec == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
@@ -153,19 +259,84 @@ jobs:
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
       - name: Build Linux
-        if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build linux --release
 
+      - name: Verify bundled native library
+        run: |
+          bundle=build/linux/x64/release/bundle
+          find "$bundle" -maxdepth 2 -type f -exec ls -la {} + | grep -v flutter_assets
+          lib="$bundle/lib/libsoundwave.so"
+          test -f "$lib" || { echo "::error::libsoundwave.so not in bundle/lib"; exit 1; }
+          nm -D --defined-only "$lib" | grep -c ' T sw_'
+          python3 -c "import ctypes,sys; l=ctypes.CDLL(sys.argv[1]); l.sw_crc32; l.sw_version.restype=ctypes.c_char_p; print('loaded', sys.argv[1], l.sw_version().decode())" "$lib"
+
+      - name: Package (tar.gz + deb + AppImage)
+        run: bash linux/packaging/package.sh build/linux/x64/release/bundle "$VERSION" dist
+
       - uses: actions/upload-artifact@v7
-        if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: linux-release
-          path: soundwave_app/build/linux/x64/release/bundle/
+          path: soundwave_app/dist/
+          if-no-files-found: error
+
+  checksums:
+    runs-on: ubuntu-latest
+    needs: [build-android, build-windows, build-macos, build-linux]
+    # Desktop packages are required; Android assets are included when built.
+    if: >-
+      always() &&
+      needs.build-windows.result == 'success' &&
+      needs.build-macos.result == 'success' &&
+      needs.build-linux.result == 'success'
+    env:
+      HAS_GPG_KEY: ${{ secrets.LINUX_GPG_PRIVATE_KEY != '' }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: '*-release'
+          path: assets
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS
+        working-directory: assets
+        run: |
+          ls -la
+          sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS"
+          mv "$RUNNER_TEMP/SHA256SUMS" SHA256SUMS
+          cat SHA256SUMS
+          sha256sum -c SHA256SUMS
+
+      - name: GPG-sign SHA256SUMS
+        if: env.HAS_GPG_KEY == 'true'
+        working-directory: assets
+        env:
+          GPG_KEY: ${{ secrets.LINUX_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.LINUX_GPG_PASSPHRASE }}
+        run: |
+          export GNUPGHOME="$(mktemp -d)"
+          echo "$GPG_KEY" | gpg --batch --import
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+            --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
+          gpg --batch --verify SHA256SUMS.asc SHA256SUMS
+          rm -rf "$GNUPGHOME"
+
+      - name: Skip notice (no GPG key)
+        if: env.HAS_GPG_KEY != 'true'
+        run: echo "::notice::LINUX_GPG_PRIVATE_KEY not configured; SHA256SUMS is unsigned."
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: checksums
+          path: |
+            assets/SHA256SUMS
+            assets/SHA256SUMS.asc
+          if-no-files-found: error
 
   deploy-android:
     runs-on: ubuntu-latest
-    needs: [build-android]
-    if: always() && needs.build-android.result == 'success'
+    needs: [meta, build-android]
+    # Store uploads never run on a dry run (workflow_dispatch default).
+    if: always() && needs.meta.outputs.publish == 'true' && needs.build-android.result == 'success'
     # The `secrets` context is not allowed in step-level `if:` expressions
     # (GitHub rejects the whole workflow file). Expose presence flags via env.
     env:
@@ -191,15 +362,17 @@ jobs:
 
   deploy-github-release:
     runs-on: ubuntu-latest
-    needs: [build-android, build-windows, build-macos, build-linux]
+    needs: [meta, build-android, build-windows, build-macos, build-linux, checksums]
     # Publish only when every platform build succeeded, so a release never
-    # silently ships with missing platform assets.
+    # silently ships with missing platform assets. Never runs on a dry run.
     if: >-
       always() &&
+      needs.meta.outputs.publish == 'true' &&
       needs.build-android.result == 'success' &&
       needs.build-windows.result == 'success' &&
       needs.build-macos.result == 'success' &&
-      needs.build-linux.result == 'success'
+      needs.build-linux.result == 'success' &&
+      needs.checksums.result == 'success'
     permissions:
       contents: write
     steps:
@@ -215,12 +388,13 @@ jobs:
             windows-release/*
             macos-release/*
             linux-release/*
+            checksums/*
           draft: true
           generate_release_notes: true
 
   deploy-snap:
     runs-on: ubuntu-latest
-    needs: [build-linux]
+    needs: [meta, build-linux]
     if: always() && needs.build-linux.result == 'success'
     env:
       HAS_SNAP_TOKEN: ${{ secrets.SNAP_TOKEN != '' }}
@@ -248,7 +422,7 @@ jobs:
         id: snapcraft
 
       - uses: snapcore/action-publish@v1
-        if: steps.snap.outputs.present == 'true' && env.HAS_SNAP_TOKEN == 'true'
+        if: steps.snap.outputs.present == 'true' && env.HAS_SNAP_TOKEN == 'true' && needs.meta.outputs.publish == 'true'
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_TOKEN }}
         with:
