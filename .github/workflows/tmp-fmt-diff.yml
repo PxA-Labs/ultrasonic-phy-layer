@@ -1,0 +1,18 @@
+name: tmp-fmt-diff
+on:
+  push:
+    branches: [feat/spectrum-visualizations-issues-71-91]
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: soundwave_app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.x'
+          channel: stable
+      - run: flutter pub get
+      - run: dart format . && git diff
