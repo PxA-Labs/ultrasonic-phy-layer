@@ -161,8 +161,8 @@ void main() {
       expect(() => tx.linkChunkBytes, throwsA(isA<FrameTooLongError>()));
       await expectLater(
           tx.sendMessage('hi'), throwsA(isA<FrameTooLongError>()));
-      await expectLater(tx.sendBinary(Uint8List(10)),
-          throwsA(isA<FrameTooLongError>()));
+      await expectLater(
+          tx.sendBinary(Uint8List(10)), throwsA(isA<FrameTooLongError>()));
       expect(native.modulatedFrames, isEmpty);
     });
   });
