@@ -50,6 +50,56 @@ static float preamble_phase_advance(const kiss_fft_cpx* Y1, const kiss_fft_cpx* 
     return isfinite(a) ? (float)a : 0.0f;
 }
 
+size_t ofdm_refine_timing(const float* samples, size_t len, size_t frame_start,
+                          int N, int cp, const ofdm_layout_t* lay) {
+    if (!samples || !lay || N <= 0 || cp < 0 || lay->num_active < 2) return frame_start;
+    size_t L = (size_t)N + (size_t)cp;
+    int b = OFDM_TIMING_BACKOFF(cp);
+    kiss_fft_cpx* X = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
+    kiss_fft_cpx* Y = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
+    if (!X || !Y || ofdm_preamble_spectrum(lay, N, cp, X) != SW_OK) {
+        free(X);
+        free(Y);
+        return frame_start;
+    }
+    size_t start = frame_start;
+    for (int pass = 0; pass < 2; pass++) {
+        if (start >= len || len - start < 2 * L) break;
+        // H_k = Y_k conj(X_k) (|X_k| = 1) on both preamble copies; the phase
+        // of sum_k H_{k+1} conj(H_k) is the slope 2 pi s / N of the cyclic
+        // shift s = e - b between the FFT window and the symbol body.
+        double acc_r = 0.0, acc_i = 0.0;
+        for (int copy = 0; copy < 2; copy++) {
+            ofdm_dft_demodulate(samples + start + (size_t)copy * L, N, cp - b, Y);
+            double pr = 0.0, pi = 0.0;
+            for (int k = lay->first_bin; k <= lay->last_bin; k++) {
+                double hr = (double)Y[k].r * X[k].r + (double)Y[k].i * X[k].i;
+                double hi = (double)Y[k].i * X[k].r - (double)Y[k].r * X[k].i;
+                if (k > lay->first_bin) {
+                    acc_r += hr * pr + hi * pi;
+                    acc_i += hi * pr - hr * pi;
+                }
+                pr = hr;
+                pi = hi;
+            }
+        }
+        if (!(acc_r * acc_r + acc_i * acc_i > 0.0)) break;
+        double s = atan2(acc_i, acc_r) * (double)N / (2.0 * (double)SW_PI);
+        double e = s + (double)b; // detected start minus true start, samples
+        if (!isfinite(e) || fabs(e) >= 0.5 * (double)L) break;
+        long shift = lround(e);
+        if (shift == 0) break;
+        if (shift > 0) {
+            start = (size_t)shift > start ? 0 : start - (size_t)shift;
+        } else {
+            start += (size_t)(-shift);
+        }
+    }
+    free(X);
+    free(Y);
+    return start;
+}
+
 int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** decoded, size_t* out_len) {
     return ofdm_demodulate_ex(samples, len, cfg, decoded, out_len, NULL, 0, NULL);
 }
@@ -67,7 +117,7 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
 
     int ret_code = SW_OK;
 
-    // Apply defaults to cfg
+    // Apply defaults to cfg (carrier_freq / bandwidth: ofdm_layout_compute)
     if (cfg.sample_rate <= 0) cfg.sample_rate = 44100;
     if (cfg.num_subcarriers <= 0) cfg.num_subcarriers = 256;
     if (cfg.cp_length <= 0) cfg.cp_length = cfg.num_subcarriers / 8;
@@ -86,9 +136,6 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     // Allocate pointers to NULL for safe single-label cleanup
     int* data_indices = NULL;
     int* pilot_indices = NULL;
-    int* null_indices = NULL;
-    float* zc_real = NULL;
-    float* zc_imag = NULL;
     kiss_fft_cpx* X_pre = NULL;
     float* pre_symbol = NULL;
     float* analytic_real = NULL;
@@ -106,52 +153,47 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     uint8_t* temp_bits = NULL;
     uint8_t* decoded_buf = NULL;
 
-    // Subcarrier allocation
-    data_indices = (int*)malloc(N * sizeof(int));
-    pilot_indices = (int*)malloc(N * sizeof(int));
-    null_indices = (int*)malloc(N * sizeof(int));
-    if (!data_indices || !pilot_indices || !null_indices) {
-        ret_code = SW_ERR_MEMORY;
-        goto cleanup;
-    }
-    int num_data, num_pilots, num_nulls;
-    ofdm_allocate_subcarriers(N, data_indices, pilot_indices, null_indices,
-                               &num_data, &num_pilots, &num_nulls);
-    if (num_data <= 0 || num_pilots <= 0 || num_pilots > N || num_data > N) {
+    // Subcarrier allocation: the same band plan as the transmitter
+    // (ofdm_layout_compute); every bin outside it is ignored.
+    ofdm_layout_t lay;
+    if (ofdm_layout_compute(N, (float)cfg.sample_rate, cfg.carrier_freq,
+                            cfg.bandwidth, &lay) != SW_OK) {
         ret_code = SW_ERR_BAD_PARAM;
         goto cleanup;
     }
-
-    int N_guard = N / 8;
-    int N_active = N / 2 - N_guard - 1;
-    int active_start = N_guard + 1;
-
-    // 1. Generate preamble ZC-OFDM frequency-domain template X_pre
-    zc_real = (float*)malloc(N_active * sizeof(float));
-    zc_imag = (float*)malloc(N_active * sizeof(float));
-    X_pre = (kiss_fft_cpx*)calloc(N, sizeof(kiss_fft_cpx));
-    pre_symbol = (float*)malloc(((size_t)N + (size_t)cp) * sizeof(float));
-
-    if (!zc_real || !zc_imag || !X_pre || !pre_symbol) {
+    int num_data = lay.num_data;
+    int N_active = lay.num_active;
+    int active_start = lay.first_bin;
+    data_indices = (int*)malloc((size_t)num_data * sizeof(int));
+    pilot_indices = (int*)malloc((size_t)lay.num_pilots * sizeof(int));
+    if (!data_indices || !pilot_indices) {
         ret_code = SW_ERR_MEMORY;
         goto cleanup;
     }
+    ofdm_allocate_subcarriers(&lay, data_indices, pilot_indices);
 
-    sync_zc_generate(1, N_active, zc_real, zc_imag);
-    for (int i = 0; i < N_active; i++) {
-        int idx = active_start + i;
-        X_pre[idx].r = zc_real[i];
-        X_pre[idx].i = zc_imag[i];
+    // 1. Preamble ZC-OFDM frequency-domain template X_pre (active bins only)
+    X_pre = (kiss_fft_cpx*)calloc(N, sizeof(kiss_fft_cpx));
+    pre_symbol = (float*)calloc((size_t)N + (size_t)cp, sizeof(float));
+    if (!X_pre || !pre_symbol) {
+        ret_code = SW_ERR_MEMORY;
+        goto cleanup;
     }
+    ret_code = ofdm_preamble_spectrum(&lay, N, cp, X_pre);
+    if (ret_code != SW_OK) goto cleanup;
 
     // 2. Modulate preamble symbol to time domain for correlation template
     ofdm_config_t ofdm_cfg;
+    memset(&ofdm_cfg, 0, sizeof ofdm_cfg);
     ofdm_cfg.num_subcarriers = N;
     ofdm_cfg.cp_length = cp;
-    ofdm_cfg.num_pilots = num_pilots;
-    ofdm_cfg.pilot_spacing = 8;
+    ofdm_cfg.num_pilots = lay.num_pilots;
+    ofdm_cfg.pilot_spacing = OFDM_PILOT_SPACING;
     ofdm_cfg.pilot_boost = 1.0f;
     ofdm_cfg.modulation = modulation;
+    ofdm_cfg.sample_rate = fs;
+    ofdm_cfg.carrier_freq = cfg.carrier_freq;
+    ofdm_cfg.bandwidth = cfg.bandwidth;
 
     ofdm_modulate_symbol(&ofdm_cfg, X_pre, pre_symbol);
 
@@ -164,6 +206,9 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     sync_cfg.zc_root = 1;
     sync_cfg.zc_length = N_active;
     sync_cfg.matched_filter_len = N + cp;
+    sync_cfg.carrier_freq = cfg.carrier_freq;
+    sync_cfg.bandwidth = cfg.bandwidth;
+    sync_cfg.sample_rate = fs;
 
     int sync_ok = sync_detect_frame(samples, len, &sync_cfg, &frame_start, &detected_snr);
     if (!sync_ok) {
@@ -192,6 +237,12 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
         goto cleanup;
     }
 
+    // Fine timing from the preamble's phase slope (MATHEMATICAL_MODEL.md 3.2):
+    // with a narrow band the Schmidl-Cox peak is broad and can land a few
+    // samples off; this puts the FFT windows back in the middle of their
+    // ISI-free range.
+    frame_start = ofdm_refine_timing(samples, len, frame_start, N, cp, &lay);
+
     // 4. Timing backoff, CFO estimation & correction
     // Need the two preamble symbols plus at least one data symbol after
     // frame_start; otherwise the reads below run past the sample buffer and
@@ -210,8 +261,10 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     // e^{-j 2 pi k b / N} on every symbol, which the preamble channel
     // estimate absorbs exactly. A late window instead mixes in the next
     // symbol's CP (ISI): the Schmidl-Cox peak can land a sample or two late,
-    // and a window one sample late already costs ~20 % EVM. The backoff makes
-    // the receiver ISI-free for timing errors in [-(cp - b), +b].
+    // and a window one sample late already costs ~20 % EVM. The first
+    // OFDM_WOLA_LEN(cp) samples of each symbol carry the transmit window's
+    // cross-fade, so the receiver is ISI-free for timing errors in
+    // [-(cp - b - OFDM_WOLA_LEN(cp)), +b].
     int fft_offset = cp - OFDM_TIMING_BACKOFF(cp);
 
     analytic_real = (float*)malloc(payload_len * sizeof(float));
@@ -291,7 +344,12 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     if (!(inv_snr >= 0.0f && inv_snr <= 10.0f)) inv_snr = 10.0f;
 
     // 6. Demodulate, Equalize & Demap each data symbol
-    int num_symbols = (int)((payload_len - (size_t)2 * ((size_t)N + (size_t)cp)) / ((size_t)N + (size_t)cp));
+    // Every whole symbol in the input is demodulated (trailing noise too; the
+    // frame codec finds the frame length). The last symbol's OFDM_WOLA_LEN(cp)
+    // fade-out samples are not a symbol, so they do not count towards one.
+    // payload_len >= 3 * sym_len > OFDM_WOLA_LEN(cp) (checked above).
+    size_t usable = payload_len - (size_t)OFDM_WOLA_LEN(cp);
+    int num_symbols = (int)((usable - (size_t)2 * sym_len) / sym_len);
     if (num_symbols <= 0) {
         ret_code = SW_ERR_SYNC;
         goto cleanup;
@@ -316,6 +374,31 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
         // DFT Demodulation
         float* sym_src = corrected + ((size_t)2 + (size_t)s) * ((size_t)N + (size_t)cp);
         ofdm_dft_demodulate(sym_src, N, fft_offset, Y_sym);
+
+        // Common phase error from the pilots (MATHEMATICAL_MODEL.md 4.2):
+        // theta = angle(sum_p Y[k_p] conj(H[k_p] X_p)), X_p = +1, -1, +1, ...
+        // The channel estimate comes from the preamble only, so residual CFO
+        // (and slow drift) would otherwise rotate every later symbol a little
+        // more; with ~10 active bins the CFO estimate is too coarse to hold
+        // the phase over a long frame without this.
+        {
+            double cr = 0.0, ci = 0.0;
+            for (int p = 0; p < lay.num_pilots; p++) {
+                int k = pilot_indices[p];
+                double sgn = (p % 2 == 0) ? 1.0 : -1.0;
+                cr += sgn * ((double)Y_sym[k].r * H[k].r + (double)Y_sym[k].i * H[k].i);
+                ci += sgn * ((double)Y_sym[k].i * H[k].r - (double)Y_sym[k].r * H[k].i);
+            }
+            double mag = sqrt(cr * cr + ci * ci);
+            if (mag > 0.0 && isfinite(mag)) {
+                float c = (float)(cr / mag), sn = (float)(-ci / mag); // e^{-j theta}
+                for (int k = lay.first_bin; k <= lay.last_bin; k++) {
+                    float yr = Y_sym[k].r, yi = Y_sym[k].i;
+                    Y_sym[k].r = yr * c - yi * sn;
+                    Y_sym[k].i = yr * sn + yi * c;
+                }
+            }
+        }
 
         // Equalization
         if (cfg.equalizer == 1) {
@@ -355,9 +438,6 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
 cleanup:
     free(data_indices);
     free(pilot_indices);
-    free(null_indices);
-    free(zc_real);
-    free(zc_imag);
     free(X_pre);
     free(pre_symbol);
     free(analytic_real);
@@ -389,7 +469,8 @@ int ofdm_demodulate_frame(const float* samples, size_t len,
     *out_len = 0;
 
     sw_config_t sw_cfg;
-    sw_cfg.sample_rate = 44100;
+    memset(&sw_cfg, 0, sizeof sw_cfg);
+    sw_cfg.sample_rate = cfg->sample_rate > 0.0f ? (int)lroundf(cfg->sample_rate) : 44100;
     sw_cfg.modulation = 1; // OFDM
     sw_cfg.sf = 8;
     sw_cfg.num_subcarriers = cfg->num_subcarriers;
@@ -398,8 +479,8 @@ int ofdm_demodulate_frame(const float* samples, size_t len,
     sw_cfg.coding_rate = 0.5f;
     sw_cfg.threshold = 3.0f;
     sw_cfg.equalizer = 0;
-    sw_cfg.carrier_freq = 19000.0f;
-    sw_cfg.bandwidth = 2000.0f;
+    sw_cfg.carrier_freq = cfg->carrier_freq; // 0 = default band
+    sw_cfg.bandwidth = cfg->bandwidth;
     sw_cfg.symbol_duration = 0.02f;
     sw_cfg.amplitude = 0.8f;
     sw_cfg.ofdm_modulation = cfg->modulation;

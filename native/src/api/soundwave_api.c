@@ -30,6 +30,16 @@ static int is_pow2(int v) { return v > 0 && (v & (v - 1)) == 0; }
 
 static int finite_nonneg(float v) { return isfinite(v) && v >= 0.0f; }
 
+// OFDM band plan for cfg (defaults applied): the active subcarriers must fit
+// in [carrier - bw/2, carrier + bw/2] below Nyquist (ofdm_layout_compute).
+static int ofdm_band_ok(sw_config_t cfg, ofdm_layout_t* lay) {
+    ofdm_layout_t tmp;
+    int N = cfg.num_subcarriers ? cfg.num_subcarriers : 256;
+    float fs = (float)(cfg.sample_rate ? cfg.sample_rate : SW_DEFAULT_RATE);
+    return ofdm_layout_compute(N, fs, cfg.carrier_freq, cfg.bandwidth,
+                               lay ? lay : &tmp) == SW_OK;
+}
+
 SW_API int sw_config_validate(sw_config_t cfg) {
     if (cfg.modulation != 0 && cfg.modulation != 1) return SW_ERR_BAD_PARAM;
     if (cfg.equalizer != 0 && cfg.equalizer != 1) return SW_ERR_BAD_PARAM;
@@ -56,6 +66,7 @@ SW_API int sw_config_validate(sw_config_t cfg) {
     int n_eff = N ? N : 256; // OFDM default
     if (cfg.cp_length < 0 || cfg.cp_length > n_eff) return SW_ERR_BAD_PARAM;
     if (cfg.num_pilots < 0 || cfg.num_pilots > n_eff / 2) return SW_ERR_BAD_PARAM;
+    if (cfg.modulation == 1 && !ofdm_band_ok(cfg, NULL)) return SW_ERR_BAD_PARAM;
     return SW_OK;
 }
 
@@ -152,7 +163,7 @@ SW_API int sw_css_demodulate(const float* samples, size_t sample_len,
 SW_API int sw_ofdm_modulate(const uint8_t* bits, size_t bit_len,
                             sw_config_t cfg, float* samples, size_t* sample_len) {
     if (!bits || !samples || !sample_len || bit_len == 0) return SW_ERR_BAD_PARAM;
-    if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
+    if (sw_config_validate(cfg) != SW_OK || !ofdm_band_ok(cfg, NULL)) return SW_ERR_BAD_PARAM;
 
     sw_signal sig = ofdm_modulate(bits, bit_len, cfg);
     if (!sig.data) return SW_ERR_MEMORY;
@@ -173,7 +184,7 @@ SW_API int sw_ofdm_modulate(const uint8_t* bits, size_t bit_len,
 SW_API int sw_ofdm_demodulate(const float* samples, size_t sample_len,
                               sw_config_t cfg, uint8_t* bits, size_t* bit_len) {
     if (!samples || !bits || !bit_len || sample_len == 0 || *bit_len == 0) return SW_ERR_BAD_PARAM;
-    if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
+    if (sw_config_validate(cfg) != SW_OK || !ofdm_band_ok(cfg, NULL)) return SW_ERR_BAD_PARAM;
 
     size_t out_bits_count = 0;
     uint8_t* decoded = NULL;
@@ -244,10 +255,9 @@ SW_API int sw_detect_frame(const float* samples, size_t len,
     sync_cfg.threshold = cfg.threshold;
     sync_cfg.zc_root = 1;
     
-    int N = cfg.num_subcarriers;
-    int N_guard = N / 8;
-    int N_active = N / 2 - N_guard - 1;
-    sync_cfg.zc_length = N_active;
+    // OFDM configs passed validation, so the band plan exists.
+    ofdm_layout_t lay = {0};
+    sync_cfg.zc_length = (cfg.modulation == 1 && ofdm_band_ok(cfg, &lay)) ? lay.num_active : 0;
     
     if (cfg.modulation == 0) {
         sync_cfg.matched_filter_len = (int)(cfg.symbol_duration * cfg.sample_rate + 0.5f);
@@ -255,7 +265,9 @@ SW_API int sw_detect_frame(const float* samples, size_t len,
         sync_cfg.bandwidth = cfg.bandwidth;
         sync_cfg.sample_rate = (float)cfg.sample_rate;
     } else {
-        sync_cfg.matched_filter_len = cfg.num_subcarriers + cfg.cp_length;
+        // Symbol period N + cp, with the OFDM modules' defaults for 0.
+        int n_ofdm = cfg.num_subcarriers ? cfg.num_subcarriers : 256;
+        sync_cfg.matched_filter_len = n_ofdm + (cfg.cp_length ? cfg.cp_length : n_ofdm / 8);
         sync_cfg.carrier_freq = cfg.carrier_freq;
         sync_cfg.bandwidth = cfg.bandwidth;
         sync_cfg.sample_rate = (float)cfg.sample_rate;
@@ -264,6 +276,12 @@ SW_API int sw_detect_frame(const float* samples, size_t len,
     int ok = sync_detect_frame(samples, len, &sync_cfg, frame_start, snr);
     if (!ok) {
         return SW_ERR_SYNC;
+    }
+    if (cfg.modulation == 1 && sync_cfg.zc_length > 0) {
+        // Same fine timing as the demodulator (preamble phase slope).
+        int N = cfg.num_subcarriers ? cfg.num_subcarriers : 256;
+        int cp = cfg.cp_length ? cfg.cp_length : N / 8;
+        *frame_start = ofdm_refine_timing(samples, len, *frame_start, N, cp, &lay);
     }
     return SW_OK;
 }

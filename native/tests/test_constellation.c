@@ -5,6 +5,7 @@
 // Release builds (NDEBUG).
 
 #include "soundwave_api.h"
+#include "soundwave/ofdm.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -31,8 +32,9 @@ static int failures = 0;
 // (positive bins only half doubled) cost 28-45 %.
 #define EVM_NOISELESS_MAX 0.01
 
-// Data subcarriers per OFDM symbol for N = 256 (95 active, 12 pilots).
-#define DATA_PER_SYMBOL 83
+// Data subcarriers per OFDM symbol for N = 256 in the default 18-20 kHz band:
+// bins 106..115 (one guard bin inside each band edge), pilots on 106 and 114.
+#define DATA_PER_SYMBOL 8
 
 static sw_config_t ofdm_config(int ofdm_modulation) {
     sw_config_t cfg;
@@ -319,7 +321,9 @@ static void test_timing_offset_within_cp(void) {
 // amplitude A has variance A^2/3 per sample, and the unitary DFT keeps that
 // per subcarrier. The ZF error is W - X (W1 + W2) / 2 (data noise plus the
 // two-copy channel-estimate noise), so EVM = sqrt(1.5 A^2 / 3) = 1.41 % for
-// A = 0.02. The window allows for the finite sample of points.
+// A = 0.02. The per-symbol common-phase correction from the two pilots adds
+// a phase error of variance (A^2/3) / 4, i.e. sqrt(1.5 + 0.25) A / sqrt(3) =
+// 1.53 %. The window allows for the finite sample of points.
 static void test_noise_evm_matches_theory(void) {
     for (int eq = 0; eq <= 1; eq++) {
         check_case("noise A=0.02", 1, 32, eq, 0, 0, 0.02, 0.010, 0.020);
@@ -359,7 +363,15 @@ static void test_bad_params(void) {
     CHECK(count == 0);
 }
 
+static void test_layout_matches_constant(void) {
+    ofdm_layout_t lay;
+    CHECK(ofdm_layout_compute(256, 44100.0f, 19000.0f, 2000.0f, &lay) == SW_OK);
+    CHECK(lay.first_bin == 106 && lay.last_bin == 115);
+    CHECK(lay.num_data == DATA_PER_SYMBOL);
+}
+
 int main(void) {
+    test_layout_matches_constant();
     test_qpsk_points_match_payload();
     test_bpsk_points_on_real_axis();
     test_noiseless_loopback_evm();
