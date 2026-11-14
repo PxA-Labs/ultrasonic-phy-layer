@@ -93,8 +93,8 @@ void main() {
       x[lead + i] += signal[i];
     }
     for (var i = 0; i < x.length; i += 441) {
-      audio.pushMockChunk(
-          Float64List.sublistView(x, i, min(i + 441, x.length)));
+      final end = min(i + 441, x.length);
+      audio.pushMockChunk(Float64List.sublistView(x, i, end));
       if (i % (441 * 50) == 0) await Future<void>.delayed(Duration.zero);
     }
     for (var i = 0; i < 100 && texts.isEmpty; i++) {
