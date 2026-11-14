@@ -134,6 +134,17 @@ void main() {
       expect(await decodeFile(path, cfg), ['float wav']);
     }, timeout: const Timeout(Duration(minutes: 2)));
 
+    test('OFDM: decodeInBackground decodes on a separate isolate', () async {
+      // The import UI decodes off the UI isolate; the native library must
+      // load there too and the caller's config must not be shared.
+      final cfg = config(modulation: 1);
+      final x = transmission(cfg, ['isolate one', 'isolate two']);
+      final got = await OfflineDecoder.decodeInBackground(x, cfg, 44100);
+      expect(got.map((m) => m.text).toList(), ['isolate one', 'isolate two']);
+      expect(got.every((m) => m.snr.isFinite), isTrue);
+      expect(cfg['sample_rate'], 44100);
+    }, timeout: const Timeout(Duration(minutes: 2)));
+
     test('noise-only file decodes nothing', () async {
       final cfg = config(modulation: 1);
       final rnd = Random(1);
