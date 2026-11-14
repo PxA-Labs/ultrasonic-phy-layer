@@ -179,23 +179,24 @@ static void test_config_validation(void) {
 
 // css_modulate recomputed the symbol length in float precision; when it
 // rounded one sample above the chirp template every bit over-read the
-// template. Check lengths and a clean round trip across many timings.
+// template. A CSS symbol is now exactly 2^SF chips of round(fs / B) samples:
+// check the length and a clean round trip across rates and spreading factors.
 static void test_css_symbol_length_consistency(void) {
     const int rates[] = {8000, 22050, 44100, 48000};
-    const float durs[] = {0.005f, 0.0113f, 0.0127f, 0.02f, 0.0333f};
     const uint8_t payload[2] = {0xC3, 0x5A};
     for (size_t r = 0; r < sizeof rates / sizeof *rates; r++) {
-        for (size_t d = 0; d < sizeof durs / sizeof *durs; d++) {
+        for (int sf = 6; sf <= 9; sf++) {
             sw_config_t c = default_cfg(0);
             c.sample_rate = rates[r];
-            c.symbol_duration = durs[d];
+            c.sf = sf;
             c.carrier_freq = 0.3f * (float)rates[r];
-            c.bandwidth = 0.05f * (float)rates[r];
+            c.bandwidth = 0.1f * (float)rates[r]; // 10 samples per chip
+            size_t sym = (size_t)(1 << sf) * 10;
             size_t cap = 0;
             float dummy;
             int rc = sw_css_modulate(payload, 16, c, &dummy, &cap);
-            CHECK(rc == SW_ERR_OVERFLOW && cap > 0);
-            CHECK(cap % (10 + 16) == 0); // 10 preamble chirps + 16 symbols
+            CHECK(rc == SW_ERR_OVERFLOW);
+            CHECK(cap == (10 + (size_t)(16 + sf - 1) / (size_t)sf) * sym);
             float* s = (float*)malloc(cap * sizeof(float));
             CHECK(s);
             size_t len = cap;
@@ -207,7 +208,17 @@ static void test_css_symbol_length_consistency(void) {
             free(s);
         }
     }
-    printf("PASS: CSS symbol length matches template; clean round trips decode\n");
+    // Symbols longer than 1 s and SF outside 6..10 are rejected up front.
+    sw_config_t c = default_cfg(0);
+    c.sf = 10;
+    c.bandwidth = 500.0f; // 2^10 / 500 Hz = 2 s
+    size_t cap = 0;
+    float dummy;
+    CHECK(sw_css_modulate(payload, 16, c, &dummy, &cap) == SW_ERR_BAD_PARAM);
+    c = default_cfg(0);
+    c.sf = 12;
+    CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
+    printf("PASS: CSS symbol length is 2^SF * D; clean round trips decode\n");
 }
 
 // ofdm_demodulate read two preamble symbols past frame_start and computed

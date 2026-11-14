@@ -27,9 +27,9 @@
 > **Soundwave sends data through the air as sound.** Type a message or pick a small file, and Soundwave plays it as a high-frequency signal through your speaker. A nearby phone or computer running Soundwave picks it up with its microphone and decodes it. No internet, Bluetooth, pairing or account is needed.
 >
 > **Two modulation modes**
-> • CSS (chirp spread spectrum): slow but robust. Each bit is a frequency sweep in the 17–21 kHz range (default settings).
+> • CSS (chirp spread spectrum): slow but robust. Each frequency sweep carries 6–10 bits, in the 18–20 kHz range with the default settings.
 > • OFDM: much faster, using many subcarriers at once. In the current version its signal is clearly audible.
-> • Presets for a robust long-range setup and a high-speed OFDM setup, plus full manual control of frequency, sweep, chirp length, FFT size, cyclic prefix and equalizer.
+> • Presets for a robust long-range setup and a high-speed OFDM setup, plus full manual control of frequency, sweep, spreading factor, FFT size, cyclic prefix and equalizer.
 >
 > **Built-in error protection**
 > Every frame carries a CRC-32 checksum and optional Reed-Solomon error correction. Longer messages and files are split into fragments and reassembled, with optional automatic retransmission (ARQ) when both devices enable it.

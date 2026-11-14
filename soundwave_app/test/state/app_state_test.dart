@@ -25,8 +25,11 @@ void main() {
 
     test('setSf sets spreading factor', () {
       final state = AppState(audio: MockAudioService());
-      state.setSf(12);
-      expect(state.sf, 12);
+      state.setSf(10);
+      expect(state.sf, 10);
+      // The chirp duration is not a separate setting: 2^SF / B.
+      expect(state.symbolDuration, closeTo(1024 * 22 / 44100, 1e-9));
+      expect(state.cssGeometry.bitsPerSymbol, 10);
     });
 
     test('addMessage prepends and caps at 100', () {
@@ -38,11 +41,12 @@ void main() {
       expect(state.messages.first, contains('msg100'));
     });
 
-    test('loadPreset long_range sets sf=12 mode=0', () {
+    test('loadPreset long_range sets sf=10 mode=0', () {
       final state = AppState(audio: MockAudioService());
       state.loadPreset('long_range');
       expect(state.mode, 0);
-      expect(state.sf, 12);
+      expect(state.sf, 10);
+      expect(state.bandwidth, 2000.0);
     });
 
     test('loadPreset high_speed sets mode=1 nsc=2048', () {

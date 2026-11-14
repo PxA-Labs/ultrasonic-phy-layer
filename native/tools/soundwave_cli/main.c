@@ -39,7 +39,7 @@ static void print_usage(void) {
     fprintf(stderr, "  soundwave-cli demodulate --mode <css|ofdm> --input <filename.wav> [options]\n");
     fprintf(stderr, "  soundwave-cli simulate --input <filename.wav> --snr <snr_db> --output <filename.wav>\n\n");
     fprintf(stderr, "Options:\n");
-    fprintf(stderr, "  --sf <sf>                  Spreading factor for CSS modulation (7..12; default 8)\n");
+    fprintf(stderr, "  --sf <sf>                  CSS spreading factor, bits per chirp (6..10; default 8)\n");
     fprintf(stderr, "  --fft <size>               FFT size for OFDM (256, 512, 1024, 2048; default 256)\n");
     fprintf(stderr, "  --cp <length>              Cyclic prefix length for OFDM (default 64)\n");
     fprintf(stderr, "  --freq <freq_hz>           Carrier frequency in Hz (default 19000.0; OFDM band centre)\n");

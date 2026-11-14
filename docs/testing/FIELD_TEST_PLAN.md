@@ -64,7 +64,7 @@ cmake -S native -B native/build -DCMAKE_BUILD_TYPE=Release -DSW_BUILD_TESTS=OFF
 cmake --build native/build --target soundwave_cli
 export SOUNDWAVE_CLI=$PWD/native/build/soundwave-cli
 
-# CSS default config: 20 frames x 64 B (~16.5 s/frame), 1 s gaps
+# CSS default config (SF 8, 2 kHz): 20 frames x 64 B (~14.3 s/frame), 1 s gaps
 python3 docs/testing/ber_sweep.py generate --mode css --frames 20 --payload-bytes 64 \
   --gap 1.0 --lead-in 2.0 --verify --out runs/css64
 # OFDM default config (N=256, CP=64, QPSK, ZF): 200 frames x 64 B, 0.3 s gaps
@@ -101,13 +101,13 @@ The repo has no impulse-response tool. As a proxy, measure RT60 (any room-acoust
 
 | ID | Mode | Parameters | Raw rate (derived) |
 |---|---|---|---|
-| C1 | CSS | f₀ 19 kHz, B 2 kHz, T 20 ms (default) | 50 bit/s |
-| C2 | CSS | f₀ 18 kHz, B 1 kHz, T 50 ms (*Long Range* preset) | 20 bit/s |
-| O1 | OFDM | N 256, CP 64, QPSK, ZF (default) | 22.9 kbit/s |
-| O2 | OFDM | N 256, CP 64, QPSK, MMSE | 22.9 kbit/s |
-| O3 | OFDM | N 256, CP 64, BPSK, MMSE | 11.4 kbit/s |
+| C1 | CSS | f_c 19 kHz, B 2 kHz, SF 8 (default) | 62.6 bit/s |
+| C2 | CSS | f_c 18 kHz, B 2 kHz, SF 10 (*Long Range* preset) | 19.6 bit/s |
+| O1 | OFDM | N 256, CP 64, QPSK, ZF, 18–20 kHz (default) | 2.2 kbit/s |
+| O2 | OFDM | N 256, CP 64, QPSK, MMSE, 18–20 kHz | 2.2 kbit/s |
+| O3 | OFDM | N 256, CP 64, BPSK, MMSE, 18–20 kHz | 1.1 kbit/s |
 
-`soundwave-cli` exposes `--freq`, `--bw`, `--fft`, `--cp`, `--amp` and `--equalizer`. It has **no options** for chirp duration T or BPSK. C2 and O3 can therefore only be run through pipeline B (app to app) until the CLI gains those options.
+`soundwave-cli` exposes `--sf`, `--freq`, `--bw`, `--fft`, `--cp`, `--ofdm-mod`, `--amp` and `--equalizer` (`ber_sweep.py generate --sf`), so every configuration runs through either pipeline (`ber_sweep.py` itself does not pass `--ofdm-mod` yet).
 
 ### 6.2 Distance (line of sight, 0°, devices at 1.0 m height)
 
@@ -128,15 +128,15 @@ The repo has no impulse-response tool. As a proxy, measure RT60 (any room-acoust
 | Doppler: TX moving at 1 m/s **toward** the RX, from 4 m to 1 m | 5 runs | C1, O1 |
 | Doppler: TX moving at 1 m/s **away**, from 1 m to 4 m | 5 runs | C1, O1 |
 
-At 1 m/s a 4 m track gives 3 s of motion per pass. That covers OFDM frames (≈ 50 ms each) but not one CSS frame (≈ 16.5 s at 64 B). For CSS, use 12 B payloads (≈ 8.2 s/frame, still longer than one pass) and treat the CSS Doppler result as **qualitative only**, or run a back-and-forth track for the full frame and log the motion profile.
+At 1 m/s a 4 m track gives 3 s of motion per pass. That covers OFDM frames (≈ 50 ms each) but not one CSS frame (≈ 14.3 s at 64 B). For CSS, use 12 B payloads (≈ 7.7 s/frame, still longer than one pass) and treat the CSS Doppler result as **qualitative only**, or run a back-and-forth track for the full frame and log the motion profile. Expect CSS to fail here: 1 m/s is a ≈ 55 Hz shift at 19 kHz, about 7 FFT bins at SF 8 / 2 kHz, while the receiver removes only a static offset of up to about ±2 bins measured on the preamble (derived, see [Mathematical model §3.1](../MATHEMATICAL_MODEL.md#31-css-preamble-detection)).
 
 ### 6.4 How many frames (statistics)
 
 | Goal | Required observation | 64 B payload frames | CSS C1 airtime | OFDM O1 airtime |
 |---|---|---|---|---|
-| Screening FER to about ±10 % | 20 frames | 20 | ≈ 6 min | ≈ 7 s |
-| "10,000-bit sequence" (issue #96) | 10,000 payload bits | 20 | ≈ 6 min | ≈ 7 s |
-| Residual BER < 10⁻⁵ at 95 % confidence (O1) | 3 × 10⁵ error-free payload bits, 0 lost frames | 586 | **≈ 2.9 h** | ≈ 3.4 min |
+| Screening FER to about ±10 % | 20 frames | 20 | ≈ 5 min | ≈ 7 s |
+| "10,000-bit sequence" (issue #96) | 10,000 payload bits | 20 | ≈ 5 min | ≈ 7 s |
+| Residual BER < 10⁻⁵ at 95 % confidence (O1) | 3 × 10⁵ error-free payload bits, 0 lost frames | 586 | **≈ 2.5 h** | ≈ 3.4 min |
 
 Airtime is derived from the code and includes the generator's gaps (1 s for CSS, 0.3 s for OFDM). A 10,000-bit run can only support a residual-BER claim down to about 3 × 10⁻⁴. Run the full O1 sample only at the reference point (E2, 3 m), and use 20-frame screening runs everywhere else.
 

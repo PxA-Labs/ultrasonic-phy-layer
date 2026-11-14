@@ -51,23 +51,26 @@ static void test_config_validation_table(void) {
     // Boundary values of each field that must be accepted. They are checked
     // on a CSS config: with modulation == 1 the OFDM band plan adds its own
     // constraints (checked below), e.g. no ultrasonic band fits at 8 kHz or
-    // in a 16-point FFT.
+    // in a 16-point FFT. Both modems require their whole band below Nyquist.
     const sw_config_t css_ok = cfg_for(0);
     sw_config_t c = css_ok;
-    c.sample_rate = 8000; c.carrier_freq = 4000.0f; c.bandwidth = 4000.0f;
+    c.sample_rate = 8000; c.carrier_freq = 2000.0f; c.bandwidth = 2000.0f;
     CHECK(sw_config_validate(c) == SW_OK);
     c = css_ok; c.sample_rate = 192000;                CHECK(sw_config_validate(c) == SW_OK);
     c = css_ok; c.sf = 6;                              CHECK(sw_config_validate(c) == SW_OK);
-    c = css_ok; c.sf = 12;                             CHECK(sw_config_validate(c) == SW_OK);
+    c = css_ok; c.sf = 10;                             CHECK(sw_config_validate(c) == SW_OK);
     c = css_ok; c.num_subcarriers = 16; c.cp_length = 16; c.num_pilots = 8;
     CHECK(sw_config_validate(c) == SW_OK);
     c = css_ok; c.num_subcarriers = 4096;              CHECK(sw_config_validate(c) == SW_OK);
     c = css_ok; c.amplitude = 1.0f;                    CHECK(sw_config_validate(c) == SW_OK);
     c = css_ok; c.symbol_duration = 1.0f;              CHECK(sw_config_validate(c) == SW_OK);
     c = css_ok; c.cp_length = 256; c.num_pilots = 128; CHECK(sw_config_validate(c) == SW_OK);
-    // sample_rate 0 means the 44.1 kHz default: Nyquist is 22050 Hz.
-    c = css_ok; c.sample_rate = 0; c.carrier_freq = 22050.0f;
+    // sample_rate 0 means the 44.1 kHz default: Nyquist is 22050 Hz, and the
+    // OFDM band may reach fs/2 - fs/N = 21877.734375 Hz (N = 256) exactly.
+    c = ok; c.sample_rate = 0; c.carrier_freq = 20877.734375f;
     CHECK(sw_config_validate(c) == SW_OK);
+    c.carrier_freq = 20877.75f; // 1/64 Hz further
+    CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
     c.carrier_freq = 22100.0f;
     CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
 
@@ -112,7 +115,13 @@ static void test_config_validation_table(void) {
     REJECT(amplitude, 1.01f);
     REJECT(amplitude, -0.1f);
     REJECT(sf, 5);
+    REJECT(sf, 11); // CSS supports SF 6..10 (MATHEMATICAL_MODEL.md 2.1)
     REJECT(sf, 13);
+    // CSS only: the chirp band must fit below Nyquist and a symbol in 1 s.
+    c = cfg_for(0); c.carrier_freq = 21500.0f;     CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
+    c = cfg_for(0); c.sf = 10; c.bandwidth = 500.0f;
+    CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
+    c.modulation = 1;                              CHECK(sw_config_validate(c) == SW_OK);
     REJECT(num_subcarriers, 100);  // not a power of two
     REJECT(num_subcarriers, 8);    // too small
     REJECT(num_subcarriers, 8192); // too large

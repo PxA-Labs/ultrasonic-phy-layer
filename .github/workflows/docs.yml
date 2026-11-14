@@ -117,6 +117,15 @@ jobs:
           python3 $S simulate --manifest out/css/manifest.json --snr 0,10,20 \
             --out out/css/awgn.json --min-delivered-at 10 1.0
 
+      - name: CSS SF6 / 4 kHz - generate, decode offset recording, AWGN sweep
+        run: |
+          S=docs/testing/ber_sweep.py
+          python3 $S generate --mode css --sf 6 --bw 4000 --frames 3 --payload-bytes 24 --gap 0.3 --lead-in 0.7 --verify --out out/css6
+          "$SOUNDWAVE_CLI" simulate --input out/css6/playlist.wav --snr 15 --output out/css6/rec.wav
+          python3 $S -v decode --manifest out/css6/manifest.json --recording out/css6/rec.wav --label ci-smoke-sf6 --out out/css6/result
+          python3 -c "import json,sys; s=json.load(open('out/css6/result/summary.json')); sys.exit(0 if s['frames_delivered']==s['frames_sent'] else 'not all frames decoded')"
+          python3 $S simulate --manifest out/css6/manifest.json --snr 0,10 --out out/css6/awgn.json --min-delivered-at 10 1.0
+
       - name: OFDM - generate and AWGN sweep
         run: |
           S=docs/testing/ber_sweep.py

@@ -9,19 +9,18 @@ An in-browser simulation of the two Soundwave waveforms, generated with the **sa
 <h2 id="lab-css">CSS: chirp frame</h2>
 
 <div class="sw-lab-math">
-<p>Each bit is one chirp of length <em>T</em>: bit 0 is an up-chirp from f<sub>0</sub> to f<sub>0</sub>+B, bit 1 is a down-chirp from f<sub>0</sub> to f<sub>0</sub>−B:
-s(t) = 0.8·cos(2π(f<sub>0</sub> + B·t/(2T))·t), 0 ≤ t &lt; T. A frame starts with 8 up-chirps and 2 down-chirps. Raw rate = 1/T bit/s. The spreading factor does not enter this waveform.</p>
+<p>Each chirp carries SF bits. Symbol k (0 ≤ k &lt; M = 2<sup>SF</sup>) is the base up-chirp started k chips into its sweep: its frequency starts at f<sub>c</sub> − B/2 + kB/M, rises at B/T and wraps from f<sub>c</sub> + B/2 to f<sub>c</sub> − B/2. B = f<sub>s</sub>/D with D = round(f<sub>s</sub>/bandwidth) samples per chip, T = M/B. Bits are Gray mapped. A frame starts with 8 base up-chirps and 2 down-chirps. Raw rate = SF·B/M bit/s.</p>
 </div>
 
 <div class="sw-lab-controls">
 <label>Sample rate
 <select id="css-fs"><option value="44100" selected>44 100 Hz</option><option value="48000">48 000 Hz</option></select></label>
-<label>Start frequency f<sub>0</sub> <output id="css-f0-o"></output>
+<label>Centre frequency f<sub>c</sub> <output id="css-f0-o"></output>
 <input type="range" id="css-f0" min="15000" max="21000" step="250" value="19000"></label>
 <label>Sweep bandwidth B <output id="css-bw-o"></output>
-<input type="range" id="css-bw" min="500" max="4000" step="250" value="2000"></label>
-<label>Chirp duration T <output id="css-t-o"></output>
-<input type="range" id="css-t" min="5" max="100" step="5" value="20"></label>
+<input type="range" id="css-bw" min="1000" max="4000" step="250" value="2000"></label>
+<label>Spreading factor SF
+<select id="css-sf"><option>6</option><option>7</option><option selected>8</option><option>9</option><option>10</option></select></label>
 <label>SNR (whole frame) <output id="css-snr-o"></output>
 <input type="range" id="css-snr" min="-10" max="40" step="1" value="20"></label>
 <label>Data bits (max 32)

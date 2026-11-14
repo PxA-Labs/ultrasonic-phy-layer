@@ -160,15 +160,16 @@ class RxEngine {
   // 2. DECODE: as audio keeps arriving, demodulate the buffer and let
   //    FrameCodec search for a frame length whose RS + CRC-32 verify. Short
   //    messages decode as soon as their last symbol arrives; attempts are
-  //    spaced by [retryStepSymbols] symbols to bound CPU use.
+  //    spaced by FrameGeometry.retryStepSymbols symbols to bound CPU use.
   // 3. If nothing verifies by the longest possible frame, count a frame error
   //    and skip past the preamble.
   // ---------------------------------------------------------------------
 
-  /// Symbols of new audio required between two decode attempts. Bounds CPU
-  /// use (each attempt demodulates the whole pending frame) at the cost of up
-  /// to this many symbols of extra latency (0.64 s CSS / 0.23 s OFDM default).
-  static const int retryStepSymbols = 32;
+  /// Upper bound on the symbols of new audio required between two decode
+  /// attempts (FrameGeometry.retryStepSymbols: 32 for OFDM, about 0.25 s but
+  /// at least 4 chirps for CSS). Bounds CPU use (each attempt demodulates the
+  /// whole pending frame) at the cost of that much extra latency.
+  static const int retryStepSymbols = FrameGeometry.ofdmRetryStepSymbols;
 
   int? _pendingFrameSince; // buffer length at the last decode attempt
   double _pendingSnr = 0.0;
@@ -281,7 +282,7 @@ class RxEngine {
     // Two symbols of slack: the OFDM demodulator only emits a symbol when
     // audio follows it, so the longest frame needs a little trailing audio.
     final maxFrame = geometry.maxFrameSamples + 2 * geometry.samplesPerSymbol;
-    final step = retryStepSymbols * geometry.samplesPerSymbol;
+    final step = geometry.retryStepSymbols * geometry.samplesPerSymbol;
     final reachedMax = available >= maxFrame;
     if (available < geometry.minFrameSamples) return false;
     if (!reachedMax &&

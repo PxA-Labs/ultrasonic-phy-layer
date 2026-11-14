@@ -75,7 +75,8 @@ void main() {
       expect(s.mode, 0);
       expect(s.sf, 8);
       expect(s.numSubcarriers, 256);
-      expect(s.symbolDuration, 0.02);
+      // symbol_duration is no longer a setting: SF8 @ 2 kHz = 5632 samples.
+      expect(s.symbolDuration, closeTo(5632 / 44100, 1e-9));
       expect(s.carrierFreq, 19000.0);
       expect(s.amplitude, 0.5);
       expect(s.enableRs, false);

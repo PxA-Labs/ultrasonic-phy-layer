@@ -43,7 +43,7 @@ ultrasonic-phy-layer/
 
 ## 2. PHY Frame Architecture & Data Flow
 
-The app's PHY frame (`soundwave_app/lib/engine/frame_codec.dart`) is modulated by CSS or OFDM after a mode-specific preamble. CSS uses 8 up-chirps and 2 down-chirps; OFDM uses two identical Zadoff-Chu symbols.
+The app's PHY frame (`soundwave_app/lib/engine/frame_codec.dart`) is modulated by CSS or OFDM after a mode-specific preamble. CSS uses 8 base up-chirps and 2 down-chirps, then one up-chirp per SF bits; OFDM uses two identical Zadoff-Chu symbols.
 
 ```mermaid
 graph LR
@@ -145,7 +145,7 @@ When calling C code from Dart via `dart:ffi`, managing memory safely across the 
 
 3. **Buffer Length Estimation Formulas**:
    - **RS Parity Allocation**: $N_{\text{parity}} = 2t = N_{\text{block}} - K_{\text{data}}$ bytes (default 32 bytes for $RS(255, 223)$).
-   - **CSS Audio Samples**: $N_{\text{samples}} = (10 + N_{\text{bits}}) \times \text{round}(T_{\text{symbol}} f_s)$ floats (10-chirp preamble, one chirp per bit).
+   - **CSS Audio Samples**: $N_{\text{samples}} = (10 + \lceil N_{\text{bits}} / SF \rceil) \times 2^{SF} \times \text{round}(f_s / B)$ floats (10-chirp preamble, one chirp per SF bits). `FrameGeometry` in `lib/engine/frame_geometry.dart` mirrors this.
    - **OFDM Audio Samples**: $N_{\text{samples}} = (2 + \lceil N_{\text{bits}} / B_{\text{sym}} \rceil) \times (N_{\text{fft}} + N_{\text{cp}}) + \lfloor N_{\text{cp}}/2 \rfloor$, where $B_{\text{sym}}$ is the number of data subcarriers in the configured band times bits per subcarrier (see [Signal chain](architecture/signal-chain.md#ofdm-mode)).
    - In practice, call once with a too-small capacity: the API returns `SW_ERR_OVERFLOW` and writes the required length.
 

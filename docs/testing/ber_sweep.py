@@ -131,7 +131,7 @@ def write_wav16(path, samples, rate):
 
 def modem_args(params):
     args = ["--mode", params["mode"]]
-    for key, flag in (("fft", "--fft"), ("cp", "--cp"), ("freq", "--freq"),
+    for key, flag in (("sf", "--sf"), ("fft", "--fft"), ("cp", "--cp"), ("freq", "--freq"),
                       ("bw", "--bw"), ("amp", "--amp")):
         if params.get(key) is not None:
             args += [flag, str(params[key])]
@@ -232,8 +232,8 @@ def cmd_generate(a):
     if not 1 <= a.payload_bytes <= CLI_MAX_PAYLOAD:
         sys.exit(f"--payload-bytes must be 1..{CLI_MAX_PAYLOAD}")
     os.makedirs(a.out, exist_ok=True)
-    params = {"mode": a.mode, "fft": a.fft, "cp": a.cp, "freq": a.freq, "bw": a.bw,
-              "amp": a.amp, "equalizer": a.equalizer}
+    params = {"mode": a.mode, "sf": a.sf, "fft": a.fft, "cp": a.cp, "freq": a.freq,
+              "bw": a.bw, "amp": a.amp, "equalizer": a.equalizer}
     rng = random.Random(a.seed)
     payloads, files = [], []
     rate = None
@@ -316,17 +316,12 @@ def track_slots(cli, manifest, samples, rate, tmp, probe):
                 m = PAYLOAD_RE.match(text)
                 if not m:
                     continue
-                # Candidate starts: the detector's offset (the CLI demodulates
-                # from it), else the window start.
-                cands = [res["seg_start"]]
-                if res.get("frame_start") is not None:
-                    cands.insert(0, res["seg_start"] + res["frame_start"])
-                for c in cands:
-                    chk = decode_at(cli, manifest, samples, rate, c - margin, tmp, "verify")
-                    if chk["ok"] and chk["payload"] == res["payload"]:
-                        anchor = (int(m.group(1)), c)
-                        break
-                if anchor:
+                # The demodulator searches the whole window, and the same run
+                # reports where the preamble starts (sw_detect_frame).
+                c = res["seg_start"] + (res.get("frame_start") or 0)
+                chk = decode_at(cli, manifest, samples, rate, c - margin, tmp, "verify")
+                if chk["ok"] and chk["payload"] == res["payload"]:
+                    anchor = (int(m.group(1)), c)
                     break
         if anchor:
             break
@@ -350,8 +345,7 @@ def track_slots(cli, manifest, samples, rate, tmp, probe):
         if res["ok"]:
             fs = res.get("frame_start")
             seg = res["seg_start"]
-            est = seg + fs if fs is not None and abs(seg + fs - p) <= tol else p
-            last[k] = est
+            last[k] = seg + fs if fs is not None and abs(seg + fs - p) <= tol else p
         results.append(res)
     return results, p0 / rate
 
@@ -459,6 +453,7 @@ def main(argv=None):
     g.add_argument("--gap", type=float, default=1.0, help="silence between frames, s")
     g.add_argument("--lead-in", type=float, default=2.0, help="silence before frame 0, s")
     g.add_argument("--seed", type=int, default=1)
+    g.add_argument("--sf", type=int, help="CSS spreading factor 6..10 (CLI default 8)")
     g.add_argument("--fft", type=int)
     g.add_argument("--cp", type=int)
     g.add_argument("--freq", type=float)

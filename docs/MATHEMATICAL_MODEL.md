@@ -66,36 +66,66 @@ $$f_{rx} = f_{tx} (1 + \beta)$$
 
 ## 2. Modulation Schemes
 
-Soundwave supports two physical layer modulation options: Chirp Spread Spectrum (CSS) for high robustness, and Orthogonal Frequency Division Multiplexing (OFDM) for high throughput.
+Soundwave supports two physical layer modulation options: Chirp Spread Spectrum (CSS) for robustness at low rates, and Orthogonal Frequency Division Multiplexing (OFDM) for high throughput.
 
 ### 2.1 Chirp Spread Spectrum (CSS)
-Chirp Spread Spectrum uses Linear Frequency Modulated (LFM) signals. It is highly robust to multipath fading and Doppler shifts.
+CSS in Soundwave uses LoRa-style chirp symbols: every data symbol is the same linear up-chirp, cyclically shifted in frequency, so one chirp carries $SF$ bits. Implementation: `native/src/css/css_modulate.c` (transmitter) and `native/src/css/css_demodulate.c` (receiver).
 
-#### 2.1.1 Continuous-Time Formulation
-An LFM chirp symbol $s(t)$ defined over the duration $T$ is expressed as:
+#### 2.1.1 Parameters and sampling
+| Symbol | Meaning | Config field / default |
+|---|---|---|
+| $f_s$ | sample rate | `sample_rate`, 44 100 Hz |
+| $f_c$ | band centre | `carrier_freq`, 19 000 Hz |
+| $SF$ | spreading factor, $6 \le SF \le 10$ | `sf`, 8 |
+| $M = 2^{SF}$ | chips per symbol (and symbol alphabet size) | |
+| $D = \operatorname{round}(f_s / B_{cfg})$ | samples per chip, $D \ge 1$ | from `bandwidth` (2000 Hz) |
+| $B = f_s / D$ | effective sweep bandwidth | |
+| $N = M D$ | samples per symbol | |
+| $T = M / B = N / f_s$ | symbol duration | |
 
-$$s(t) = A \cos \left( 2\pi \left( f_0 + \frac{B}{2T} t \right) t + \phi_0 \right), \quad 0 \leq t \leq T$$
+The configured bandwidth is quantised to $f_s / D$ so that a chip is a whole number of samples and every symbol is exactly $N = MD$ samples. At 44.1 kHz, `bandwidth` 2000 gives $D = 22$, $B = 2004.5$ Hz; 4000 gives $D = 11$, $B = 4009.1$ Hz. The receiver works at the chip rate $B$ after filtering, so $D$ is the oversampling factor of the audio stream. `symbol_duration` is **not used** by CSS: the symbol length follows from $SF$ and $B$. The band $[f_c - B/2, f_c + B/2]$ must lie in $(0, f_s/2]$; otherwise the configuration is rejected (`SW_ERR_BAD_PARAM`).
 
-where:
-- $A$ is the signal amplitude.
-- $f_0$ is the starting (carrier) frequency.
-- $B$ is the bandwidth ($f_{end} - f_0$).
-- $T$ is the chirp symbol duration.
-- $\phi_0$ is the initial phase.
+#### 2.1.2 Symbol waveform
+Symbol value $k \in \{0, \dots, M-1\}$ is the base up-chirp started $k$ chips into its sweep. Its instantaneous frequency is
 
-The instantaneous frequency $f_{inst}(t)$ varies linearly with time:
+$$f_k(t) = f_c - \frac{B}{2} + B \left( \frac{k}{M} + \frac{t}{T} \bmod 1 \right), \qquad 0 \le t < T,$$
 
-$$f_{inst}(t) = \frac{1}{2\pi} \frac{d}{dt} \left( 2\pi \left( f_0 + \frac{B}{2T} t \right) t + \phi_0 \right) = f_0 + \frac{B}{T} t$$
+that is, it starts at $f_c - B/2 + kB/M$, rises at $B/T$ Hz/s and wraps from $f_c + B/2$ back to $f_c - B/2$ at $t_w = T(1 - k/M)$, which is sample $(M - k) D$. The transmitted sample is $s[n] = A \cos(2\pi \varphi(n / f_s))$ with $\varphi$ the integral of $f_k$; phase is carried across symbols so the signal is continuous. The down-chirp used in the preamble sweeps $f_c + B/2 \to f_c - B/2$.
 
-- If $B > 0$, the signal is an **up-chirp**.
-- If $B < 0$, the signal is a **down-chirp**.
+#### 2.1.3 Bits to symbols (Gray mapping) and frame
+Bits are taken MSB first, $SF$ at a time (the last group is zero padded). A group with value $v$ is sent as the symbol $k$ whose Gray code equals $v$, i.e. $v = k \oplus (k \gg 1)$. The most likely demodulation error is a neighbouring bin ($k \pm 1$, also across the wrap $M-1 \leftrightarrow 0$), and neighbours differ in exactly one bit. A frame is
 
-#### 2.1.2 Discrete-Time Formulation
-Sampling at $f_s = 1/T_s$, the discrete-time chirp $s[n]$ is:
+$$\underbrace{8 \times \text{base up-chirp } (k = 0)}_{\text{preamble}} \;\; \underbrace{2 \times \text{down-chirp}}_{\text{sync word}} \;\; \underbrace{\lceil n_{bits} / SF \rceil \times \text{data up-chirps}}_{\text{payload}}$$
 
-$$s[n] = A \cos \left( 2\pi \left( f_0 + \frac{B}{2N} n \right) n T_s + \phi_0 \right), \quad 0 \leq n \leq N-1$$
+so it occupies $(10 + \lceil n_{bits}/SF \rceil) \cdot N$ samples. Data symbols are always up-chirps; a payload can therefore contain base up-chirps (e.g. zero bytes) but never a down-chirp.
 
-where $N = T / T_s$ is the number of samples per symbol.
+#### 2.1.4 Demodulation (dechirp + FFT)
+1. **Complex baseband.** $z[n] = \text{LPF}\{ y[n] e^{-j 2\pi f_c n / f_s} \}$ with a Hamming-windowed sinc low-pass of $10D + 1$ taps and cut-off $0.6B$. It removes the negative-frequency image at $-2f_c$ and the noise outside the band; its group delay is compensated so $z$ is aligned with $y$.
+2. **Chip samples.** For data symbol $i$ starting at $t_i = \hat{t}_0 + (10 + i) N$ (fractional), take $z$ at $t_i + mD$, $m = 0, \dots, M-1$ (linear interpolation), and remove the estimated frequency offset: $v[m] = z(t_i + mD)\, e^{-j 2\pi \widehat{\Delta f} (t_i + mD)/f_s}$.
+3. **Dechirp.** Multiply by the conjugate chip-rate base chirp $c[m] = e^{j\pi(m^2/M - m)}$. Symbol $k$ becomes a tone of $k/M$ cycles per chip; at the chip rate the wrapped part of the chirp aliases onto the same tone.
+4. **FFT and decision.** $\hat{k} = \arg\max_k |\mathrm{FFT}_M\{v[m] c^*[m]\}[k]|^2$, then $v = \hat{k} \oplus (\hat{k} \gg 1)$ gives the $SF$ bits.
+
+The decision is a bank of $M$ matched filters computed by one $M$-point FFT. Integrating $M$ chips gives a processing gain of $10 \log_{10} M$ dB (18.1 dB at SF6, 30.1 dB at SF10).
+
+#### 2.1.5 Valid SF range (computed, 44.1 kHz)
+| $SF$ | $N$ at 2 kHz ($D$=22) | $T$ at 2 kHz | Raw rate at 2 kHz | $N$ at 4 kHz ($D$=11) | $T$ at 4 kHz | Raw rate at 4 kHz | Bin spacing $B/M$ at 4 kHz |
+|---|---|---|---|---|---|---|---|
+| 6 | 1408 | 31.9 ms | 187.9 bit/s | 704 | 16.0 ms | 375.9 bit/s | 62.6 Hz |
+| 7 | 2816 | 63.9 ms | 109.6 bit/s | 1408 | 31.9 ms | 219.2 bit/s | 31.3 Hz |
+| 8 (default) | 5632 | 127.7 ms | 62.6 bit/s | 2816 | 63.9 ms | 125.3 bit/s | 15.7 Hz |
+| 9 | 11264 | 255.4 ms | 35.2 bit/s | 5632 | 127.7 ms | 70.5 bit/s | 7.8 Hz |
+| 10 | 22528 | 510.8 ms | 19.6 bit/s | 11264 | 255.4 ms | 39.2 bit/s | 3.9 Hz |
+
+Raw rate $= SF \cdot B / M$ (computed from the formulas above, not measured; preamble and FEC excluded). At 2 kHz the bin spacing is half the 4 kHz value.
+
+Why $6 \le SF \le 10$:
+
+- **Upper bound.** A frequency error of half a bin moves the FFT peak to the wrong symbol. The preamble estimate below removes a static offset, but what changes during a frame is not tracked: a speaker/microphone clock mismatch of ±50 ppm per device is up to 2 Hz at 20 kHz, and 0.1 m/s of hand movement is a 5.5 Hz Doppler shift at 19 kHz. At SF10 the bin is already 3.9 Hz (4 kHz band) or 2.0 Hz (2 kHz band); SF11/12 would be 1–2 Hz (0.5–1 Hz at 2 kHz) with 0.5–2 s symbols. Symbols are also capped at 1 s (`CSS_MAX_SYMBOL_SEC`), which SF11 already exceeds at 2 kHz.
+- **Lower bound.** Below SF6 the processing gain is under 18 dB and the preamble correlation of noise or data ($\approx 1/M$, see 3.1) gets close to the detection threshold.
+- **Oversampling.** For any $B \le f_s/2$, $D = \operatorname{round}(f_s/B) \ge 2$ samples per chip. The symbol is an integer number of samples for every SF, so no fractional resampling is needed.
+
+#### 2.1.6 FEC
+CSS and OFDM share the frame FEC: Reed-Solomon RS(255,223) with 32 parity bytes (corrects 16 byte errors), on or off. There is no adjustable code rate; the former `coding_rate` setting had no effect and was removed from the app. The `sw_config_t.coding_rate` field remains for ABI compatibility and is ignored.
 
 ### 2.2 Orthogonal Frequency Division Multiplexing (OFDM)
 For high-rate communications, OFDM divides the transmission band into $N_c$ orthogonal subcarriers.
@@ -151,16 +181,27 @@ The two preamble copies are joined without a cross-fade so that they stay sample
 
 Proper timing and frequency synchronization are critical in acoustic communication to align the receiver's decoding window and correct for carrier frequency offsets.
 
-### 3.1 Preamble Detection via Matched Filtering
-For Chirp-based systems, frame detection is achieved by correlating the received signal $y[n]$ with the template chirp $s[n]$:
+### 3.1 CSS Preamble Detection
+The CSS receiver (`css_detect_frame()` in `native/src/css/css_demodulate.c`; `sync_detect_frame()` mode 0 and `sw_detect_frame()` call it) searches the **whole** buffer on the complex baseband $z[n]$ of section 2.1.4. For every lag $m$ it correlates the $N$-sample window with the base up-chirp $u[n]$ and with the down-chirp $u^*[n]$ (FFT overlap-save, $O(L \log N)$):
 
-$$R_{ys}[m] = \sum_{n=0}^{N-1} y[n + m] s^*[n]$$
+$$c_{up}[m] = \frac{1}{N}\left| \sum_{n=0}^{N-1} z[m+n]\, u^*[n] \right|^2, \qquad c_{dn}[m] = \frac{1}{N}\left| \sum_{n=0}^{N-1} z[m+n]\, u[n] \right|^2.$$
 
-A threshold detector identifies the start of the frame at sample $m_{start}$:
+A preamble starting at $m$ has slots $m + iN$, $i = 0..9$. With $\bar{E}(m)$ the mean window energy $\sum_n |z|^2$ of those 10 slots, it scores
 
-$$m_{start} = \arg\max_{m} \left| R_{ys}[m] \right|^2 \quad \text{subject to } \left| R_{ys}[m_{start}] \right|^2 > \theta \cdot \sigma_n^2$$
+$$U(m) = \frac{1}{8 \bar{E}(m)} \sum_{i=0}^{7} c_{up}[m + iN], \qquad D(m) = \frac{\min\left(c_{dn}[m + 8N],\ c_{dn}[m + 9N]\right)}{\bar{E}(m)}.$$
 
-where $\theta$ is a scaling threshold and $\sigma_n^2$ is the estimated noise variance.
+By Cauchy-Schwarz both are at most 1 for a real preamble (equal energy in every slot), whatever the signal level. Normalising by the mean of all 10 slots rather than each slot's own energy means a slot holding only a fragment of signal (a preamble cut by the buffer end, a frame next to silence) cannot score like a whole chirp. Taking the weaker down slot stops a lock one symbol early or late, where one of the two slots holds an up-chirp. Candidates whose slots average more than 60 dB below the loudest window are ignored.
+
+Only lags with the whole 10-chirp preamble inside the buffer are scored, so a preamble near the end of the buffer is not judged on part of its chirps.
+
+- **Threshold.** In noise, $\rho \approx 1/(1.2M)$ (the low-pass passes about $1.2M$ complex degrees of freedom per window). Detection needs $U \ge \gamma$ and $\max_{|\delta| \le 2D} D(m+\delta) \ge \gamma$ with $\gamma = \min(0.5, 4\theta/M)$ and $\theta$ = `threshold` (default 3), i.e. 12/M: 0.19 at SF6, 0.012 at SF10. With $\rho \approx \text{SNR}_{band}/(1+\text{SNR}_{band})$ this corresponds to an in-band SNR of about −6 dB (SF6) to −19 dB (SF10).
+- **Why data cannot fake it.** Data symbols are up-chirps only. A shifted up-chirp correlated with the down-chirp template gives $\rho \approx 1/(2M)$ (stationary-phase estimate), the same order as noise, so the two-down-chirp term stays below $\gamma$ inside any payload, including payloads of zero bytes (runs of base up-chirps). The old waveform sent a down-chirp for every 1 bit, so the old 8-up/2-down preamble could occur inside data.
+- **Peak selection.** The start is the maximum of $U + D$ within one symbol after the first lag that passes. A later, stronger frame in the same buffer is not preferred over the first one.
+- **Fractional timing and offset.** A frequency offset $\Delta f$ delays the up-chirp correlation peak and advances the down-chirp peak by $\Delta f / (B/T)$ seconds, i.e. one chip per bin. With $t_{up}$, $t_{dn}$ the parabola-refined peaks of $U$ and $D$ within $\pm 2D$ samples,
+
+$$\hat{t}_0 = \frac{t_{up} + t_{dn}}{2}, \qquad \widehat{\Delta f} = \frac{t_{dn} - t_{up}}{2} \cdot \frac{B}{N} \text{ Hz}.$$
+
+The data symbols are demodulated at the fractional start $\hat{t}_0$ with $\widehat{\Delta f}$ removed (offsets up to about ±2 bins). `sw_detect_frame` reports $\operatorname{round}(\hat{t}_0)$ and the in-band SNR estimate $10\log_{10}(\bar\rho / (1 - \bar\rho))$, where $\bar\rho$ is the preamble mean.
 
 ### 3.2 Zadoff-Chu Sequences for OFDM Sync
 For OFDM, a Zadoff-Chu (ZC) sequence is placed in the preamble. ZC sequences possess constant amplitude and zero autocorrelation properties. The $u$-th root ZC sequence of length $N_{ZC}$ (where $N_{ZC}$ is prime) is defined as:

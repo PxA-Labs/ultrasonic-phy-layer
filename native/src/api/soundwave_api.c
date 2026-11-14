@@ -20,8 +20,8 @@
 #define SW_MIN_SAMPLE_RATE   8000
 #define SW_MAX_SAMPLE_RATE   192000
 #define SW_DEFAULT_RATE      44100
-#define SW_MIN_SF            6
-#define SW_MAX_SF            12
+#define SW_MIN_SF            CSS_MIN_SF
+#define SW_MAX_SF            CSS_MAX_SF
 #define SW_MIN_SUBCARRIERS   16
 #define SW_MAX_SUBCARRIERS   4096
 #define SW_MAX_SYMBOL_SEC    1.0f
@@ -66,6 +66,10 @@ SW_API int sw_config_validate(sw_config_t cfg) {
     int n_eff = N ? N : 256; // OFDM default
     if (cfg.cp_length < 0 || cfg.cp_length > n_eff) return SW_ERR_BAD_PARAM;
     if (cfg.num_pilots < 0 || cfg.num_pilots > n_eff / 2) return SW_ERR_BAD_PARAM;
+
+    // CSS: the waveform must fit (band inside (0, fs/2], symbol <= 1 s).
+    css_geometry_t g;
+    if (cfg.modulation == 0 && css_geometry(&cfg, &g) != 0) return SW_ERR_BAD_PARAM;
     if (cfg.modulation == 1 && !ofdm_band_ok(cfg, NULL)) return SW_ERR_BAD_PARAM;
     return SW_OK;
 }
@@ -118,19 +122,18 @@ SW_API int sw_css_modulate(const uint8_t* bits, size_t bit_len,
                            sw_config_t cfg, float* samples, size_t* sample_len) {
     if (!bits || !samples || !sample_len || bit_len == 0) return SW_ERR_BAD_PARAM;
     if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
+    css_geometry_t g;
+    if (css_geometry(&cfg, &g) != 0) return SW_ERR_BAD_PARAM;
 
-    sw_signal sig = css_modulate(bits, bit_len, cfg);
-    if (!sig.data) return SW_ERR_MEMORY;
-
-    if (sig.length > *sample_len) {
-        *sample_len = sig.length;
-        free(sig.data);
+    // Size check before synthesis: a too-small buffer costs nothing.
+    size_t need = css_frame_samples(&g, bit_len);
+    if (need == 0) return SW_ERR_BAD_PARAM; // would overflow
+    if (need > *sample_len) {
+        *sample_len = need;
         return SW_ERR_OVERFLOW;
     }
-
-    memcpy(samples, sig.data, sig.length * sizeof(float));
-    *sample_len = sig.length;
-    free(sig.data);
+    css_modulate_into(&g, bits, bit_len, samples);
+    *sample_len = need;
     return SW_OK;
 }
 
@@ -260,7 +263,10 @@ SW_API int sw_detect_frame(const float* samples, size_t len,
     sync_cfg.zc_length = (cfg.modulation == 1 && ofdm_band_ok(cfg, &lay)) ? lay.num_active : 0;
     
     if (cfg.modulation == 0) {
-        sync_cfg.matched_filter_len = (int)(cfg.symbol_duration * cfg.sample_rate + 0.5f);
+        css_geometry_t g;
+        if (css_geometry(&cfg, &g) != 0) return SW_ERR_BAD_PARAM;
+        sync_cfg.sf = g.sf;
+        sync_cfg.matched_filter_len = g.N;
         sync_cfg.carrier_freq = cfg.carrier_freq;
         sync_cfg.bandwidth = cfg.bandwidth;
         sync_cfg.sample_rate = (float)cfg.sample_rate;

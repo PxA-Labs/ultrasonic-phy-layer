@@ -11,10 +11,11 @@ typedef struct {
     float  threshold;         // Detection threshold theta (default 3.0)
     int    zc_root;           // Zadoff-Chu root index for OFDM (default 1)
     int    zc_length;         // ZC sequence length (default 127)
-    int    matched_filter_len; // CSS preamble template length / OFDM symbol period
+    int    matched_filter_len; // OFDM symbol period (unused by CSS: 2^sf * fs/B)
     float  carrier_freq;      // Carrier frequency in Hz
     float  bandwidth;         // Bandwidth in Hz
     float  sample_rate;       // Sample rate in Hz
+    int    sf;                // CSS spreading factor (0 = default 8)
 } sync_config_t;
 
 // Matched filter cross-correlation: R_ys[m] = sum y[n+m] * s[n]

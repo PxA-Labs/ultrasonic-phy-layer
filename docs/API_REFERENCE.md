@@ -27,16 +27,16 @@ This page is maintained by hand and checked against `native/include/soundwave_ap
 typedef struct {
     int   sample_rate;      // Hz; 0 = 44100
     int   modulation;       // 0 = CSS, 1 = OFDM
-    int   sf;               // CSS spreading factor (validated 6..12; see note)
+    int   sf;               // CSS spreading factor 6..10 (0 = 8): SF bits per chirp
     int   num_subcarriers;  // OFDM FFT size N (power of two, 16..4096; 0 = 256)
     int   cp_length;        // OFDM cyclic prefix in samples (0..N; 0 = N/8)
     int   num_pilots;       // OFDM pilots (0..N/2; see note)
-    float coding_rate;      // must be finite; currently unused by the DSP
+    float coding_rate;      // reserved, ignored (must be finite); FEC is fixed RS(255,223)
     float threshold;        // detection threshold multiplier (>= 0)
     int   equalizer;        // 0 = ZF, 1 = MMSE
-    float carrier_freq;     // Hz; CSS chirp start f0, OFDM band centre (0 = 19000)
-    float bandwidth;        // Hz; CSS sweep B, OFDM band width (0 = 2000)
-    float symbol_duration;  // s; CSS chirp length T (0 = 0.02, max 1.0)
+    float carrier_freq;     // Hz; CSS band centre fc, OFDM band centre (0 = 19000)
+    float bandwidth;        // Hz; CSS sweep (used as fs / round(fs / bandwidth)), OFDM band width (0 = 2000)
+    float symbol_duration;  // s; ignored by CSS (T = 2^sf / B); validated <= 1.0
     float amplitude;        // [0, 1] (0 = 0.8)
     int   ofdm_modulation;  // 0 = BPSK, 1 = QPSK
 } sw_config_t;
@@ -45,7 +45,8 @@ typedef struct {
 Field notes (from the implementation):
 
 - **Zero means default** for most fields. Each module fills in its own default.
-- `sf`, `coding_rate` and `num_pilots` are validated but **do not change the waveform**. CSS sends one bit per chirp (up-chirp = 0, down-chirp = 1). OFDM puts a pilot on every 8th active subcarrier regardless of `num_pilots`.
+- `sf` sets the CSS symbol: one chirp of $2^{SF}$ chips carries SF bits (cyclically shifted up-chirps, Gray mapped). The chirp lasts $2^{SF}/B$, so `symbol_duration` is not used by CSS.
+- `coding_rate` is reserved and ignored: the only FEC is the fixed RS(255,223) code applied by the caller (app/CLI). `num_pilots` is validated but does not change the waveform: OFDM puts a pilot on every 8th active subcarrier regardless of `num_pilots`.
 - `carrier_freq` and `bandwidth` also set the **OFDM band** $[f_c - B/2, f_c + B/2]$ (default 18–20 kHz). Only subcarriers inside it (with one guard bin per edge) carry data or pilots. `sw_config_validate` (for `modulation == 1`) and every `sw_ofdm_*` function reject a band that reaches DC, lies within one subcarrier spacing of Nyquist, or holds fewer than 4 subcarriers (see [Signal chain](architecture/signal-chain.md#ofdm-mode)).
 
 ### `sw_config_validate`
@@ -63,10 +64,12 @@ Returns `SW_OK` or `SW_ERR_BAD_PARAM`. Every `sw_*` function that takes a config
 - `carrier_freq` and `bandwidth` are ≤ Nyquist.
 - `symbol_duration` ≤ 1 s.
 - `amplitude` is in [0, 1].
-- `sf` is 0 or 6..12.
+- `sf` is 0 or 6..10.
+- CSS (`modulation` 0) only: the band `carrier_freq` ± B/2 lies in (0, Nyquist] and a symbol $2^{SF}/B$ is at most 1 s, with B = fs / round(fs / `bandwidth`).
 - `num_subcarriers` is 0 or a power of two in 16..4096.
 - `cp_length` is in 0..N.
 - `num_pilots` is in 0..N/2.
+- OFDM (`modulation` 1) only: the band `carrier_freq` ± `bandwidth`/2 lies above DC, its upper edge is at most fs/2 − fs/N, and it holds at least 4 subcarriers after one guard bin per edge. The `sw_ofdm_*` functions apply this check whatever `modulation` says.
 
 ## Library information
 
@@ -105,8 +108,8 @@ int sw_css_demodulate(const float* samples, size_t sample_len, sw_config_t cfg,
 ```
 
 - **Bit packing:** `bits` is a **packed byte array** (MSB first). `bit_len` counts bits.
-- **Output length:** `sw_css_modulate` produces `(10 + bit_len) × round(T·fs)` samples: an 8 up-chirp + 2 down-chirp preamble, then one chirp per bit. `*sample_len` is the capacity on input and the written count on output. On `SW_ERR_OVERFLOW` it holds the required count.
-- **Demodulation:** `sw_css_demodulate` searches for the first preamble, then decodes every remaining whole chirp, so trailing noise also becomes bits. It returns packed bytes, and `*bit_len` is set to a multiple of 8. It returns `SW_ERR_SYNC` if no preamble is found and `SW_ERR_OVERFLOW` (with the required bit count) if the buffer is too small.
+- **Output length:** `sw_css_modulate` produces `(10 + ceil(bit_len / SF)) × 2^SF × D` samples, D = round(fs / `bandwidth`): an 8 base up-chirp + 2 down-chirp preamble, then one chirp per SF bits (the last group zero padded). `*sample_len` is the capacity on input and the written count on output. On `SW_ERR_OVERFLOW` it holds the required count (checked before any synthesis).
+- **Demodulation:** `sw_css_demodulate` searches the whole buffer for the first complete preamble (any amount of audio may precede it), estimates fractional timing and frequency offset, then decodes every remaining whole chirp (dechirp + $2^{SF}$-point FFT), so trailing noise also becomes bits. It returns packed bytes, and `*bit_len` is set to a multiple of 8. It returns `SW_ERR_SYNC` if no preamble is found and `SW_ERR_OVERFLOW` (with the required bit count) if the buffer is too small.
 
 ## OFDM modem
 
@@ -132,7 +135,7 @@ int sw_estimate_cfo(const float* samples, size_t len, sw_config_t cfg,
                     float* cfo_hz);
 ```
 
-- **`sw_detect_frame`:** finds the preamble (CSS: matched filter on the 8-up/2-down pattern; OFDM: Schmidl-Cox repetition metric as presence gate, then the earliest strong peak of a normalised matched filter on the known preamble, refined from the preamble's phase slope). It writes the start offset and an SNR estimate in dB, and returns `SW_ERR_SYNC` if nothing is above threshold. For CSS mode the buffer must hold at least 10 chirps.
+- **`sw_detect_frame`:** finds the preamble (CSS: normalised up-/down-chirp correlation scored on all 10 preamble chirps, first preamble in the buffer, see [math §3.1](MATHEMATICAL_MODEL.md#31-css-preamble-detection); OFDM: Schmidl-Cox repetition metric as presence gate, then the earliest strong peak of a normalised matched filter on the known preamble, refined from the preamble's phase slope). It writes the start offset and an SNR estimate in dB, and returns `SW_ERR_SYNC` if nothing is above threshold. For CSS mode the buffer must hold the whole 10-chirp preamble; the CSS SNR is an in-band estimate.
 - **`sw_estimate_cfo`:** Schmidl-Cox estimate over two repeated periods of `N + cp` samples. It needs `len ≥ 2(N + cp)`, otherwise it returns `SW_ERR_SYNC`.
 
 ## Real-time audio I/O

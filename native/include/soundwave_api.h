@@ -54,8 +54,10 @@ SW_API const char* sw_version(void);
  *  - sample_rate: 8000..192000 Hz
  *  - all float fields finite; threshold, carrier_freq, bandwidth,
  *    symbol_duration >= 0; amplitude in [0, 1]
- *  - CSS: sf 6..12; carrier_freq and bandwidth <= sample_rate / 2;
- *    symbol_duration <= 1 s
+ *  - CSS: sf 6..10; carrier_freq and bandwidth <= sample_rate / 2;
+ *    symbol_duration <= 1 s (ignored by CSS). With modulation 0 the band
+ *    carrier_freq +/- B/2 must lie in (0, fs/2] and 2^sf / B <= 1 s, where
+ *    B = fs / round(fs / bandwidth)
  *  - OFDM: num_subcarriers a power of two in 16..4096;
  *    cp_length <= num_subcarriers; num_pilots <= num_subcarriers / 2;
  *    when modulation == 1, the band [carrier_freq - bandwidth/2,
