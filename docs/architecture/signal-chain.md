@@ -58,15 +58,15 @@ All values are **computed** from the code at $f_s$ = 44.1 kHz (not measured). Ra
 |---|---|---|---|---|
 | 256 / 32, 18–20 kHz | 98.69 % | −44.7 dB | −33.8 dB | 1.11 |
 | 256 / 64, 18–20 kHz (default) | 98.99 % | −53.9 dB | −44.4 dB | 1.11 |
-| 512 / 64, 18–20 kHz | 99.17 % | −46.5 dB | −42.1 dB | 1.06 |
-| 1024 / 128, 18–20 kHz | 99.20 % | −42.3 dB | −39.2 dB | 1.10 |
-| 2048 / 128, 18–20 kHz | 99.49 % | −47.8 dB | −44.4 dB | 2.16 |
-| 256 / 64, 18–21 kHz | 99.39 % | −43.0 dB | −39.2 dB | 1.41 |
-| 2048 / 128, 18–21 kHz (*High Speed*) | 99.40 % | −56.2 dB | −49.9 dB | 2.47 |
+| 512 / 64, 18–20 kHz | 99.23 % | −46.5 dB | −42.0 dB | 1.06 |
+| 1024 / 128, 18–20 kHz | 99.24 % | −42.2 dB | −39.1 dB | 1.10 |
+| 2048 / 128, 18–20 kHz | 99.43 % | −47.5 dB | −44.1 dB | 1.19 (2.16 before padding whitening) |
+| 256 / 64, 18–21 kHz | 99.39 % | −42.9 dB | −39.1 dB | 1.41 |
+| 2048 / 128, 18–21 kHz (*High Speed*) | 99.37 % | −56.0 dB | −49.7 dB | 1.54 (2.47 before padding whitening) |
 
 Before this change the OFDM modulator ignored `carrier_freq` and `bandwidth` and spread energy over 5.7–21.9 kHz (N = 256): only about 11–15 % of the energy fell in 18–20 kHz and about −2 dB (≈ 60 %) was below 16 kHz (pure-Python model of the old modulator, same frame; peak samples 7–19).
 
-The raw IDFT peaks above exceed full scale for N = 2048 and for the 18–21 kHz band. The modulator therefore normalises every frame to a peak of exactly `amplitude` (default 0.8) with one gain per frame (see *Transmit level* in the [mathematical model](../MATHEMATICAL_MODEL.md#223-ultrasonic-band-plan)); the energy fractions above do not depend on the level. The app and `soundwave-cli` play or write the samples unscaled, and `native/tests/test_tx_peak.c` checks max |sample| ≤ `amplitude` across FFT sizes, CP lengths, BPSK/QPSK, bands and worst-case payloads.
+The raw IDFT peaks above exceed full scale (and did more before the last symbol's zero padding was whitened, see [data whitening](../MATHEMATICAL_MODEL.md#223-ultrasonic-band-plan)); across the configurations in `test_tx_peak` they reach about 2–6 with crest factors of 9–19 dB. The modulator therefore normalises every frame to a peak of exactly `amplitude` (default 0.8) with one gain per frame (see *Transmit level* in the [mathematical model](../MATHEMATICAL_MODEL.md#223-ultrasonic-band-plan)); the energy fractions above do not depend on the level. The app and `soundwave-cli` play or write the samples unscaled, and `native/tests/test_tx_peak.c` checks max |sample| ≤ `amplitude` across FFT sizes, CP lengths, BPSK/QPSK, bands and worst-case payloads.
 
 !!! warning "Not measured over the air"
     The band plan and spectrum are exact properties of the transmitted samples. Whether a given speaker and microphone pass 18–20 kHz, and what SNR they achieve there, has not been measured; see the [field test plan](../testing/FIELD_TEST_PLAN.md). Many devices roll off above 18–20 kHz, which is why the default band stops at 20 kHz.
