@@ -277,35 +277,98 @@ def load_manifest(path):
         return json.load(f)
 
 
-def decode_windows(cli, manifest, samples, rate, offset, first, count, tmp):
-    """Decodes `count` slot windows starting at slot `first`; returns results."""
-    slot = manifest["frame_samples"] + manifest["gap_samples"]
-    win = slot + manifest["gap_samples"]
-    out = []
-    for j in range(first, first + count):
-        start = offset + j * slot
-        if start >= len(samples):
+def decode_at(cli, manifest, samples, rate, start, tmp, tag):
+    """Decodes one window starting at absolute sample `start`."""
+    win = manifest["frame_samples"] + 2 * manifest["gap_samples"]
+    start = max(0, start)
+    path = os.path.join(tmp, f"win_{tag}.wav")
+    write_wav16(path, samples[start:start + win], rate)
+    res = cli_demodulate(cli, manifest["params"], path)
+    res["seg_start"] = start
+    res["window_start_s"] = round(start / rate, 3)
+    if VERBOSE:
+        last = res["stderr"].splitlines()[-1] if res["stderr"] else ""
+        print(f"  {tag} @ {start / rate:.3f} s: {'ok' if res['ok'] else 'fail'} | {last}",
+              file=sys.stderr)
+    return res
+
+
+def decode_with_resync(cli, manifest, samples, rate, start, tmp, tag):
+    """Window at `start`; on failure, retry at the sw_detect_frame offset.
+
+    `soundwave-cli demodulate --mode css` locks onto the first correlation
+    value above its threshold, so a frame preceded by more than a few ms of
+    audio is often missed. The same run prints sw_detect_frame's global peak
+    (`frame_start`), which is usually the true start.
+    """
+    res = decode_at(cli, manifest, samples, rate, start, tmp, tag)
+    fs0 = res.get("frame_start")
+    if not res["ok"] and fs0:
+        res = decode_at(cli, manifest, samples, rate, res["seg_start"] + fs0, tmp, tag + "r")
+    return res
+
+
+def track_slots(cli, manifest, samples, rate, tmp, probe):
+    """Finds one frame, then predicts every other frame from the slot period.
+
+    Returns (results, anchor_seconds or None).
+    """
+    gap = manifest["gap_samples"]
+    slot = manifest["frame_samples"] + gap
+    margin = int(0.002 * rate)          # start each window 2 ms early
+    tol = int(0.010 * rate)             # accept re-anchoring within +/-10 ms
+    anchor = None                       # (slot index, absolute frame start)
+    # 1) Coarse search: windows one half-gap apart over the first slots.
+    step = max(1, gap // 2)
+    for off in range(-gap, slot, step):
+        for j in range(probe + 1):
+            res = decode_with_resync(cli, manifest, samples, rate, off + j * slot, tmp,
+                                     f"probe{off}_{j}")
+            if res["ok"]:
+                text = res["payload"].decode("ascii", "replace")
+                m = PAYLOAD_RE.match(text)
+                if not m:
+                    continue
+                # Candidate starts: the window start itself (CSS succeeds only
+                # when the frame starts there) or the detector's offset.
+                cands = [res["seg_start"]]
+                if res.get("frame_start") is not None:
+                    cands.insert(0, res["seg_start"] + res["frame_start"])
+                for c in cands:
+                    chk = decode_at(cli, manifest, samples, rate, c - margin, tmp, "verify")
+                    if chk["ok"] and chk["payload"] == res["payload"]:
+                        anchor = (int(m.group(1)), c)
+                        break
+                if anchor:
+                    break
+        if anchor:
             break
-        seg = samples[max(0, start):start + win]
-        path = os.path.join(tmp, f"win_{j:05d}.wav")
-        write_wav16(path, seg, rate)
-        res = cli_demodulate(cli, manifest["params"], path)
-        fs0 = res.get("frame_start")
-        if not res["ok"] and fs0:
-            # `demodulate` (CSS) locks onto the first correlation value above
-            # its threshold, so a frame preceded by more than a few ms of
-            # audio is often missed. sw_detect_frame (global peak) is printed
-            # in the same run: re-cut the window at that offset and retry.
-            start = max(0, start) + fs0
-            write_wav16(path, samples[start:start + win], rate)
-            res = cli_demodulate(cli, manifest["params"], path)
-        res["window_start_s"] = round(max(0, start) / rate, 3)
-        if VERBOSE:
-            last = res["stderr"].splitlines()[-1] if res["stderr"] else ""
-            print(f"  window {j} @ {res['window_start_s']:.2f} s: "
-                  f"{'ok' if res['ok'] else 'fail'} | {last}", file=sys.stderr)
-        out.append(res)
-    return out
+    if anchor is None:
+        return [], None
+    # 2) Predict each slot from the nearest successful frame (tracks drift).
+    results = []
+    k0, p0 = anchor
+    order = list(range(k0, manifest["frames"])) + list(range(k0 - 1, -1, -1))
+    last = {}
+    for k in order:
+        ref_k, ref_p = (k0, p0)
+        nearer = [kk for kk in last if abs(kk - k) < abs(ref_k - k)]
+        if nearer:
+            ref_k = min(nearer, key=lambda kk: abs(kk - k))
+            ref_p = last[ref_k]
+        p = ref_p + (k - ref_k) * slot
+        if p - margin >= len(samples):
+            continue
+        res = decode_with_resync(cli, manifest, samples, rate, p - margin, tmp, f"slot{k}")
+        if res["ok"]:
+            fs = res.get("frame_start")
+            seg = res["seg_start"]
+            est = seg + fs if fs is not None and abs(seg + fs - p) <= tol else p
+            if abs(seg - (p - margin)) > 0:   # succeeded after a re-sync
+                est = seg if abs(seg - p) <= tol else p
+            last[k] = est
+        results.append(res)
+    return results, p0 / rate
 
 
 def match(manifest, results):
@@ -339,28 +402,17 @@ def cmd_decode(a):
         if manifest["params"]["mode"] == "ofdm":
             sys.exit(msg + "; OFDM needs the same rate (resample first)")
         print("WARNING: " + msg, file=sys.stderr)
-    slot = manifest["frame_samples"] + manifest["gap_samples"]
     tmp = tempfile.mkdtemp(prefix="sw_ber_")
     try:
-        # Align the slot grid: try offsets one half-gap apart over one slot and
-        # keep the one that decodes most of the first `probe` slots.
-        step = max(1, manifest["gap_samples"] // 2)
-        probe = min(a.probe, manifest["frames"])
-        best, best_n = 0, -1
-        for off in range(-manifest["gap_samples"], slot, step):
-            res = decode_windows(a.cli, manifest, samples, rate, off, 0, probe + 1, tmp)
-            n = sum(1 for r in match(manifest, res) if r["decoded"])
-            if n > best_n:
-                best, best_n = off, n
-            if n >= probe:
-                break
-        n_slots = manifest["frames"] + 2
-        results = decode_windows(a.cli, manifest, samples, rate, best, 0, n_slots, tmp)
+        results, anchor_s = track_slots(a.cli, manifest, samples, rate, tmp,
+                                        min(a.probe, manifest["frames"]))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    if anchor_s is None:
+        print("WARNING: no frame could be decoded anywhere in the recording", file=sys.stderr)
     rows = match(manifest, results)
     summary = summarize(manifest, rows)
-    summary.update(recording=os.path.basename(a.recording), grid_offset_s=best / rate,
+    summary.update(recording=os.path.basename(a.recording), first_frame_found_at_s=anchor_s,
                    label=a.label or "", kind="FIELD (recorded)")
     report(a.out, rows, summary)
 
