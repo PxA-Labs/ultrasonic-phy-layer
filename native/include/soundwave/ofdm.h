@@ -101,8 +101,9 @@ int ofdm_preamble_spectrum(const ofdm_layout_t* lay, int N, int cp, kiss_fft_cpx
 
 // Data whitening: XORs bits[0 .. nbits) (MSB-first) with the PRBS15
 // sequence x^15 + x^14 + 1 (seed all ones), restarting at bit 0 of every
-// frame. Self-inverse. The modulator scrambles the data bits and the
-// demodulator descrambles them, so repeated payload bytes (runs of zeros,
+// frame. Self-inverse. The modulator scrambles the data bits including the
+// zero padding of the last symbol (so it is not a constant, high-crest-factor
+// symbol) and the demodulator descrambles every demodulated bit, so repeated payload bytes (runs of zeros,
 // "0000", padding) never produce identical consecutive OFDM symbols, which
 // the repetition-based (Schmidl-Cox) detector would take for a preamble.
 void ofdm_scramble(uint8_t* bits, size_t nbits);

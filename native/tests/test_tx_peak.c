@@ -206,6 +206,30 @@ static void test_ofdm_scale_invariance(float* tx_a, float* tx_b) {
     printf("PASS: OFDM level scaling is a pure gain; frames decode at amplitude 0.25 and 1.0\n");
 }
 
+// The last symbol's padding is whitened on air but still decodes as zeros,
+// also when the payload ends inside a byte.
+static void test_ofdm_partial_byte_padding(float* tx) {
+    const uint8_t p[2] = {0xFF, 0xFF};
+    for (int mod = 0; mod <= 1; mod++) {
+        sw_config_t c = base_cfg(1);
+        c.ofdm_modulation = mod;
+        size_t n = MAX_SAMPLES;
+        CHECK(sw_ofdm_modulate(p, 13, c, tx, &n) == SW_OK);
+        float pk = peak_of(tx, n);
+        CHECK(within(pk, c.amplitude));
+        uint8_t out[64];
+        memset(out, 0xEE, sizeof out);
+        size_t bits = sizeof out * 8;
+        int rc = sw_ofdm_demodulate(tx, n, c, out, &bits);
+        CHECK(rc == SW_OK && bits >= 16);
+        if (rc != SW_OK || bits < 16) continue;
+        // The frame carries 16 bits (one QPSK / two BPSK symbols): 13 ones,
+        // then 3 padding bits that were whitened on air and decode as zeros.
+        CHECK(out[0] == 0xFF && out[1] == 0xF8);
+    }
+    printf("PASS: partial-byte payload decodes, whitened padding decodes as zeros\n");
+}
+
 // Internal entry points: ofdm_modulate_frame with out-of-range amplitudes,
 // and ofdm_peak_normalize edge cases.
 static void test_ofdm_internal(float* tx) {
@@ -304,6 +328,7 @@ int main(void) {
     }
     test_ofdm_matrix(a);
     test_ofdm_scale_invariance(a, b);
+    test_ofdm_partial_byte_padding(a);
     test_ofdm_internal(a);
     test_css_matrix(a);
     free(a);

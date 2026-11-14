@@ -350,14 +350,23 @@ int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
     kiss_fft_cpx* X = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
     float* sym = (float*)calloc(L, sizeof(float));
     float* ramp = (float*)malloc(((size_t)W + 1) * sizeof(float));
-    uint8_t* wbits = (uint8_t*)malloc(bit_len / 8 + 1);
+    // Every data subcarrier of every symbol carries a bit: the payload,
+    // then zero padding up to the end of the last symbol.
+    size_t air_bits = num_symbols * (size_t)bits_per_symbol;
+    uint8_t* wbits = (uint8_t*)calloc(air_bits / 8 + 1, 1);
     if (!data_indices || !X || !sym || !ramp || !wbits) {
         free(data_indices); free(X); free(sym); free(ramp); free(wbits);
         return SW_ERR_MEMORY;
     }
-    // Whitened copy of the data bits (see ofdm_scramble).
+    // Whitened copy of the data bits, padding included (see ofdm_scramble):
+    // unwhitened padding would put the same point on hundreds of
+    // subcarriers of the last symbol, i.e. a coherent time-domain pulse with
+    // a crest factor of up to ~26 dB, and peak normalization would then make
+    // the whole frame that much quieter. The receiver descrambles every
+    // demodulated bit, so the padding still decodes as zeros.
     memcpy(wbits, bits, (bit_len + 7) / 8);
-    ofdm_scramble(wbits, bit_len);
+    if (bit_len % 8) wbits[bit_len / 8] &= (uint8_t)(0xFFu << (8 - bit_len % 8));
+    ofdm_scramble(wbits, air_bits);
     bits = wbits;
     ofdm_allocate_subcarriers(&lay, data_indices, NULL);
     // Raised-cosine rise r[n]; the matching fall is r[W - 1 - n], and
@@ -387,12 +396,12 @@ int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
         for (int i = 0; i < lay.num_data; i++) {
             int idx = data_indices[i];
             size_t bit_pos = s * (size_t)bits_per_symbol + (size_t)i * (size_t)bits_per_sub;
+            // bit_pos < air_bits: the whitened buffer covers every symbol.
             if (cfg->modulation == 0) {
-                int bit = (bit_pos < bit_len) ? get_bit(bits, bit_pos) : 0;
-                bpsk_map(bit, &X[idx]);
+                bpsk_map(get_bit(bits, bit_pos), &X[idx]);
             } else {
-                int bit1 = (bit_pos < bit_len) ? get_bit(bits, bit_pos) : 0;
-                int bit2 = ((bit_pos + 1) < bit_len) ? get_bit(bits, bit_pos + 1) : 0;
+                int bit1 = get_bit(bits, bit_pos);
+                int bit2 = get_bit(bits, bit_pos + 1);
                 qpsk_map((uint8_t)((bit1 << 1) | bit2), &X[idx]);
             }
         }
