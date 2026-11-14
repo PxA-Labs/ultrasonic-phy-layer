@@ -74,8 +74,7 @@ void main() {
     if (base.existsSync()) base.deleteSync(recursive: true);
   });
 
-  /// Feeds 0.1 s of captured audio so a sample can be saved. Captured audio
-  /// alone does not notify listeners, so this runs before the first build.
+  /// Feeds 0.1 s of captured audio so a sample can be saved.
   Future<void> captureSomeAudio(WidgetTester tester) async {
     audio.pushMockChunk(Float64List(4410));
     await tester.pump();
@@ -87,6 +86,29 @@ void main() {
       .whereType<File>()
       .where((f) => f.path.contains('samples'))
       .toList();
+
+  testWidgets('Save Signal Sample enables once captured audio arrives',
+      (tester) async {
+    await tester.pumpWidget(host(state, FailingShareGateway()));
+    final save = find.byKey(const Key('save_signal_sample_button'));
+    expect(tester.widget<ButtonStyleButton>(save).onPressed, isNull);
+
+    var notifications = 0;
+    state.addListener(() => notifications++);
+
+    // Audio is the only state change: the button must still rebuild.
+    audio.pushMockChunk(Float64List(4410));
+    await tester.pump();
+    expect(tester.widget<ButtonStyleButton>(save).onPressed, isNotNull);
+    expect(notifications, 1);
+
+    // Further chunks do not change hasRecentAudio, so they do not notify.
+    audio.pushMockChunk(Float64List(4410));
+    audio.pushMockChunk(Float64List(4410));
+    await tester.pump();
+    expect(notifications, 1);
+    expect(tester.widget<ButtonStyleButton>(save).onPressed, isNotNull);
+  });
 
   testWidgets('saving a signal sample writes audio and the note',
       (tester) async {
