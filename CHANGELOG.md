@@ -61,6 +61,9 @@ All notable changes to this project will be documented in this file.
 - **sync:** Zero-initialise analytic buffers in CFO estimator (#28)
 - **ofdm:** Compute 1/SNR without dividing by zero for silent pilots (#28)
 - **app:** Do not return a Future from setState in the storage card
+- **android:** Import Properties in app build script
+- **ci:** Gate Android signature check on apksigner exit status, not cert wording
+- **ci:** Pin macOS build to Flutter 3.50.0 to avoid 3.47 gen_snapshot crash
 
 ### Build
 
@@ -79,6 +82,7 @@ All notable changes to this project will be documented in this file.
 - **workflow:** Add auto-formatting and auto-commit step to CI for Dart files
 - Remove redundant auto-format and auto-commit steps in ci.yml
 - Add sanitizer, libFuzzer and static-analysis jobs; document workflow (#28)
+- **build:** Produce debug/split release APKs and AAB with packaged .so checks
 
 ### Documentation
 
@@ -144,6 +148,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -174,6 +179,8 @@ All notable changes to this project will be documented in this file.
 - **agc:** Native automatic gain control with FFI API (#92)
 - **app:** Apply AGC in the RX pipeline with settings toggle and gain readout (#92)
 - **app:** WAV recording, signal import/demodulation and message export (#33)
+- **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
+- **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
 
 ### Maintenance
 
