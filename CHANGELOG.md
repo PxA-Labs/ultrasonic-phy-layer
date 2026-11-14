@@ -48,10 +48,38 @@ All notable changes to this project will be documented in this file.
 - **test:** Scroll ListView in dashboard_test to bring message log into view
 - **ui:** Prevent notifyListeners calls after AppState is disposed
 - **test:** Implement updateConfig in MockAudioService
+- **ci:** Add Flutter platform projects and repair Build/Release workflows
+- **ci:** Align CI Flutter with platform templates and upgrade record to v7
+- **ci:** Install GStreamer for Linux and silence STL1011 on Windows builds
+- **sync:** Normalised, energy-gated Schmidl-Cox metric for OFDM frame timing (#88)
+- **ffi:** Send all frame bits and size modulator buffers by the API's overflow protocol (#88)
+- **api,rs:** Validate sw_config_t at the FFI boundary; decode RS with explicit parity (#28)
+- **sync:** Bounds-check CFO estimation, timing metric and matched filter (#28)
+- **css:** Derive symbol length from the chirp template; remove debug print (#28)
+- **ofdm:** Guard short inputs, unchecked allocations and failed frame writes (#28)
+- **fec,packet:** Make FEC round-trip and enforce packet length limits (#28)
+- **sync:** Zero-initialise analytic buffers in CFO estimator (#28)
+- **ofdm:** Compute 1/SNR without dividing by zero for silent pilots (#28)
+- **app:** Do not return a Future from setState in the storage card
+- **android:** Import Properties in app build script
+- **ci:** Gate Android signature check on apksigner exit status, not cert wording
+- **ci:** Pin macOS build to Flutter 3.50.0 to avoid 3.47 gen_snapshot crash
+- **ci:** Resolve libunwind conflict on ubuntu-22.04 desktop builds
+- **linux:** Avoid SIGPIPE false failure when checking .deb contents
+- **release:** Checksum and publish a flattened asset set
+- **ci:** Pin Flutter 3.50.0 to avoid macOS AOT snapshotter crash
+- **ci:** Pin Flutter 3.50.0 only for macOS desktop jobs
+- **android:** Import Properties in app build script
+- **ci:** Gate Android signature check on apksigner exit status, not cert wording
+- **ci:** Pin macOS build to Flutter 3.50.0 to avoid 3.47 gen_snapshot crash
+- **android:** Import Properties in app build script
+- **ci:** Gate Android signature check on apksigner exit status, not cert wording
+- **ci:** Pin macOS build to Flutter 3.50.0 to avoid 3.47 gen_snapshot crash
 
 ### Build
 
 - Ignore AGENTS.md for local agent configuration
+- **native:** ASan/UBSan/libFuzzer options and property-based fuzz harnesses (#28)
 
 ### CI
 
@@ -64,6 +92,11 @@ All notable changes to this project will be documented in this file.
 - Fix invalid GitHub action major versions in workflow files
 - **workflow:** Add auto-formatting and auto-commit step to CI for Dart files
 - Remove redundant auto-format and auto-commit steps in ci.yml
+- Add sanitizer, libFuzzer and static-analysis jobs; document workflow (#28)
+- **build:** Produce debug/split release APKs and AAB with packaged .so checks
+- **build:** Produce debug/split release APKs and AAB with packaged .so checks
+- **build:** Produce debug/split release APKs and AAB with packaged .so checks
+- Temporary format diff job (to be removed)
 
 ### Documentation
 
@@ -127,6 +160,13 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
+- **ci:** Document desktop packaging, signing secrets and dry-run releases
+- **ci:** Note the macOS Flutter pin
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -152,11 +192,30 @@ All notable changes to this project will be documented in this file.
 - **ui:** Implement Dashboard, Signal Monitor, and Settings screens (#30)
 - **ui:** Dynamic config settings propagation and OpenSSF secure bounds checks
 - **ui:** Implement throughput meter, SNR display & connection status widget (#90)
+- **engine:** Config-driven RX pipeline with shared frame codec for CSS and OFDM (#88)
+- **settings:** Persist modem settings, add BPSK/QPSK selector, fix CP options (#88)
+- **agc:** Native automatic gain control with FFI API (#92)
+- **app:** Apply AGC in the RX pipeline with settings toggle and gain readout (#92)
+- **app:** WAV recording, signal import/demodulation and message export (#33)
+- **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
+- **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
+- **desktop:** Bundle libsoundwave and package Windows/macOS/Linux builds
+- **release:** Sign, package and checksum desktop builds with dry-run mode
+- **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
+- **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
+- **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
+- **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
+- **monitor:** Spectrum analyzer, waterfall and OFDM constellation widgets (#71, #91)
 
 ### Maintenance
 
 - Change license from MIT to Apache 2.0
 - Merge main into feat/ci-benchmarking
+- Land stacked PRs #118, #120, #121 and #119 (#122)
+
+### Performance
+
+- **sync:** FFT overlap-save correlation for CSS sync; replay fuzz regressions in CTest (#28)
 
 ### Styling
 
@@ -167,10 +226,21 @@ All notable changes to this project will be documented in this file.
 - Remove trailing whitespace in dashboard_test.dart
 - **ui:** Format audio_service.dart according to dart format guidelines
 - **ui:** Apply standard dart format to audio_service.dart
+- Dart format test files; drop temporary format job
 
 ### Testing
 
 - **qa:** Implement AWGN channel simulator and BER benchmarking harness (#72)
 - **app:** Fix ProviderNotFound, CSV csv contains format, closeTo tolerance, and ServicesBinding in tests
+- **native:** Real TX->audio->RX loopback tests, run in CI against this commit's DSP (#88)
+- **native:** Memory-safety regression suite and ASan canaries (#28)
+- **native:** Pad constellation test frames, report per-symbol EVM
+- Bound constellation EVM by the measured clean-loopback level
+- Check constellation decisions against frame bits; diagnose monitor peak
+- Pad native constellation frames; pump monitor test past throttle
+
+### Merge
+
+- Android NDK branch into desktop pipeline (stack on #124)
 
 
