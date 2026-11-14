@@ -14,6 +14,12 @@ concurrency:
 
 env:
   CCACHE_DIR: ${{ github.workspace }}/.ccache
+  # Coverage gates (issue #36): CI fails if coverage drops below these.
+  # Set just below the measured numbers (native 86.43% lines / 74.32%
+  # branches, Flutter 90.24% lines); raise them as coverage improves.
+  NATIVE_MIN_LINE: '86.0'
+  NATIVE_MIN_BRANCH: '74.0'
+  FLUTTER_MIN_LINE: '89.5'
 
 jobs:
   flutter-quality-gate:
@@ -45,14 +51,22 @@ jobs:
 
       - name: Check formatting
         if: steps.check.outputs.exists == 'true'
-        run: dart format --set-exit-if-changed .
+        # On failure, print the exact diff so it can be fixed without a local SDK.
+        run: |
+          if ! dart format --set-exit-if-changed . ; then
+            dart format . > /dev/null
+            git --no-pager diff -- '*.dart'
+            exit 1
+          fi
 
       - name: Build native library for FFI tests
         if: steps.check.outputs.exists == 'true'
         working-directory: native
         run: |
           cmake -S . -B build-ffi -DCMAKE_BUILD_TYPE=Release -DSW_BUILD_TESTS=OFF
-          cmake --build build-ffi --target soundwave_shared -j "$(nproc)"
+          # soundwave-cli too: test/native/cli_compat_test.dart cross-decodes
+          # app and CLI WAV files.
+          cmake --build build-ffi --target soundwave_shared soundwave_cli -j "$(nproc)"
 
       - name: Run Flutter tests
         if: steps.check.outputs.exists == 'true'
@@ -61,13 +75,90 @@ jobs:
           # fail (instead of skipping) if the library cannot be loaded.
           SOUNDWAVE_LIB: ${{ github.workspace }}/native/build-ffi/libsoundwave.so
           SOUNDWAVE_REQUIRE_NATIVE: '1'
-        run: flutter test --coverage
+          SOUNDWAVE_CLI: ${{ github.workspace }}/native/build-ffi/soundwave-cli
+          SOUNDWAVE_REQUIRE_CLI: '1'
+        run: |
+          mkdir -p build
+          flutter test --coverage --file-reporter json:build/flutter-test-results.json
+
+      - name: Flutter coverage gate
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          python3 ../.github/scripts/coverage_report.py report \
+            --name "Flutter app" --lcov coverage/lcov.info --include '(^|/)lib/' --worst 40 --uncovered 25 \
+            --min-line "$FLUTTER_MIN_LINE" \
+            --flutter-json build/flutter-test-results.json \
+            --json-out coverage/summary-flutter.json
+
+      - name: Upload Flutter coverage artifact
+        if: always() && steps.check.outputs.exists == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-flutter
+          path: |
+            soundwave_app/coverage/lcov.info
+            soundwave_app/coverage/summary-flutter.json
+            soundwave_app/build/flutter-test-results.json
+          if-no-files-found: warn
 
       - name: Upload coverage to Codecov
+        # Optional: without a CODECOV_TOKEN the upload may be rejected; that
+        # must never fail CI (the gate above is the source of truth).
         if: github.event_name == 'push' && steps.check.outputs.exists == 'true'
         uses: codecov/codecov-action@v7
         with:
           files: soundwave_app/coverage/lcov.info
+          flags: flutter
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  # ---------------------------------------------------------------------------
+  # Flutter integration tests (issue #34): the real Linux desktop app (with the
+  # bundled native DSP library) under a virtual X server.
+  # ---------------------------------------------------------------------------
+  flutter-integration:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: soundwave_app
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.x'
+          channel: stable
+          cache: true
+
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          # ubuntu-22.04 ships libunwind-14-dev, which conflicts with the
+          # libunwind-dev that libgstreamer1.0-dev depends on.
+          sudo apt-get remove -y libunwind-14-dev || true
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev xvfb
+
+      - name: Install dependencies
+        run: |
+          flutter pub get
+          git --no-pager diff -- pubspec.lock
+
+      - name: Run integration tests (Linux desktop, xvfb)
+        run: |
+          mkdir -p build
+          xvfb-run -a flutter test integration_test -d linux \
+            --file-reporter json:build/integration-test-results.json
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: integration-test-results
+          path: soundwave_app/build/integration-test-results.json
+          if-no-files-found: ignore
 
   dsp-core:
     strategy:
@@ -137,6 +228,13 @@ jobs:
           ctest --output-on-failure --build-config Release
         shell: bash
 
+      - name: OFDM transmit spectrum report
+        # Prints the in-band / audible-band energy figures quoted in
+        # docs/architecture/signal-chain.md (simulation, not a measurement).
+        if: steps.check.outputs.exists == 'true' && matrix.os == 'ubuntu-latest'
+        run: ctest --test-dir native/build -R test_ofdm_spectrum -V --build-config Release
+        shell: bash
+
       - name: Show ccache stats
         if: steps.check.outputs.exists == 'true'
         run: ccache --show-stats
@@ -144,54 +242,111 @@ jobs:
 
   dsp-coverage:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake gcc g++ make lcov
+          sudo apt-get install -y cmake gcc g++ make
+          pipx install gcovr
+          gcovr --version
 
       - name: Configure with coverage
-        run: |
-          cd native
-          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DSW_BUILD_COVERAGE=ON
+        run: cmake -S native -B native/build -DCMAKE_BUILD_TYPE=Debug -DSW_BUILD_COVERAGE=ON
 
-      - name: Build and run tests
-        run: |
-          cd native
-          cmake --build build
-          cd build
-          ctest --output-on-failure
+      - name: Build
+        run: cmake --build native/build -j "$(nproc)"
+
+      - name: Run tests
+        # Serial on purpose: concurrent processes update the same .gcda files.
+        run: ctest --test-dir native/build --output-on-failure --output-junit ctest-results.xml
 
       - name: Generate coverage report
+        working-directory: native
         run: |
-          cd native/build
-          find . -name "*.gcda" 2>/dev/null
-          lcov --capture --directory . --output-file coverage.info \
-            --ignore-errors empty,unused 2>&1 || true
-          if [ -s coverage.info ]; then
-            lcov --remove coverage.info '/usr/*' '*/_deps/*' \
-              -o coverage_filtered.info --ignore-errors empty,unused 2>&1 || true
-            # Check if filtered file has any records
-            if [ -s coverage_filtered.info ] && grep -q "^SF:" coverage_filtered.info; then
-              lcov --list coverage_filtered.info
-            else
-              echo "All records removed by filters. Using full coverage data."
-              cp coverage.info coverage_filtered.info
-            fi
-          else
-            echo "No coverage data generated."
-          fi
+          mkdir -p build/coverage-html
+          gcovr --root . --filter 'src/' \
+            --exclude-unreachable-branches --exclude-throw-branches \
+            --lcov build/coverage.lcov \
+            --html-details build/coverage-html/index.html \
+            --print-summary build
+
+      - name: Native coverage gate
+        run: |
+          python3 .github/scripts/coverage_report.py report \
+            --name "Native DSP core" --lcov native/build/coverage.lcov \
+            --include '(^|/)src/' --worst 40 --uncovered 25 \
+            --min-line "$NATIVE_MIN_LINE" --min-branch "$NATIVE_MIN_BRANCH" \
+            --junit native/build/ctest-results.xml \
+            --json-out native/build/summary-native.json
+
+      - name: Upload native coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-native
+          path: |
+            native/build/coverage.lcov
+            native/build/summary-native.json
+            native/build/ctest-results.xml
+            native/build/coverage-html/
+          if-no-files-found: warn
 
       - name: Upload to Codecov
+        if: github.event_name == 'push'
         uses: codecov/codecov-action@v7
         with:
-          files: native/build/coverage_filtered.info
+          files: native/build/coverage.lcov
           flags: dsp-core
           fail_ci_if_error: false
         continue-on-error: true
+
+  # ---------------------------------------------------------------------------
+  # Quality dashboard (issue #36): one table in the run summary.
+  # ---------------------------------------------------------------------------
+  quality-dashboard:
+    runs-on: ubuntu-latest
+    needs: [flutter-quality-gate, dsp-coverage, flutter-integration]
+    if: always()
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          pattern: coverage-*
+          path: reports
+
+      - name: Publish quality dashboard
+        env:
+          FLUTTER_RESULT: ${{ needs.flutter-quality-gate.result }}
+          NATIVE_RESULT: ${{ needs.dsp-coverage.result }}
+          INTEGRATION_RESULT: ${{ needs.flutter-integration.result }}
+        run: |
+          set +e
+          # Artifact roots differ (native/build vs soundwave_app), so locate
+          # the summaries instead of hard-coding nested paths.
+          native=$(find reports -name summary-native.json | head -1)
+          flutter=$(find reports -name summary-flutter.json | head -1)
+          python3 .github/scripts/coverage_report.py dashboard \
+            "${native:-summary-native.json}" "${flutter:-summary-flutter.json}"
+          rc=$?
+          {
+            echo ""
+            echo "| Job | Result |"
+            echo "|---|---|"
+            echo "| Native coverage (dsp-coverage) | $NATIVE_RESULT |"
+            echo "| Flutter unit/widget tests (flutter-quality-gate) | $FLUTTER_RESULT |"
+            echo "| Flutter integration tests, Linux desktop (flutter-integration) | $INTEGRATION_RESULT |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$NATIVE_RESULT" != success ] || [ "$FLUTTER_RESULT" != success ] || \
+             [ "$INTEGRATION_RESULT" != success ]; then
+            rc=1
+          fi
+          exit $rc
 
   # ---------------------------------------------------------------------------
   # Memory safety (issue #28)

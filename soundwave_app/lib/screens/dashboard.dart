@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
+import '../theme/soundwave_theme.dart';
+import '../widgets/file_transfer_card.dart';
 import '../widgets/signal_status_bar.dart';
 import 'signal_files.dart';
 
@@ -50,6 +52,8 @@ class DashboardScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _MessagesLog(state: state),
           const SizedBox(height: 16),
+          const FileTransferCard(),
+          const SizedBox(height: 16),
           const SignalFilesCard(),
         ],
       ),
@@ -88,6 +92,7 @@ class _TxSectionState extends State<_TxSection> {
             TextField(
               controller: _controller,
               decoration: const InputDecoration(
+                labelText: 'Message',
                 hintText: 'Enter message to transmit (max 256 bytes)',
                 border: OutlineInputBorder(),
               ),
@@ -121,14 +126,18 @@ class _RxSection extends StatelessWidget {
   final AppState state;
   const _RxSection({required this.state});
 
-  Color _getSnrColor(double snr) {
-    if (snr >= 10.0) return Colors.green;
-    if (snr >= 3.0) return Colors.yellow;
-    return Colors.red;
+  Color _getSnrColor(double snr, SignalColors colors) {
+    if (snr >= 10.0) return colors.success;
+    if (snr >= 3.0) return colors.warning;
+    return colors.danger;
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final signal = SignalColors.of(context);
+    final snrColor = _getSnrColor(state.lastSnr, signal);
+    final listening = state.isListening;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -138,34 +147,50 @@ class _RxSection extends StatelessWidget {
             Text('Receiver Control',
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Wrap (not Row) so large text scales reflow instead of
+            // overflowing.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 8,
               children: [
                 ElevatedButton.icon(
                   onPressed: () => state.toggleListening(),
-                  icon: Icon(state.isListening ? Icons.stop : Icons.mic),
+                  icon: Icon(listening ? Icons.stop : Icons.mic),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        state.isListening ? Colors.red.shade900 : null,
+                    backgroundColor: listening ? scheme.error : null,
+                    foregroundColor: listening ? scheme.onError : null,
                   ),
-                  label: Text(
-                    state.isListening ? 'Stop Listening' : 'Start Listening',
-                  ),
+                  label: Text(listening ? 'Stop Listening' : 'Start Listening'),
                 ),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('Status: ',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Status: ',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     Text(
-                      state.isListening ? 'Listening...' : 'Idle',
+                      listening ? 'Listening...' : 'Idle',
                       style: TextStyle(
-                        color: state.isListening ? Colors.green : Colors.grey,
+                        color: listening ? signal.success : signal.neutral,
                       ),
                     ),
                   ],
                 ),
               ],
             ),
+            if (state.messages.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              // Live region: screen readers announce each new message.
+              Semantics(
+                key: const Key('rx_live_region'),
+                container: true,
+                liveRegion: true,
+                child: Text('Last received: ${state.messages.first}'),
+              ),
+            ],
             if (state.isListening) ...[
               const SizedBox(height: 12),
               Row(
@@ -176,14 +201,16 @@ class _RxSection extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: _getSnrColor(state.lastSnr).withAlpha(50),
+                      color: snrColor.withValues(
+                        alpha: SignalColors.badgeAlpha,
+                      ),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: _getSnrColor(state.lastSnr)),
+                      border: Border.all(color: snrColor),
                     ),
                     child: Text(
                       '${state.lastSnr.toStringAsFixed(1)} dB',
                       style: TextStyle(
-                        color: _getSnrColor(state.lastSnr),
+                        color: snrColor,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -256,9 +283,11 @@ class _MessagesLog extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Received Messages Log',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Expanded(
+                  child: Text(
+                    'Received Messages Log',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
                 Text(
                   'Count: ${state.messages.length}',
@@ -270,13 +299,15 @@ class _MessagesLog extends StatelessWidget {
             const Divider(),
             const SizedBox(height: 8),
             state.messages.isEmpty
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24.0),
+                      padding: const EdgeInsets.symmetric(vertical: 24.0),
                       child: Text(
                         'No messages decoded yet. Start listening to capture waves!',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   )
@@ -286,8 +317,10 @@ class _MessagesLog extends StatelessWidget {
                     itemCount: state.messages.length,
                     separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (_, i) => ListTile(
-                      leading:
-                          const Icon(Icons.arrow_downward, color: Colors.cyan),
+                      leading: Icon(
+                        Icons.arrow_downward,
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
                       title: Text(state.messages[i]),
                       dense: true,
                     ),

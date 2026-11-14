@@ -38,6 +38,15 @@ sw_add_test(test_ber                 test_ber.c)
 sw_add_test(test_memsafety           test_memsafety.c)
 sw_add_test(test_xcorr               test_xcorr.c)
 sw_add_test(test_constellation       test_constellation.c)
+sw_add_test(test_packet_fec          test_packet_fec.c)
+sw_add_test(test_api_errors          test_api_errors.c)
+sw_add_test(test_dsp_paths           test_dsp_paths.c)
+sw_add_test(test_ofdm_spectrum      test_ofdm_spectrum.c)
+
+# soundwave-cli frame format (same bytes as the app's FrameCodec)
+sw_add_test(test_cli_frame          test_cli_frame.c)
+target_sources(test_cli_frame PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../tools/soundwave_cli/frame_format.c)
+target_include_directories(test_cli_frame PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../tools/soundwave_cli)
 
 # Sanitizer canary (issue #28): deliberate memory errors that ASan must report.
 # A silently missing sanitizer prints no report, so the test fails.

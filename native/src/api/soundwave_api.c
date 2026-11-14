@@ -20,8 +20,8 @@
 #define SW_MIN_SAMPLE_RATE   8000
 #define SW_MAX_SAMPLE_RATE   192000
 #define SW_DEFAULT_RATE      44100
-#define SW_MIN_SF            6
-#define SW_MAX_SF            12
+#define SW_MIN_SF            CSS_MIN_SF
+#define SW_MAX_SF            CSS_MAX_SF
 #define SW_MIN_SUBCARRIERS   16
 #define SW_MAX_SUBCARRIERS   4096
 #define SW_MAX_SYMBOL_SEC    1.0f
@@ -29,6 +29,16 @@
 static int is_pow2(int v) { return v > 0 && (v & (v - 1)) == 0; }
 
 static int finite_nonneg(float v) { return isfinite(v) && v >= 0.0f; }
+
+// OFDM band plan for cfg (defaults applied): the active subcarriers must fit
+// in [carrier - bw/2, carrier + bw/2] below Nyquist (ofdm_layout_compute).
+static int ofdm_band_ok(sw_config_t cfg, ofdm_layout_t* lay) {
+    ofdm_layout_t tmp;
+    int N = cfg.num_subcarriers ? cfg.num_subcarriers : 256;
+    float fs = (float)(cfg.sample_rate ? cfg.sample_rate : SW_DEFAULT_RATE);
+    return ofdm_layout_compute(N, fs, cfg.carrier_freq, cfg.bandwidth,
+                               lay ? lay : &tmp) == SW_OK;
+}
 
 SW_API int sw_config_validate(sw_config_t cfg) {
     if (cfg.modulation != 0 && cfg.modulation != 1) return SW_ERR_BAD_PARAM;
@@ -56,6 +66,11 @@ SW_API int sw_config_validate(sw_config_t cfg) {
     int n_eff = N ? N : 256; // OFDM default
     if (cfg.cp_length < 0 || cfg.cp_length > n_eff) return SW_ERR_BAD_PARAM;
     if (cfg.num_pilots < 0 || cfg.num_pilots > n_eff / 2) return SW_ERR_BAD_PARAM;
+
+    // CSS: the waveform must fit (band inside (0, fs/2], symbol <= 1 s).
+    css_geometry_t g;
+    if (cfg.modulation == 0 && css_geometry(&cfg, &g) != 0) return SW_ERR_BAD_PARAM;
+    if (cfg.modulation == 1 && !ofdm_band_ok(cfg, NULL)) return SW_ERR_BAD_PARAM;
     return SW_OK;
 }
 
@@ -107,19 +122,18 @@ SW_API int sw_css_modulate(const uint8_t* bits, size_t bit_len,
                            sw_config_t cfg, float* samples, size_t* sample_len) {
     if (!bits || !samples || !sample_len || bit_len == 0) return SW_ERR_BAD_PARAM;
     if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
+    css_geometry_t g;
+    if (css_geometry(&cfg, &g) != 0) return SW_ERR_BAD_PARAM;
 
-    sw_signal sig = css_modulate(bits, bit_len, cfg);
-    if (!sig.data) return SW_ERR_MEMORY;
-
-    if (sig.length > *sample_len) {
-        *sample_len = sig.length;
-        free(sig.data);
+    // Size check before synthesis: a too-small buffer costs nothing.
+    size_t need = css_frame_samples(&g, bit_len);
+    if (need == 0) return SW_ERR_BAD_PARAM; // would overflow
+    if (need > *sample_len) {
+        *sample_len = need;
         return SW_ERR_OVERFLOW;
     }
-
-    memcpy(samples, sig.data, sig.length * sizeof(float));
-    *sample_len = sig.length;
-    free(sig.data);
+    css_modulate_into(&g, bits, bit_len, samples);
+    *sample_len = need;
     return SW_OK;
 }
 
@@ -152,7 +166,7 @@ SW_API int sw_css_demodulate(const float* samples, size_t sample_len,
 SW_API int sw_ofdm_modulate(const uint8_t* bits, size_t bit_len,
                             sw_config_t cfg, float* samples, size_t* sample_len) {
     if (!bits || !samples || !sample_len || bit_len == 0) return SW_ERR_BAD_PARAM;
-    if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
+    if (sw_config_validate(cfg) != SW_OK || !ofdm_band_ok(cfg, NULL)) return SW_ERR_BAD_PARAM;
 
     sw_signal sig = ofdm_modulate(bits, bit_len, cfg);
     if (!sig.data) return SW_ERR_MEMORY;
@@ -173,7 +187,7 @@ SW_API int sw_ofdm_modulate(const uint8_t* bits, size_t bit_len,
 SW_API int sw_ofdm_demodulate(const float* samples, size_t sample_len,
                               sw_config_t cfg, uint8_t* bits, size_t* bit_len) {
     if (!samples || !bits || !bit_len || sample_len == 0 || *bit_len == 0) return SW_ERR_BAD_PARAM;
-    if (sw_config_validate(cfg) != SW_OK) return SW_ERR_BAD_PARAM;
+    if (sw_config_validate(cfg) != SW_OK || !ofdm_band_ok(cfg, NULL)) return SW_ERR_BAD_PARAM;
 
     size_t out_bits_count = 0;
     uint8_t* decoded = NULL;
@@ -244,24 +258,39 @@ SW_API int sw_detect_frame(const float* samples, size_t len,
     sync_cfg.threshold = cfg.threshold;
     sync_cfg.zc_root = 1;
     
-    int N = cfg.num_subcarriers;
-    int N_guard = N / 8;
-    int N_active = N / 2 - N_guard - 1;
-    sync_cfg.zc_length = N_active;
+    // OFDM configs passed validation, so the band plan exists.
+    ofdm_layout_t lay = {0};
+    sync_cfg.zc_length = (cfg.modulation == 1 && ofdm_band_ok(cfg, &lay)) ? lay.num_active : 0;
     
     if (cfg.modulation == 0) {
-        sync_cfg.matched_filter_len = (int)(cfg.symbol_duration * cfg.sample_rate + 0.5f);
+        css_geometry_t g;
+        if (css_geometry(&cfg, &g) != 0) return SW_ERR_BAD_PARAM;
+        sync_cfg.sf = g.sf;
+        sync_cfg.matched_filter_len = g.N;
         sync_cfg.carrier_freq = cfg.carrier_freq;
         sync_cfg.bandwidth = cfg.bandwidth;
         sync_cfg.sample_rate = (float)cfg.sample_rate;
     } else {
-        sync_cfg.matched_filter_len = cfg.num_subcarriers + cfg.cp_length;
+        // Symbol period N + cp, with the OFDM modules' defaults for 0.
+        int n_ofdm = cfg.num_subcarriers ? cfg.num_subcarriers : 256;
+        sync_cfg.matched_filter_len = n_ofdm + (cfg.cp_length ? cfg.cp_length : n_ofdm / 8);
         sync_cfg.carrier_freq = cfg.carrier_freq;
         sync_cfg.bandwidth = cfg.bandwidth;
         sync_cfg.sample_rate = (float)cfg.sample_rate;
     }
     
-    int ok = sync_detect_frame(samples, len, &sync_cfg, frame_start, snr);
+    int ok;
+    if (cfg.modulation == 1 && sync_cfg.zc_length > 0) {
+        // Same detector as the demodulator: Schmidl-Cox, fine timing and the
+        // known-preamble check (no matched-filter-only detections here, so
+        // noise does not count as a frame).
+        int N = cfg.num_subcarriers ? cfg.num_subcarriers : 256;
+        int cp = cfg.cp_length ? cfg.cp_length : N / 8;
+        ok = ofdm_locate_preamble(samples, len, N, cp, &lay, cfg.threshold, 0,
+                                  frame_start, snr);
+    } else {
+        ok = sync_detect_frame(samples, len, &sync_cfg, frame_start, snr);
+    }
     if (!ok) {
         return SW_ERR_SYNC;
     }

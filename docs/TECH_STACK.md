@@ -1,5 +1,7 @@
 # Technology Stack Specification
 
+> **Planning document.** This specification predates the implementation. Several APIs, packages and file layouts it describes (for example `sw_create`/`sw_context`, `ffigen`, `permission_handler`, `flutter_soloud`, a Podfile) were never adopted. For what exists, see the [architecture overview](architecture/overview.md), the [C API](API_REFERENCE.md) and `soundwave_app/pubspec.yaml`.
+
 **Project:** Soundwave — Ultrasonic Physical Layer
 **Version:** 1.0
 **Date:** July 18, 2026

@@ -3,7 +3,7 @@
  * @brief Shared data structures, status codes, and configuration types for Soundwave PHY.
  * 
  * @copyright Copyright (c) 2026 PxA Labs (Archit Mittal, Purvansh Joshi)
- * @license MIT License
+ * @license Apache License 2.0 (SPDX-License-Identifier: Apache-2.0); see LICENSE.
  */
 
 #ifndef SOUNDWAVE_TYPES_H
@@ -22,16 +22,16 @@ extern "C" {
 typedef struct {
     int    sample_rate;      /**< Audio sampling rate in Hz (default 44100 Hz). */
     int    modulation;       /**< Modulation scheme: 0 = CSS (Chirp Spread Spectrum), 1 = OFDM. */
-    int    sf;               /**< CSS Spreading Factor (7 to 12). */
+    int    sf;               /**< CSS spreading factor 6..10: SF bits per chirp (0 = 8). */
     int    num_subcarriers;  /**< OFDM FFT Size (256, 512, 1024, 2048). */
     int    cp_length;        /**< OFDM Cyclic Prefix length in samples. */
     int    num_pilots;       /**< OFDM Pilot subcarrier count for channel estimation. */
-    float  coding_rate;      /**< Forward Error Correction (FEC) coding rate (0.5, 0.75). */
+    float  coding_rate;      /**< Reserved, ignored (must be finite). FEC is fixed RS(255,223). */
     float  threshold;        /**< Preamble detection threshold multiplier theta. */
     int    equalizer;        /**< Equalizer algorithm: 0 = Zero-Forcing (ZF), 1 = MMSE. */
-    float  carrier_freq;     /**< Carrier center frequency f0 in Hz (default 19000.0). */
-    float  bandwidth;        /**< Sweep bandwidth B in Hz (default 2000.0). */
-    float  symbol_duration;  /**< Symbol duration T in seconds (default 0.02). */
+    float  carrier_freq;     /**< CSS band centre; OFDM band centre. Hz (default 19000.0). */
+    float  bandwidth;        /**< CSS sweep bandwidth, quantised to fs/round(fs/B); OFDM occupied band width. Hz (default 2000.0). */
+    float  symbol_duration;  /**< Ignored by CSS (a chirp lasts 2^sf / B); validated <= 1 s. */
     float  amplitude;        /**< Amplitude A (0.0 to 1.0) (default 0.8). */
     int    ofdm_modulation;  /**< OFDM constellation mapping: 0 = BPSK, 1 = QPSK. */
 } sw_config;

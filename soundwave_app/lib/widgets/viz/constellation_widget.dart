@@ -75,7 +75,8 @@ class ConstellationDiagram extends StatelessWidget {
       children: [
         Expanded(
           child: Semantics(
-            label: 'Constellation diagram',
+            container: true,
+            label: 'Constellation diagram of equalized OFDM symbols',
             child: RepaintBoundary(
               child: CustomPaint(
                 painter: ConstellationPainter(

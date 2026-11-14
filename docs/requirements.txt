@@ -1,0 +1,4 @@
+# Documentation site toolchain (see .github/workflows/docs.yml).
+mkdocs==1.6.1
+mkdocs-material==9.6.14
+pymdown-extensions==10.15

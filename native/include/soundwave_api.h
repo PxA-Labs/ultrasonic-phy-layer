@@ -7,7 +7,7 @@
  * with fixed-width C-compatible types.
  * 
  * @copyright Copyright (c) 2026 PxA Labs (Archit Mittal, Purvansh Joshi)
- * @license MIT License
+ * @license Apache License 2.0 (SPDX-License-Identifier: Apache-2.0); see LICENSE.
  */
 
 #ifndef SOUNDWAVE_API_H
@@ -54,10 +54,18 @@ SW_API const char* sw_version(void);
  *  - sample_rate: 8000..192000 Hz
  *  - all float fields finite; threshold, carrier_freq, bandwidth,
  *    symbol_duration >= 0; amplitude in [0, 1]
- *  - CSS: sf 6..12; carrier_freq and bandwidth <= sample_rate / 2;
- *    symbol_duration <= 1 s
+ *  - CSS: sf 6..10; carrier_freq and bandwidth <= sample_rate / 2;
+ *    symbol_duration <= 1 s (ignored by CSS). With modulation 0 the band
+ *    carrier_freq +/- B/2 must lie in (0, fs/2] and 2^sf / B <= 1 s, where
+ *    B = fs / round(fs / bandwidth)
  *  - OFDM: num_subcarriers a power of two in 16..4096;
- *    cp_length <= num_subcarriers; num_pilots <= num_subcarriers / 2
+ *    cp_length <= num_subcarriers; num_pilots <= num_subcarriers / 2;
+ *    when modulation == 1, the band [carrier_freq - bandwidth/2,
+ *    carrier_freq + bandwidth/2] (defaults 19000 / 2000 Hz) must lie above
+ *    DC and at least one subcarrier spacing (fs/N) below Nyquist, and hold
+ *    at least 4 subcarriers after one guard bin at each edge.
+ *    sw_ofdm_modulate/demodulate/equalized_symbols check the band even when
+ *    modulation is 0.
  *
  * @param cfg Configuration to check.
  * @return SW_OK if valid, SW_ERR_BAD_PARAM otherwise.
@@ -93,7 +101,7 @@ SW_API int sw_rs_encode(const uint8_t* data, size_t data_len,
  * @param parity Pointer to parity bytes buffer (32 bytes).
  * @param parity_len Byte length of parity buffer.
  * @param errors_corrected Output pointer receiving number of corrected errors (0 to 16).
- * @return SW_OK (0) on success, SW_ERR_DECODE_FAILED if uncorrectable (>16 errors).
+ * @return SW_OK (0) on success, SW_ERR_DECODE if uncorrectable (> t = parity_len / 2 errors).
  */
 SW_API int sw_rs_decode(uint8_t* data, size_t* data_len,
                         const uint8_t* parity, size_t parity_len,
@@ -128,7 +136,12 @@ SW_API int sw_css_demodulate(const float* samples, size_t sample_len,
 // --- OFDM Modem ---
 
 /**
- * @brief Modulates bit array into OFDM acoustic audio samples (IDFT + Cyclic Prefix).
+ * @brief Modulates bit array into OFDM audio samples (IDFT + cyclic prefix).
+ *
+ * Data and pilot subcarriers occupy only the band [carrier_freq - bandwidth/2,
+ * carrier_freq + bandwidth/2] (default 18-20 kHz); all other bins are zero and
+ * symbol boundaries are raised-cosine cross-faded. Output length is
+ * (2 + ceil(bit_len / bits_per_symbol)) * (N + cp) + cp / 2 samples.
  * @param bits Pointer to input bit stream array.
  * @param bit_len Number of input bits.
  * @param cfg PHY configuration struct.
@@ -177,13 +190,16 @@ SW_API int sw_ofdm_equalized_symbols(const float* samples, size_t sample_len,
 // --- Synchronization & CFO ---
 
 /**
- * @brief Detects preamble start offset using matched filter (CSS) or Zadoff-Chu correlation (OFDM).
+ * @brief Detects the preamble start: matched filter (CSS), or Schmidl-Cox
+ *        timing metric on the repeated preamble refined by the preamble's
+ *        phase slope (OFDM).
  * @param samples Pointer to audio PCM sample buffer.
  * @param len Sample count.
  * @param cfg PHY configuration struct.
  * @param frame_start Output pointer receiving sample offset of preamble peak.
  * @param snr Output pointer receiving estimated Signal-to-Noise Ratio (dB).
- * @return SW_OK (0) if detected, SW_ERR_NOT_FOUND if peak below noise threshold.
+ * @return SW_OK (0) if detected, SW_ERR_SYNC if no preamble passes the threshold,
+ *         SW_ERR_BAD_PARAM for invalid arguments or configuration.
  */
 SW_API int sw_detect_frame(const float* samples, size_t len,
                            sw_config_t cfg, size_t* frame_start, float* snr);
@@ -202,10 +218,12 @@ SW_API int sw_estimate_cfo(const float* samples, size_t len,
 // --- Real-Time Audio I/O ---
 
 /**
- * @brief Starts miniaudio real-time microphone capture stream at 44.1 kHz PCM.
+ * @brief Starts miniaudio real-time microphone capture stream at cfg.sample_rate
+ *        (0 = 44100 Hz).
  * @param cfg PHY configuration struct.
  * @param handle Output pointer receiving opaque audio handle.
- * @return SW_OK (0) on success, or SW_ERR_AUDIO_IO.
+ * @return SW_OK (0) on success, SW_ERR_AUDIO if the device cannot be opened or started,
+ *         SW_ERR_BAD_PARAM or SW_ERR_MEMORY.
  */
 SW_API int sw_audio_capture_start(sw_config_t cfg, void** handle);
 
@@ -228,10 +246,12 @@ SW_API int sw_audio_capture_read(void* handle, float* buffer,
                                  size_t count, size_t* read);
 
 /**
- * @brief Starts miniaudio real-time speaker playback stream at 44.1 kHz PCM.
+ * @brief Starts miniaudio real-time speaker playback stream at cfg.sample_rate
+ *        (0 = 44100 Hz).
  * @param cfg PHY configuration struct.
  * @param handle Output pointer receiving opaque audio handle.
- * @return SW_OK (0) on success, or SW_ERR_AUDIO_IO.
+ * @return SW_OK (0) on success, SW_ERR_AUDIO if the device cannot be opened or started,
+ *         SW_ERR_BAD_PARAM or SW_ERR_MEMORY.
  */
 SW_API int sw_audio_playback_start(sw_config_t cfg, void** handle);
 

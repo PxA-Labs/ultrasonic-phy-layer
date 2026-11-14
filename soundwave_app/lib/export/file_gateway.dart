@@ -24,6 +24,10 @@ abstract class FileGateway {
 
   /// Opens the platform share sheet for [file].
   Future<void> shareFile(File file, {String? text});
+
+  /// Lets the user pick any file of at most [maxBytes] to transmit over the
+  /// link layer (#89); null if cancelled. Throws [FormatException] if larger.
+  Future<PickedSignalFile?> pickTransferFile({required int maxBytes});
 }
 
 /// [FileGateway] backed by `file_picker` and `share_plus`.
@@ -43,6 +47,26 @@ class PlatformFileGateway extends FileGateway {
       throw FormatException('File is too large ($length bytes)');
     }
     return PickedSignalFile(picked.name, await picked.readAsBytes());
+  }
+
+  @override
+  Future<PickedSignalFile?> pickTransferFile({required int maxBytes}) async {
+    final picked = await FilePicker.pickFile(
+      dialogTitle: 'Send file',
+      type: FileType.any,
+    );
+    if (picked == null) return null;
+    final length = await picked.length();
+    if (length != null && length > maxBytes) {
+      throw FormatException(
+          'File is too large ($length bytes, limit $maxBytes)');
+    }
+    final bytes = await picked.readAsBytes();
+    if (bytes.length > maxBytes) {
+      throw FormatException(
+          'File is too large (${bytes.length} bytes, limit $maxBytes)');
+    }
+    return PickedSignalFile(picked.name, bytes);
   }
 
   @override

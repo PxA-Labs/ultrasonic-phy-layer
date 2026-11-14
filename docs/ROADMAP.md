@@ -1,5 +1,7 @@
 # Implementation Roadmap
 
+> **Planning document.** The weekly plan was written before implementation. For what has shipped, see the [CHANGELOG](development/changelog.md) and the GitHub issues.
+
 **Project:** Soundwave — Ultrasonic Physical Layer
 **Version:** 1.0
 **Date:** July 18, 2026

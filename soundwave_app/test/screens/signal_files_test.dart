@@ -24,6 +24,10 @@ class FakeGateway extends FileGateway {
   Future<PickedSignalFile?> pickSignalFile() async => next;
 
   @override
+  Future<PickedSignalFile?> pickTransferFile({required int maxBytes}) async =>
+      next;
+
+  @override
   Future<void> shareFile(File file, {String? text}) async {
     shared.add(file);
   }

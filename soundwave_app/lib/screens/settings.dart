@@ -3,7 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../engine/frame_geometry.dart';
+import '../onboarding/onboarding_screen.dart';
 import '../state/app_state.dart';
+import '../state/ui_preferences.dart';
 import 'signal_files.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -100,28 +103,19 @@ class SettingsScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   SwitchListTile(
                     title: const Text('Enable Reed-Solomon Correction'),
-                    subtitle:
-                        const Text('Uses RS(255,223) error correction layer'),
+                    subtitle: const Text(
+                        'RS(255,223): 32 parity bytes, corrects up to 16 '
+                        'byte errors per frame'),
                     value: state.enableRs,
                     onChanged: (v) => state.setEnableRs(v),
-                  ),
-                  const Divider(),
-                  DropdownButtonFormField<double>(
-                    initialValue: state.codingRate,
-                    decoration: const InputDecoration(
-                        labelText: 'Convolutional Coding Rate'),
-                    items: const [
-                      DropdownMenuItem(
-                          value: 0.5, child: Text('Rate 1/2 (More Robust)')),
-                      DropdownMenuItem(
-                          value: 0.75, child: Text('Rate 3/4 (Higher Speed)')),
-                    ],
-                    onChanged: (v) => state.setCodingRate(v ?? 0.5),
                   ),
                 ],
               ),
             ),
           ),
+          const SizedBox(height: 16),
+
+          _LinkLayerCard(state: state),
           const SizedBox(height: 16),
 
           // Audio Hardware & Volume Card
@@ -135,6 +129,7 @@ class SettingsScreen extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: state.inputDevice?.name,
                     decoration: const InputDecoration(
                         labelText: 'Capture Device (Microphone)'),
@@ -150,6 +145,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: state.outputDevice?.name,
                     decoration: const InputDecoration(
                         labelText: 'Playback Device (Speaker)'),
@@ -165,13 +161,16 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text('Playback Volume: ${(state.volume * 100).toInt()}%'),
-                  Slider(
-                    value: state.volume,
-                    min: 0.0,
-                    max: 1.0,
-                    divisions: 10,
-                    label: '${(state.volume * 100).toInt()}%',
-                    onChanged: (v) => state.setVolume(v),
+                  Semantics(
+                    label: 'Playback volume',
+                    child: Slider(
+                      value: state.volume,
+                      min: 0.0,
+                      max: 1.0,
+                      divisions: 10,
+                      label: '${(state.volume * 100).toInt()}%',
+                      onChanged: (v) => state.setVolume(v),
+                    ),
                   ),
                   SwitchListTile(
                     key: const Key('agc_toggle'),
@@ -189,8 +188,94 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const StorageCard(),
+          const SizedBox(height: 16),
+          const _AppearanceCard(),
           const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+}
+
+/// Theme mode and tutorial replay (issue #93).
+class _AppearanceCard extends StatelessWidget {
+  const _AppearanceCard();
+
+  /// Null when the screen is hosted without UI preferences, e.g. in
+  /// isolated screen tests; the theme selector is then omitted.
+  UiPreferences? _maybePrefs(BuildContext context) {
+    try {
+      return context.watch<UiPreferences>();
+    } on ProviderNotFoundException {
+      return null;
+    }
+  }
+
+  void _openTutorial(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (route) => OnboardingScreen(
+          onFinished: () => Navigator.of(route).pop(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = _maybePrefs(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Appearance & Help',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            if (prefs != null) ...[
+              const SizedBox(height: 12),
+              const Text('Theme'),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<ThemeMode>(
+                  key: const Key('theme_mode_selector'),
+                  segments: const [
+                    ButtonSegment(
+                      value: ThemeMode.system,
+                      icon: Icon(Icons.brightness_auto),
+                      label: Text('System'),
+                    ),
+                    ButtonSegment(
+                      value: ThemeMode.light,
+                      icon: Icon(Icons.light_mode),
+                      label: Text('Light'),
+                    ),
+                    ButtonSegment(
+                      value: ThemeMode.dark,
+                      icon: Icon(Icons.dark_mode),
+                      label: Text('Dark'),
+                    ),
+                  ],
+                  selected: {prefs.themeMode},
+                  onSelectionChanged: (v) => prefs.setThemeMode(v.first),
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            ListTile(
+              key: const Key('show_tutorial'),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.school),
+              title: const Text('Show tutorial'),
+              subtitle: const Text('Replay the introduction to Soundwave'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _openTutorial(context),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -202,6 +287,7 @@ class _CssSettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final g = state.cssGeometry;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -212,24 +298,22 @@ class _CssSettingsCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             Text('Spreading Factor (SF): ${state.sf}'),
-            Slider(
-              value: state.sf.toDouble(),
-              min: 7,
-              max: 12,
-              divisions: 5,
-              label: 'SF ${state.sf}',
-              onChanged: (v) => state.setSf(v.toInt()),
+            Semantics(
+              label: 'Spreading factor',
+              child: Slider(
+                value: state.sf.toDouble(),
+                min: FrameGeometry.minSf.toDouble(),
+                max: FrameGeometry.maxSf.toDouble(),
+                divisions: FrameGeometry.maxSf - FrameGeometry.minSf,
+                label: 'SF ${state.sf}',
+                onChanged: (v) => state.setSf(v.toInt()),
+              ),
             ),
-            const SizedBox(height: 12),
             Text(
-                'Chirp/Symbol Duration: ${(state.symbolDuration * 1000).toInt()} ms'),
-            Slider(
-              value: state.symbolDuration,
-              min: 0.01,
-              max: 0.1,
-              divisions: 9,
-              label: '${(state.symbolDuration * 1000).toInt()} ms',
-              onChanged: (v) => state.setSymbolDuration(v),
+              'Computed: ${(g.symbolSeconds * 1000).toStringAsFixed(1)} ms '
+              'per chirp, ${g.bitsPerSymbol} bits per chirp, '
+              '${g.rawBitRate.toStringAsFixed(1)} bit/s raw',
+              key: const Key('css_computed_rate'),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -272,6 +356,7 @@ class _OfdmSettingsCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
+              isExpanded: true,
               initialValue: state.numSubcarriers,
               decoration:
                   const InputDecoration(labelText: 'FFT Subcarriers Size'),
@@ -298,6 +383,7 @@ class _OfdmSettingsCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
+              isExpanded: true,
               // Keyed by FFT size: the options change with it, and a stale
               // selection outside the new item list would assert.
               key: ValueKey('cp_${state.numSubcarriers}'),
@@ -322,6 +408,7 @@ class _OfdmSettingsCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
+              isExpanded: true,
               initialValue: state.numPilots,
               decoration:
                   const InputDecoration(labelText: 'Pilot Subcarriers Count'),
@@ -331,6 +418,8 @@ class _OfdmSettingsCard extends StatelessWidget {
                   .toList(),
               onChanged: (v) => state.setNumPilots(v ?? 8),
             ),
+            const SizedBox(height: 8),
+            _OfdmBandInfo(config: state.configMap),
             const SizedBox(height: 16),
             const Text('OFDM Channel Equalization Mode'),
             const SizedBox(height: 8),
@@ -349,6 +438,98 @@ class _OfdmSettingsCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Link-layer reliability settings (#100).
+class _LinkLayerCard extends StatelessWidget {
+  final AppState state;
+  const _LinkLayerCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Link Layer & Retransmission (ARQ)',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              key: const Key('arq_toggle'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Automatic Retransmission (ARQ)'),
+              subtitle: const Text(
+                  'Wait for an ACK after each fragment and resend on loss. '
+                  'Both devices must enable it; turn off for one-way '
+                  'broadcast.'),
+              value: state.arqEnabled,
+              onChanged: state.setArqEnabled,
+            ),
+            DropdownButtonFormField<int>(
+              key: const Key('arq_retries'),
+              initialValue: state.arqMaxRetries,
+              decoration: const InputDecoration(labelText: 'Max Retries'),
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('1')),
+                DropdownMenuItem(value: 3, child: Text('3')),
+                DropdownMenuItem(value: 5, child: Text('5')),
+              ],
+              onChanged: (v) => state.setArqMaxRetries(v ?? 3),
+            ),
+            const SizedBox(height: 16),
+            Text('ACK Timeout: ${state.arqAckTimeoutMs} ms '
+                '(added to frame airtime)'),
+            Semantics(
+              label: 'ARQ acknowledgement timeout',
+              child: Slider(
+                key: const Key('arq_timeout'),
+                value: state.arqAckTimeoutMs.toDouble(),
+                min: 200,
+                max: 2000,
+                divisions: 18,
+                label: '${state.arqAckTimeoutMs} ms',
+                onChanged: (v) => state.setArqAckTimeoutMs(v.round()),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Computed (not measured) OFDM band plan and raw rate for the current
+/// settings. OFDM uses Carrier Frequency +- Bandwidth / 2 from the CSS card.
+class _OfdmBandInfo extends StatelessWidget {
+  final Map<String, dynamic> config;
+  const _OfdmBandInfo({required this.config});
+
+  @override
+  Widget build(BuildContext context) {
+    final cfg = {...config, 'modulation': 1};
+    final band = OfdmBand.fromConfig(cfg);
+    final style = Theme.of(context).textTheme.bodySmall;
+    if (band == null) {
+      return Text(
+        'Band does not fit: OFDM needs Carrier ± Bandwidth/2 below '
+        'Nyquist with at least 4 subcarriers.',
+        key: const Key('ofdm_band_info'),
+        style: style?.copyWith(color: Theme.of(context).colorScheme.error),
+      );
+    }
+    final g = FrameGeometry.fromConfig(cfg);
+    String khz(double hz) => (hz / 1000).toStringAsFixed(2);
+    return Text(
+      'Subcarriers ${khz(band.lowestHz)}–${khz(band.highestHz)} kHz '
+      '(${band.dataSubcarriers} data + ${band.pilotSubcarriers} pilot), '
+      '${g.bitsPerSymbol} bit/symbol, raw '
+      '${(g.rawBitRate / 1000).toStringAsFixed(2)} kbit/s (computed)',
+      key: const Key('ofdm_band_info'),
+      style: style,
     );
   }
 }
