@@ -211,13 +211,14 @@ The `meta` job resolves the version (`v1.2.3` tag → `1.2.3`; otherwise `<pubsp
 
 The `native/` project is built as an `ExternalProject` (not `add_subdirectory`) because its object-library target is also named `soundwave`, which clashes with the runner executable. Both `build.yml` and `release.yml` assert after the build that the library is present in the bundle, exports `sw_*` symbols and can be loaded (`ctypes.CDLL`), and that the macOS runner has the `@executable_path/../Frameworks` rpath and `NSMicrophoneUsageDescription`.
 
-#### Desktop packages
+#### Packages
 
 | Platform | Runner | Artifacts | Packaging script |
 |---|---|---|---|
 | Windows | `windows-latest` | `soundwave-<ver>-windows-x64.zip`, `soundwave-<ver>-windows-x64.msix` | `soundwave_app/windows/packaging/package.ps1` (`Compress-Archive`, Windows SDK `makeappx`; manifest `AppxManifest.xml.in` declares `runFullTrust` + `microphone`) |
 | macOS | `macos-latest` | `soundwave-<ver>-macos-universal.dmg` | `soundwave_app/macos/packaging/sign_and_package.sh` (`codesign` with hardened runtime + `Runner/Release.entitlements`, `hdiutil` UDZO, `notarytool` + `stapler`) |
 | Linux | `ubuntu-22.04` (glibc 2.35 baseline) | `soundwave-<ver>-linux-x64.tar.gz`, `soundwave_<ver>_amd64.deb`, `Soundwave-<ver>-x86_64.AppImage` | `soundwave_app/linux/packaging/package.sh` (`tar`, `dpkg-deb` installing to `/opt/soundwave` + `/usr/bin/soundwave`, `appimagetool` 1.9.1) |
+| Android | `ubuntu-latest` | `soundwave-<ver>-android-{arm64-v8a,armeabi-v7a,x86_64}.apk`, `soundwave-<ver>-android.aab` | `.github/scripts/android_signing.sh` (`configure` / `verify` / `cleanup`; self-tested by the `release-scripts` CI job) |
 | All | `ubuntu-latest` (`checksums` job) | `SHA256SUMS`, `SHA256SUMS.asc` (when GPG key set) | inline |
 
 **Flutter version:** macOS jobs pin Flutter `3.50.0`; Flutter 3.47.8/3.47.9 `gen_snapshot` aborts with `Class with illegal cid` (`_Rect` in `widgets/_window_macos.dart`) when building the app with the microphone permission gate (#87). Other jobs stay on `3.47.x` until `android/` moves to AGP ≥ 9.1.1 (required by Flutter 3.50); then all jobs should use one pinned version.
@@ -226,12 +227,13 @@ The `native/` project is built as an `ExternalProject` (not `add_subdirectory`) 
 
 macOS microphone access: `Info.plist` has `NSMicrophoneUsageDescription`; `Release.entitlements` (applied when signing) has `com.apple.security.app-sandbox` and `com.apple.security.device.audio-input`. The packaging script fails if the signed app lacks the audio-input entitlement.
 
-#### Signing (all optional; gated on secret presence)
+#### Signing (gated on secret presence)
 
 `secrets` cannot be used in step-level `if:`, so each job exposes a presence flag in job-level `env` (e.g. `HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 != '' }}`) and signing steps test that flag. Without secrets the pipeline still succeeds with unsigned packages.
 
 | Platform | When secrets exist | Without secrets |
 |---|---|---|
+| Android | `android_signing.sh configure` writes `key.properties` from the `ANDROID_KEYSTORE_*` secrets (after checking they open the key); per-ABI APKs + AAB are release-signed; `verify` runs `apksigner`, `jarsigner`, a same-certificate check across all artifacts and `bundletool validate`. See [Android release](store/ANDROID_RELEASE.md). | Dry runs: debug-signed (verified, but not uploadable). **Publishing runs fail** rather than ship debug-signed builds. |
 | Windows | `signtool` (SHA-256, DigiCert RFC 3161 timestamp) signs `soundwave.exe`, `soundwave.dll` and the MSIX. MSIX `Publisher` comes from repository variable `MSIX_PUBLISHER` and must equal the certificate subject. | Unsigned zip + unsigned MSIX (MSIX installs only after signing / developer mode sideload). |
 | macOS | Certificate imported into a temporary keychain; frameworks/dylibs then the app are signed with `Developer ID Application` + hardened runtime + timestamp; DMG signed, notarized with `xcrun notarytool submit --wait` and stapled. Keychain deleted afterwards. | Ad-hoc signature (`codesign -s -`), not notarized; Gatekeeper will require right-click → Open. |
 | Linux | `SHA256SUMS` detached-signed (`SHA256SUMS.asc`) with the GPG key and verified. | Unsigned `SHA256SUMS`. |
@@ -246,7 +248,7 @@ macOS microphone access: `Info.plist` has `NSMicrophoneUsageDescription`; `Relea
 
 ## 4. Required Secrets
 
-All signing/publishing secrets are optional: when one is missing the corresponding step is skipped with a `::notice::` and unsigned packages are produced. Add them under *Settings → Secrets and variables → Actions*.
+All signing/publishing secrets are optional for builds and dry runs: when one is missing the corresponding step is skipped with a `::notice::` and unsigned packages are produced. The exception is a **publishing** release run, which requires the `ANDROID_KEYSTORE_*` secrets (Play rejects debug-signed bundles, and per-runner debug keys break in-place updates). Add them under *Settings → Secrets and variables → Actions*.
 
 | Secret | Platform | Purpose |
 |---|---|---|
@@ -269,6 +271,7 @@ All signing/publishing secrets are optional: when one is missing the correspondi
 
 | Repository **variable** (not secret) | Purpose |
 |---|---|
+| `ANDROID_SIGNING_CERT_SHA256` | Optional pin of the Android upload certificate (SHA-256, any case, colons optional). Publishing fails if the signed artifacts use a different certificate. |
 | `MSIX_PUBLISHER` | MSIX `Identity/@Publisher`; must exactly equal the Windows certificate subject (e.g. `CN=PxA Labs, O=PxA Labs, C=IN`). Defaults to `CN=PxA Labs`. |
 
 The macOS certificate is detected by the `Developer ID Application` identity in the `.p12`; notarization runs only when that identity and all three `MACOS_NOTARIZATION_*` secrets are present.
@@ -406,3 +409,4 @@ main (production)
 |---|---|---|---|
 | 1.0 | 2026-07-18 | PxA Labs | Initial CI/CD specification |
 | 1.1 | 2026-11-14 | PxA Labs | Desktop packaging, native-library bundling, signing, dry-run releases, checksums (#95, #35) |
+| 1.2 | 2026-11-14 | PxA Labs | Release-signed Android assets in `release.yml`, shared signing helper with bundletool validation and certificate pinning, manual Play upload guide (#94, #35) |
