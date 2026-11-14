@@ -9,10 +9,13 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
+import '../../dsp/band_activity.dart';
 import '../../dsp/waterfall_buffer.dart';
 import 'colormap.dart';
+import 'band_activity_semantics.dart';
 import 'frame_throttle.dart';
 import 'plot_text.dart';
 
@@ -219,11 +222,15 @@ class WaterfallPlot extends StatefulWidget {
   final double minFrequencyHz;
   final double maxFrequencyHz;
 
+  /// Band summary exposed as the plot's semantics value (#93).
+  final ValueListenable<BandActivity>? activity;
+
   const WaterfallPlot({
     super.key,
     required this.controller,
     required this.minFrequencyHz,
     required this.maxFrequencyHz,
+    this.activity,
   });
 
   @override
@@ -240,8 +247,8 @@ class _WaterfallPlotState extends State<WaterfallPlot> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Semantics(
-      container: true,
+    return BandActivitySemantics(
+      activity: widget.activity,
       label: 'Waterfall spectrogram: frequency content over time',
       child: MouseRegion(
         onHover: (e) => _setPointer(e.localPosition),
@@ -391,10 +398,14 @@ class WaterfallView extends StatefulWidget {
   /// Centre of the "Carrier +/-500 Hz" zoom.
   final double carrierHz;
 
+  /// Band summary for screen readers (#93).
+  final ValueListenable<BandActivity>? activity;
+
   const WaterfallView({
     super.key,
     required this.controller,
     this.carrierHz = 19000,
+    this.activity,
   });
 
   @override
@@ -415,6 +426,7 @@ class _WaterfallViewState extends State<WaterfallView> {
             controller: c,
             minFrequencyHz: lo,
             maxFrequencyHz: hi,
+            activity: widget.activity,
           ),
         ),
         ListenableBuilder(

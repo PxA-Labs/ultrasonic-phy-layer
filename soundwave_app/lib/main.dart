@@ -2,6 +2,7 @@
 // Initializes state management and renders the material app.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'onboarding/onboarding_screen.dart';
@@ -127,27 +128,92 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  final FocusNode _shellFocus = FocusNode(debugLabel: 'MainShell');
   final List<Widget> _screens = const [
     DashboardScreen(),
     MonitorScreen(),
     SettingsScreen(),
   ];
 
+  /// Ctrl+1..3 (Cmd+1..3 on macOS) switch tabs (#93).
+  static const List<LogicalKeyboardKey> _tabKeys = [
+    LogicalKeyboardKey.digit1,
+    LogicalKeyboardKey.digit2,
+    LogicalKeyboardKey.digit3,
+  ];
+
+  void _select(int i) {
+    if (i == _currentIndex) return;
+    setState(() => _currentIndex = i);
+    // Tab then starts from the top of the newly shown screen.
+    _shellFocus.requestFocus();
+  }
+
+  @override
+  void dispose() {
+    _shellFocus.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (i) => setState(() => _currentIndex = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+    return CallbackShortcuts(
+      bindings: {
+        for (var i = 0; i < _tabKeys.length; i++) ...{
+          SingleActivator(_tabKeys[i], control: true): () => _select(i),
+          SingleActivator(_tabKeys[i], meta: true): () => _select(i),
+        },
+      },
+      child: Focus(
+        focusNode: _shellFocus,
+        autofocus: true,
+        skipTraversal: true,
+        // Keyboard order: the visible screen's controls first (in reading
+        // order), then the navigation bar. Screens hidden by the
+        // IndexedStack are excluded so Tab never lands on an invisible
+        // control.
+        child: FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: Scaffold(
+            body: IndexedStack(
+              index: _currentIndex,
+              children: [
+                for (var i = 0; i < _screens.length; i++)
+                  ExcludeFocus(
+                    excluding: i != _currentIndex,
+                    child: FocusTraversalOrder(
+                      order: const NumericFocusOrder(1),
+                      child: FocusTraversalGroup(child: _screens[i]),
+                    ),
+                  ),
+              ],
+            ),
+            bottomNavigationBar: FocusTraversalOrder(
+              order: const NumericFocusOrder(2),
+              child: NavigationBar(
+                selectedIndex: _currentIndex,
+                onDestinationSelected: _select,
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.dashboard),
+                    label: 'Dashboard',
+                    tooltip: 'Dashboard (Ctrl+1)',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.show_chart),
+                    label: 'Monitor',
+                    tooltip: 'Monitor (Ctrl+2)',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.settings),
+                    label: 'Settings',
+                    tooltip: 'Settings (Ctrl+3)',
+                  ),
+                ],
+              ),
+            ),
           ),
-          NavigationDestination(icon: Icon(Icons.show_chart), label: 'Monitor'),
-          NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
-        ],
+        ),
       ),
     );
   }

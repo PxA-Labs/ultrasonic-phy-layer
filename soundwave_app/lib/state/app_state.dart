@@ -15,6 +15,7 @@ import 'package:soundwave/engine/rx_engine.dart';
 import 'package:soundwave/engine/tx_queue.dart';
 import 'package:soundwave/engine/signal_metrics.dart';
 import 'package:soundwave/engine/throughput_calculator.dart';
+import 'package:soundwave/native/native_status.dart';
 import 'package:soundwave/services/audio_service.dart';
 import 'package:soundwave/state/settings_store.dart';
 import 'package:soundwave/export/message_exporter.dart';
@@ -76,6 +77,11 @@ class AppState extends ChangeNotifier {
   RxTransferProgress? _rxTransfer;
   String? _transferError;
   final List<ReceivedFileRecord> _receivedFiles = [];
+
+  final NativeStatus Function() _nativeProbe;
+
+  /// Whether the DSP library loaded (probed once, on first use).
+  late final NativeStatus nativeStatus = _nativeProbe();
   Timer? _throughputTimer;
   bool _isDisposed = false;
 
@@ -109,7 +115,9 @@ class AppState extends ChangeNotifier {
     AudioService? audio,
     SettingsStore? store,
     ReceivedFileSink? fileSink,
+    NativeStatus Function()? nativeProbe,
   })  : _store = store,
+        _nativeProbe = nativeProbe ?? NativeStatus.probe,
         _fileSink = fileSink ?? DirectoryFileSink() {
     _configMap = {};
     _syncConfigMap();
