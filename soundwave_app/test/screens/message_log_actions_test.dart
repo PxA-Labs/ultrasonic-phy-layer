@@ -142,8 +142,7 @@ void main() {
     expect(find.textContaining('no disk'), findsOneWidget);
   });
 
-  testWidgets('a failing share sheet is reported after export',
-      (tester) async {
+  testWidgets('a failing share sheet is reported after export', (tester) async {
     state.addDecodedMessage(
       DecodedMessage(
         text: 'logged',
