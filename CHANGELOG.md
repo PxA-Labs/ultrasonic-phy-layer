@@ -63,18 +63,36 @@ All notable changes to this project will be documented in this file.
 - **app:** Do not return a Future from setState in the storage card
 - **android:** Import Properties in app build script
 - **ci:** Gate Android signature check on apksigner exit status, not cert wording
-- **ci:** Pin macOS build to Flutter 3.50.0 to avoid 3.47 gen_snapshot crash
 - **ci:** Resolve libunwind conflict on ubuntu-22.04 desktop builds
 - **linux:** Avoid SIGPIPE false failure when checking .deb contents
 - **release:** Checksum and publish a flattened asset set
 - **ci:** Pin Flutter 3.50.0 to avoid macOS AOT snapshotter crash
 - **ci:** Pin Flutter 3.50.0 only for macOS desktop jobs
+- **app:** Drop unused import after FileGateway switch
+- **app:** Numeric-safe level semantics; test true 200% linear text scale
+- **app:** Onboarding permission button follows the same platform switch as the gate
+- **sync:** Double both parts of positive bins in analytic signal
+- **ofdm:** Back off FFT window into CP and estimate CFO on it
+- **docs:** Exclude dart doc markdown from nav check; re-sync BER sweep windows on sw_detect_frame offset
+- **docs:** Track frame slots from a verified anchor in the BER sweep decoder
+- **ofdm:** Confine OFDM to the configured ultrasonic band
+- **ofdm:** Demodulate every symbol whose FFT window fits; drop padding workarounds
+- **app:** Serialise settings writes and enable sample save on first audio
+- **ofdm,cli:** Earliest matched-filter preamble; CLI demodulates from detected start
+- **css:** Score preamble slots against the mean slot energy and the weaker down slot
+- **css:** Explicit preamble slot bounds for static analysis; silence GCC stringop false positive
+- **css:** Explicit window bound in sliding max for static analysis
+- **tx:** Peak-normalize OFDM frames to cfg.amplitude and guard playback
+- **ofdm:** Whiten the last symbol's padding to cut the frame crest factor
 - **android:** Import Properties in app build script
 - **ci:** Gate Android signature check on apksigner exit status, not cert wording
+- **ci:** Pin macOS build to Flutter 3.50.0 to avoid 3.47 gen_snapshot crash
 - **ci:** Pin macOS build to Flutter 3.50.0 to avoid 3.47 gen_snapshot crash
 - **android:** Import Properties in app build script
 - **ci:** Gate Android signature check on apksigner exit status, not cert wording
 - **ci:** Pin macOS build to Flutter 3.50.0 to avoid 3.47 gen_snapshot crash
+- **tx:** Deliver the first frame; size frames to the config; drop RX settle workaround
+- **audio:** Create RecordAudioService plugins lazily; derive link test fragment counts from the frame budget
 
 ### Build
 
@@ -94,9 +112,15 @@ All notable changes to this project will be documented in this file.
 - Remove redundant auto-format and auto-commit steps in ci.yml
 - Add sanitizer, libFuzzer and static-analysis jobs; document workflow (#28)
 - **build:** Produce debug/split release APKs and AAB with packaged .so checks
-- **build:** Produce debug/split release APKs and AAB with packaged .so checks
-- **build:** Produce debug/split release APKs and AAB with packaged .so checks
 - Temporary format diff job (to be removed)
+- **docs:** Add MkDocs Material site with Doxygen and dart doc API builds (#37)
+- Add coverage gates, quality dashboard and Linux integration test job
+- Annotate coverage numbers and fix dashboard artifact paths
+- List least-covered files and locate dashboard summaries
+- Annotate uncovered line ranges for the least-covered files
+- Enforce coverage thresholds and document the quality gates
+- **build:** Produce debug/split release APKs and AAB with packaged .so checks
+- **build:** Produce debug/split release APKs and AAB with packaged .so checks
 
 ### Documentation
 
@@ -161,11 +185,20 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
-- Update CHANGELOG.md [skip ci]
-- Update CHANGELOG.md [skip ci]
-- Update CHANGELOG.md [skip ci]
 - **ci:** Document desktop packaging, signing secrets and dry-run releases
 - **ci:** Note the macOS Flutter pin
+- Document analytic signal, FFT window backoff and CFO/noise estimates
+- Add site pages, verified C/Dart API reference and Signal Lab (#37)
+- **testing:** Add field test and hardware profiling plans with BER sweep tool (#96, #98)
+- **legal:** Draft privacy policy, terms of service and Play Store listing (#97)
+- **readme:** Describe the real project structure, status and build steps
+- **signal-chain:** OFDM transmit spectrum figures from test_ofdm_spectrum
+- **css:** Document SF chirp symbols, sync, SF range and computed rates
+- Update OFDM raw peaks and spectrum figures after padding whitening
+- Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 
 ### Features
@@ -196,21 +229,29 @@ All notable changes to this project will be documented in this file.
 - **settings:** Persist modem settings, add BPSK/QPSK selector, fix CP options (#88)
 - **agc:** Native automatic gain control with FFI API (#92)
 - **app:** Apply AGC in the RX pipeline with settings toggle and gain readout (#92)
+- **link:** Payload fragmentation, file transfer and stop-and-wait ARQ (#89, #100)
 - **app:** WAV recording, signal import/demodulation and message export (#33)
 - **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
 - **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
 - **desktop:** Bundle libsoundwave and package Windows/macOS/Linux builds
 - **release:** Sign, package and checksum desktop builds with dry-run mode
-- **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
-- **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
-- **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
-- **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
 - **monitor:** Spectrum analyzer, waterfall and OFDM constellation widgets (#71, #91)
+- **app:** Add WCAG AA light/dark themes, onboarding tutorial and accessibility pass (#93)
+- **cli:** Adopt the app frame format; whiten OFDM data; verify preamble
+- **css:** SF-bit LoRa-style chirp symbols with robust whole-buffer preamble sync
+- **app:** CSS geometry from SF and bandwidth; remove dead CSS knobs
+- **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
+- **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
+- **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
+- **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
 
 ### Maintenance
 
 - Change license from MIT to Apache 2.0
 - Merge main into feat/ci-benchmarking
+- Remove temporary format helper workflow
+- Temporary format helper workflow
+- Remove temporary format helper workflow
 - Land stacked PRs #118, #120, #121 and #119 (#122)
 
 ### Performance
@@ -226,7 +267,12 @@ All notable changes to this project will be documented in this file.
 - Remove trailing whitespace in dashboard_test.dart
 - **ui:** Format audio_service.dart according to dart format guidelines
 - **ui:** Apply standard dart format to audio_service.dart
+- Apply dart format and fix analyzer warning
 - Dart format test files; drop temporary format job
+- **test:** Dart format
+- Format rx_stream_start_test
+- Format tx_engine_test
+- Format link_engines_test
 
 ### Testing
 
@@ -234,13 +280,60 @@ All notable changes to this project will be documented in this file.
 - **app:** Fix ProviderNotFound, CSV csv contains format, closeTo tolerance, and ServicesBinding in tests
 - **native:** Real TX->audio->RX loopback tests, run in CI against this commit's DSP (#88)
 - **native:** Memory-safety regression suite and ASan canaries (#28)
+- **link:** Fix zone and capture-start races in link-layer tests
+- **link:** Diagnostics for broadcast loopback
+- **link:** Fix diagnostics string
+- **link:** Format diagnostics
+- **link:** Settle receivers on background noise before transfers
 - **native:** Pad constellation test frames, report per-symbol EVM
 - Bound constellation EVM by the measured clean-loopback level
 - Check constellation decisions against frame bits; diagnose monitor peak
 - Pad native constellation frames; pump monitor test past throttle
+- **app:** Use isSemantics instead of deprecated containsSemantics
+- **app:** Scroll settings controls fully into view before tapping
+- **app:** Measure text scale on body text, not the clamped AppBar title
+- **app:** Scroll to the OFDM card in the 200% text test
+- Temporary OFDM EVM diagnostic (baseline)
+- Bound noiseless OFDM loopback EVM below 1 %
+- Remove temporary OFDM EVM diagnostic
+- **docs:** Add verbose window logging to the BER sweep smoke test
+- **app:** Load UI preferences before boot in integration test; fix coverage report dir
+- **native:** Add packet/FEC and C API error-path tests
+- **app:** AppState link-layer e2e, SharedPreferences store and status bar state tests
+- **app:** File transfer progress card states
+- **app:** Drop unnecessary import
+- **native:** RS decoder stages, OFDM frame negotiation, CSS sync defaults, pilot SNR
+- **app:** Message log actions save/cancel/failure flows
+- Fix formatting and give CSS sync test a realistic capture length
+- **app:** Settings controls drive AppState
+- **app:** Offline decode on a background isolate with the real DSP
+- **app:** FFI error codes surface as SwException
+- **app:** Capture audio before building the log actions
+- **app:** Drop unnecessary import
+- **app:** Wait for async transfer progress and sequential prefs saves
+- **app:** Reproduce lost same-tick settings saves and stale sample button
+- **app:** Cross-decode app and soundwave-cli WAV files in CI
+- **ofdm:** Band-aware config boundaries; zero-init FFT buffers; spectrum report in CI
+- **css:** Adapt API/sync tests to SF symbols; full-preamble lag scoring at buffer end
+- **css:** Cover argument, config and hostile-input edge cases; clamp narrowing casts
+- **api:** CSS-only geometry check uses a band the OFDM plan accepts
+- Reference spectrum/EVM checks to the TX frame gain; fix test ordering
+- Reproduce first-frame playback drop and first-frame RX failures
 
 ### Merge
 
+- WAV recording, signal import & message export (#33)
+- Android NDK build, AAudio backend & APK/AAB CI (#87, #94)
 - Android NDK branch into desktop pipeline (stack on #124)
+- Desktop packaging & release pipeline (#95, #35)
+- Spectrum analyzer, waterfall & constellation (#71, #91)
+- Integrate origin/integration/overnight into fragmentation/ARQ branch
+- Theme, onboarding & accessibility (#93)
+- Integrate latest origin/integration/overnight (theme, onboarding, a11y)
+- Fix OFDM analytic-signal/equalizer EVM
+- Docs site, README, legal drafts & test plans (#37, #97, #96, #98)
+- Coverage gates, quality dashboard & integration tests (#34, #36)
+- Settings save race & sample button fixes
+- Real spreading-factor CSS & robust CSS sync
 
 
