@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the FrameGeometry class from the frame_geometry library, for the Dart programming language.">
+  <title>FrameGeometry class - frame_geometry library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../static-assets/styles.css?v1">
+  <link rel="icon" href="../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../index.html">soundwave</a></li>
+    <li><a href="../engine_frame_geometry/">engine&#47;frame_geometry.dart</a></li>
+    <li class="self-crumb">FrameGeometry class</li>
+  </ol>
+  <div class="self-name">FrameGeometry</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="engine_frame_geometry&#47;engine_frame_geometry-library-sidebar.html"
+    data-below-sidebar="engine_frame_geometry&#47;FrameGeometry-class-sidebar.html">
+    <div>
+<h1><span class="kind-class">FrameGeometry</span> class 
+ 
+</h1></div>
+
+    
+
+
+
+    
+  <section class="summary offset-anchor" id="constructors">
+    <h2>Constructors</h2>
+    <dl class="constructor-summary-list">
+        <dt id="FrameGeometry.fromConfig" class="callable">
+          <span class="name"><a href="../engine_frame_geometry/FrameGeometry/FrameGeometry.fromConfig.html">FrameGeometry.fromConfig</a></span><span class="signature">(<span class="parameter" id="fromConfig-param-cfg"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span> <span class="parameter-name">cfg</span></span>)</span>
+        </dt>
+        <dd>
+          Defaults match the native modules: a 0 / missing value means "default".
+            <div class="constructor-modifier features">factory</div>
+        </dd>
+    </dl>
+  </section>
+    
+  <section
+      class="summary offset-anchor"
+      id="instance-properties">
+    <h2>Properties</h2>
+    <dl class="properties">
+        <dt id="bitsPerSymbol" class="property">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/bitsPerSymbol.html">bitsPerSymbol</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  Payload bits carried by one data symbol.
+  <div class="features"><span class="feature">final</span></div>
+
+</dd>
+
+        <dt id="enableRs" class="property">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/enableRs.html">enableRs</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>
+  
+
+</dt>
+<dd>
+  Whether frames carry Reed-Solomon parity (affects the minimum length).
+  <div class="features"><span class="feature">final</span></div>
+
+</dd>
+
+        <dt id="hashCode" class="property inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/hashCode.html">hashCode</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd class="inherited">
+  The hash code for this object.
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="maxFrameSamples" class="property">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/maxFrameSamples.html">maxFrameSamples</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  Longest valid frame: CRC + max payload (+ RS parity).
+  <div class="features"><span class="feature">no setter</span></div>
+
+</dd>
+
+        <dt id="minFrameSamples" class="property">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/minFrameSamples.html">minFrameSamples</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  Shortest valid frame: CRC + 1 payload byte (+ RS parity).
+  <div class="features"><span class="feature">no setter</span></div>
+
+</dd>
+
+        <dt id="preambleSamples" class="property">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/preambleSamples.html">preambleSamples</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  Samples occupied by the synchronisation preamble.
+  <div class="features"><span class="feature">final</span></div>
+
+</dd>
+
+        <dt id="rawBitRate" class="property">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/rawBitRate.html">rawBitRate</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/double-class.html">double</a></span>
+  
+
+</dt>
+<dd>
+  Raw PHY bit rate while data symbols are on air (no preamble, no FEC).
+  <div class="features"><span class="feature">no setter</span></div>
+
+</dd>
+
+        <dt id="retryStepSymbols" class="property">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/retryStepSymbols.html">retryStepSymbols</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  New audio (in symbols) the RX engine waits for between two decode
+attempts of a pending frame.
+  <div class="features"><span class="feature">final</span></div>
+
+</dd>
+
+        <dt id="runtimeType" class="property inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/runtimeType.html">runtimeType</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Type-class.html">Type</a></span>
+  
+
+</dt>
+<dd class="inherited">
+  A representation of the runtime type of the object.
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="sampleRate" class="property">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/sampleRate.html">sampleRate</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  Audio sample rate (Hz) the geometry was computed for.
+  <div class="features"><span class="feature">final</span></div>
+
+</dd>
+
+        <dt id="samplesPerSymbol" class="property">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/samplesPerSymbol.html">samplesPerSymbol</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  Samples per data symbol (CSS chirp, or OFDM symbol incl. cyclic prefix).
+  <div class="features"><span class="feature">final</span></div>
+
+</dd>
+
+        <dt id="searchWindowSamples" class="property">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/searchWindowSamples.html">searchWindowSamples</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  Window handed to frame detection: a full preamble plus margin on both
+sides so a preamble straddling the window edge is found next time.
+  <div class="features"><span class="feature">no setter</span></div>
+
+</dd>
+
+        <dt id="symbolSeconds" class="property">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/symbolSeconds.html">symbolSeconds</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/double-class.html">double</a></span>
+  
+
+</dt>
+<dd>
+  Duration of one data symbol in seconds.
+  <div class="features"><span class="feature">no setter</span></div>
+
+</dd>
+
+        <dt id="tailSamples" class="property">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/tailSamples.html">tailSamples</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  Samples after the last symbol (OFDM: the transmit window's fade-out).
+  <div class="features"><span class="feature">final</span></div>
+
+</dd>
+
+    </dl>
+  </section>
+
+    
+  <section
+      class="summary offset-anchor"
+      id="instance-methods">
+    <h2>Methods</h2>
+    <dl class="callables">
+        <dt id="airtimeSeconds" class="callable">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/airtimeSeconds.html">airtimeSeconds</a></span><span class="signature">(<wbr><span class="parameter" id="airtimeSeconds-param-frameBytes"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">frameBytes</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/double-class.html">double</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Air time of a frame of <code>frameBytes</code> bytes, preamble included.
+  
+
+</dd>
+
+        <dt id="maxPayloadWithin" class="callable">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/maxPayloadWithin.html">maxPayloadWithin</a></span><span class="signature">(<wbr><span class="parameter" id="maxPayloadWithin-param-maxSamples"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">maxSamples</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Largest payload (at most <a href="../engine_frame_codec/FrameCodec/maxPayload-constant.html">FrameCodec.maxPayload</a>) whose frame takes no
+more than <code>maxSamples</code> samples; 0 if not even one byte fits.
+  
+
+</dd>
+
+        <dt id="noSuchMethod" class="callable inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/noSuchMethod.html">noSuchMethod</a></span><span class="signature">(<wbr><span class="parameter" id="noSuchMethod-param-invocation"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Invocation-class.html">Invocation</a></span> <span class="parameter-name">invocation</span></span>)
+    <span class="returntype parameter">&#8594; dynamic</span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  Invoked when a nonexistent method or property is accessed.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="payloadBitRate" class="callable">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/payloadBitRate.html">payloadBitRate</a></span><span class="signature">(<wbr><span class="parameter" id="payloadBitRate-param-payloadBytes"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">payloadBytes</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/double-class.html">double</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Payload throughput of back-to-back single frames carrying
+<code>payloadBytes</code> each (CRC + RS parity and preamble counted as overhead).
+  
+
+</dd>
+
+        <dt id="samplesForFrameBytes" class="callable">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/samplesForFrameBytes.html">samplesForFrameBytes</a></span><span class="signature">(<wbr><span class="parameter" id="samplesForFrameBytes-param-frameBytes"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">frameBytes</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Samples needed to carry a frame of <code>frameBytes</code> bytes (incl. preamble).
+  
+
+</dd>
+
+        <dt id="toString" class="callable">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/toString.html">toString</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  A string representation of this object.
+  <div class="features"><span class="feature">override</span></div>
+
+</dd>
+
+        <dt id="txFrameSampleBudget" class="callable">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/txFrameSampleBudget.html">txFrameSampleBudget</a></span><span class="signature">(<wbr>{<span class="parameter" id="txFrameSampleBudget-param-minPayload"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">minPayload</span> = <span class="default-value">1</span></span>})
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Sample budget for one transmitted frame that must carry at least
+<code>minPayload</code> bytes: <a href="../engine_frame_geometry/FrameGeometry/targetFrameAirtimeSeconds-constant.html">targetFrameAirtimeSeconds</a>, stretched to twice the
+smallest such frame when that alone takes more than half of it, and
+never above <a href="../native_soundwave_native/SoundwaveNative/maxFrameSamples-constant.html">SoundwaveNative.maxFrameSamples</a>. The stretch matters for
+slow CSS settings (SF10 / 2 kHz: a 12-byte link frame already takes
+~25 s, mostly preamble and FEC): frames there stay at most twice the
+minimum, so at least half of their airtime carries payload.
+  
+
+</dd>
+
+    </dl>
+  </section>
+    
+  <section
+      class="summary offset-anchor inherited"
+      id="operators">
+    <h2>Operators</h2>
+    <dl class="callables">
+        <dt id="operator ==" class="callable inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/operator_equals.html">operator ==</a></span><span class="signature">(<wbr><span class="parameter" id="==-param-other"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Object-class.html">Object</a></span> <span class="parameter-name">other</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  The equality operator.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+    </dl>
+  </section>
+    
+    
+  <section class="summary offset-anchor" id="static-methods">
+    <h2>Static Methods</h2>
+    <dl class="callables">
+        <dt id="cssSamplesPerChip" class="callable">
+  <span class="name"><a href="../engine_frame_geometry/FrameGeometry/cssSamplesPerChip.html">cssSamplesPerChip</a></span><span class="signature">(<wbr><span class="parameter" id="cssSamplesPerChip-param-sampleRate"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">sampleRate</span>, </span><span class="parameter" id="cssSamplesPerChip-param-bandwidth"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/double-class.html">double</a></span> <span class="parameter-name">bandwidth</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  CSS samples per chip, D = round(fs / B) with B as the float32 the
+native sw_config_t stores. The effective bandwidth is fs / D.
+  
+
+</dd>
+
+    </dl>
+  </section>
+    
+
+  <section class="summary offset-anchor" id="constants">
+    <h2>Constants</h2>
+    <dl class="properties">
+        <dt id="defaultCssBandwidth" class="constant">
+    <span class="name "><a href="../engine_frame_geometry/FrameGeometry/defaultCssBandwidth-constant.html">defaultCssBandwidth</a></span>
+  <span class="signature">&#8594; const <a href="https://api.flutter.dev/flutter/dart-core/double-class.html">double</a></span>
+  
+
+</dt>
+<dd>
+  
+  
+
+</dd>
+
+        <dt id="defaultSf" class="constant">
+    <span class="name "><a href="../engine_frame_geometry/FrameGeometry/defaultSf-constant.html">defaultSf</a></span>
+  <span class="signature">&#8594; const <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  Native CSS defaults (css_geometry in native/src/css/css_modulate.c).
+  
+
+</dd>
+
+        <dt id="maxSf" class="constant">
+    <span class="name "><a href="../engine_frame_geometry/FrameGeometry/maxSf-constant.html">maxSf</a></span>
+  <span class="signature">&#8594; const <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  
+  
+
+</dd>
+
+        <dt id="minSf" class="constant">
+    <span class="name "><a href="../engine_frame_geometry/FrameGeometry/minSf-constant.html">minSf</a></span>
+  <span class="signature">&#8594; const <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  Supported CSS spreading factors (native CSS_MIN_SF..CSS_MAX_SF).
+  
+
+</dd>
+
+        <dt id="ofdmRetryStepSymbols" class="constant">
+    <span class="name "><a href="../engine_frame_geometry/FrameGeometry/ofdmRetryStepSymbols-constant.html">ofdmRetryStepSymbols</a></span>
+  <span class="signature">&#8594; const <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  OFDM decode-retry step; CSS waits ~0.25 s (4..32 chirps).
+  
+
+</dd>
+
+        <dt id="targetFrameAirtimeSeconds" class="constant">
+    <span class="name "><a href="../engine_frame_geometry/FrameGeometry/targetFrameAirtimeSeconds-constant.html">targetFrameAirtimeSeconds</a></span>
+  <span class="signature">&#8594; const <a href="https://api.flutter.dev/flutter/dart-core/double-class.html">double</a></span>
+  
+
+</dt>
+<dd>
+  Airtime the TX path aims for per frame. Long frames are fragile (one
+noise burst or a moved phone loses the whole frame), stall ARQ (each
+attempt waits a frame's airtime) and give no progress feedback. 15 s
+keeps OFDM frames full (219-byte payloads take ~1 s) and only splits
+slow CSS settings (a full frame is ~34 s at SF8 and ~110 s at SF10,
+2 kHz; the latter does not even fit <a href="../native_soundwave_native/SoundwaveNative/maxFrameSamples-constant.html">SoundwaveNative.maxFrameSamples</a>).
+  
+
+</dd>
+
+    </dl>
+  </section>
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../index.html">soundwave</a></li>
+    <li><a href="../engine_frame_geometry/">frame_geometry</a></li>
+    <li class="self-crumb">FrameGeometry class</li>
+</ol>
+
+    <h5>frame_geometry library</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div>
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+  </div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    soundwave
+      1.0.0+1
+  </span>
+  
+</footer>
+
+
+<script src="../static-assets/highlight.pack.js?v1"></script>
+<script src="../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

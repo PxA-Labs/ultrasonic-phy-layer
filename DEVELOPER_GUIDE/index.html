@@ -1,0 +1,2265 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Ultrasonic physical-layer modem (C DSP core + Flutter app) for short-range data transfer over sound.">
+      
+      
+      
+        <link rel="canonical" href="https://pxa-labs.github.io/ultrasonic-phy-layer/DEVELOPER_GUIDE/">
+      
+      
+        <link rel="prev" href="../architecture/signal-chain/">
+      
+      
+        <link rel="next" href="../MATHEMATICAL_MODEL/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>Developer guide - Soundwave</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.342714a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#soundwave-developer--architecture-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Soundwave" class="md-header__button md-logo" aria-label="Soundwave" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Soundwave
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Developer guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="cyan"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="cyan"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PxA-Labs/ultrasonic-phy-layer" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PxA-Labs/ultrasonic-phy-layer
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../getting-started/build/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../API_REFERENCE/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../lab/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Signal Lab
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../testing/FIELD_TEST_PLAN/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../development/contributing/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../legal/PRIVACY_POLICY/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Legal & store (drafts)
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Soundwave" class="md-nav__button md-logo" aria-label="Soundwave" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Soundwave
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PxA-Labs/ultrasonic-phy-layer" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PxA-Labs/ultrasonic-phy-layer
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Build from source
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Using the app
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CLI_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CLI guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Architecture
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/signal-chain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Signal chain & parameters
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Developer guide
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Developer guide
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-architectural-sitemap--repository-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Architectural Sitemap &amp; Repository Overview
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-phy-frame-architecture--data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. PHY Frame Architecture &amp; Data Flow
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. PHY Frame Architecture &amp; Data Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phy-frame-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      PHY frame format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#link-layer-fragmentation-file-transfer--arq-89-100" class="md-nav__link">
+    <span class="md-ellipsis">
+      Link Layer: Fragmentation, File Transfer &amp; ARQ (#89, #100)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-ffi-memory-ownership-contracts--buffer-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. FFI Memory Ownership Contracts &amp; Buffer Lifecycle
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. FFI Memory Ownership Contracts &amp; Buffer Lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      Memory Rules
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-ownership-pattern-example-dart-ffi" class="md-nav__link">
+    <span class="md-ellipsis">
+      Memory Ownership Pattern Example (Dart FFI)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-multi-platform-setup--build-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Multi-Platform Setup &amp; Build Guide
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Multi-Platform Setup &amp; Build Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-building-the-native-cc-core-library" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 1: Building the Native C/C++ Core Library
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cmake-presets-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      CMake Presets (Optional)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-running-the-flutter-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 2: Running the Flutter App
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#native-library-for-flutter-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      Native library for Flutter tests
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#android-ndk--aaudio" class="md-nav__link">
+    <span class="md-ellipsis">
+      Android (NDK + AAudio)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-testing--debugging-framework" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Testing &amp; Debugging Framework
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Testing &amp; Debugging Framework">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-native-c-unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running Native C Unit Tests
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sanitizers--fuzzing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sanitizers &amp; Fuzzing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-code-style--commit-guidelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Code Style &amp; Commit Guidelines
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../MATHEMATICAL_MODEL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Mathematical model
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    API
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            API
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API_REFERENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    C API
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/dart-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Dart API
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Signal Lab
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Testing
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Testing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/FIELD_TEST_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Field test plan
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/HARDWARE_PROFILING_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Hardware profiling plan
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Project
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Project
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CI_CD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CI/CD
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../TECH_STACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tech stack (planning)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PRD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    PRD
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ROADMAP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Roadmap
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Changelog
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Legal & store (drafts)
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Legal & store (drafts)
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../legal/PRIVACY_POLICY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Privacy policy
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../legal/TERMS_OF_SERVICE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Terms of service
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../store/PLAY_STORE_LISTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Play Store listing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../store/DATA_SAFETY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Play data safety
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-architectural-sitemap--repository-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Architectural Sitemap &amp; Repository Overview
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-phy-frame-architecture--data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. PHY Frame Architecture &amp; Data Flow
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. PHY Frame Architecture &amp; Data Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phy-frame-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      PHY frame format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#link-layer-fragmentation-file-transfer--arq-89-100" class="md-nav__link">
+    <span class="md-ellipsis">
+      Link Layer: Fragmentation, File Transfer &amp; ARQ (#89, #100)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-ffi-memory-ownership-contracts--buffer-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. FFI Memory Ownership Contracts &amp; Buffer Lifecycle
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. FFI Memory Ownership Contracts &amp; Buffer Lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      Memory Rules
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-ownership-pattern-example-dart-ffi" class="md-nav__link">
+    <span class="md-ellipsis">
+      Memory Ownership Pattern Example (Dart FFI)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-multi-platform-setup--build-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Multi-Platform Setup &amp; Build Guide
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Multi-Platform Setup &amp; Build Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-building-the-native-cc-core-library" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 1: Building the Native C/C++ Core Library
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cmake-presets-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      CMake Presets (Optional)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-running-the-flutter-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 2: Running the Flutter App
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#native-library-for-flutter-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      Native library for Flutter tests
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#android-ndk--aaudio" class="md-nav__link">
+    <span class="md-ellipsis">
+      Android (NDK + AAudio)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-testing--debugging-framework" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Testing &amp; Debugging Framework
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Testing &amp; Debugging Framework">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-native-c-unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running Native C Unit Tests
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sanitizers--fuzzing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sanitizers &amp; Fuzzing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-code-style--commit-guidelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Code Style &amp; Commit Guidelines
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="soundwave-developer--architecture-guide">Soundwave Developer &amp; Architecture Guide<a class="headerlink" href="#soundwave-developer--architecture-guide" title="Permanent link">&para;</a></h1>
+<p>Welcome to the Soundwave Physical Layer (PHY) developer guide! This document provides an architectural sitemap, visual sequence diagrams, memory management contracts across the Dart FFI boundary, and setup instructions for contributors building or extending the native C library and Flutter application.</p>
+<hr />
+<h2 id="1-architectural-sitemap--repository-overview">1. Architectural Sitemap &amp; Repository Overview<a class="headerlink" href="#1-architectural-sitemap--repository-overview" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ultrasonic-phy-layer/
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── docs/                        # Documentation site sources (MkDocs, see mkdocs.yml)
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│   ├── getting-started/ architecture/ api/ lab/ testing/ legal/ store/ development/
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   ├── MATHEMATICAL_MODEL.md    # PHY equations
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   ├── API_REFERENCE.md         # C API reference (soundwave_api.h)
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│   ├── DEVELOPER_GUIDE.md       # This file
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│   └── CLI_GUIDE.md, CI_CD.md, PRD.md, ROADMAP.md, TECH_STACK.md
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>├── native/                      # C11 DSP core library (CMake)
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│   ├── include/
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│   │   ├── soundwave_api.h      # Public C ABI used by dart:ffi
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│   │   └── soundwave/           # Module headers (types, css, ofdm, sync, cfo, chanest, rs, crc, agc, audio, ...)
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│   ├── src/                     # api/ css/ ofdm/ sync/ chanest/ equalizer/ rs/ crc/ fec/ packet/ agc/ audio/
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│   ├── vendor/                  # Vendored KissFFT and miniaudio
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│   ├── tests/                   # CTest executables + Catch2 runner
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│   ├── Fuzzing/                 # libFuzzer harnesses, regression inputs
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│   ├── benchmarks/              # Micro-benchmarks (SW_BUILD_BENCHMARKS)
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│   └── tools/soundwave_cli/     # soundwave-cli developer tool
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>├── soundwave_app/               # Flutter app (Android, Windows, macOS, Linux)
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│   ├── lib/
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│   │   ├── native/              # dart:ffi bindings (SoundwaveNative, SwConfig), hand-written
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│   │   ├── engine/              # FrameCodec, TxEngine, RxEngine, link layer, ARQ, AGC wrapper
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│   │   ├── dsp/                 # Visualization DSP (FFT, spectrum, waterfall, constellation)
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>│   │   ├── export/              # WAV recording/import, offline decoder, exporters, storage
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>│   │   ├── services/            # AudioService, microphone permission, received-file store
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>│   │   ├── state/               # AppState, settings persistence, UI preferences
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│   │   ├── screens/ widgets/ onboarding/ theme/
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│   │   └── main.dart
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>│   ├── test/                    # Unit, widget, a11y and native loopback tests
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>│   └── android/ windows/ macos/ linux/   # Runners and packaging scripts
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>└── .github/                     # Workflows, CODEOWNERS, PR template
+</code></pre></div>
+<hr />
+<h2 id="2-phy-frame-architecture--data-flow">2. PHY Frame Architecture &amp; Data Flow<a class="headerlink" href="#2-phy-frame-architecture--data-flow" title="Permanent link">&para;</a></h2>
+<p>The app's PHY frame (<code>soundwave_app/lib/engine/frame_codec.dart</code>) is modulated by CSS or OFDM after a mode-specific preamble. CSS uses 8 base up-chirps and 2 down-chirps, then one up-chirp per SF bits; OFDM uses two identical Zadoff-Chu symbols.</p>
+<pre class="mermaid"><code>graph LR
+    P[Preamble&lt;br/&gt;CSS: 8 up + 2 down chirps&lt;br/&gt;OFDM: 2 x ZC symbol] --&gt; C[CRC-32 LE&lt;br/&gt;4 bytes, over payload]
+    C --&gt; D[Payload&lt;br/&gt;1..219 bytes]
+    D --&gt; R[RS parity&lt;br/&gt;32 bytes, optional]</code></pre>
+<h3 id="phy-frame-format">PHY frame format<a class="headerlink" href="#phy-frame-format" title="Permanent link">&para;</a></h3>
+<p>This is the single frame format of the project. The app (<code>soundwave_app/lib/engine/frame_codec.dart</code>) and <code>soundwave-cli</code> (<code>native/tools/soundwave_cli/frame_format.c</code>) implement it byte for byte:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Size</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CRC</td>
+<td>4 bytes</td>
+<td>CRC-32 (IEEE 802.3, <code>sw_crc32</code>) over the payload, little-endian</td>
+</tr>
+<tr>
+<td>Payload</td>
+<td>1..219 bytes</td>
+<td>Application bytes (UTF-8 text, or a link-layer frame)</td>
+</tr>
+<tr>
+<td>RS parity</td>
+<td>32 bytes, unless RS is off (<code>enable_rs</code> / <code>--no-rs</code>)</td>
+<td><code>sw_rs_encode</code> over CRC + payload: a shortened RS(255,223) codeword of at most 255 bytes</td>
+</tr>
+</tbody>
+</table>
+<p>Example: payload <code>hello</code> gives <code>86 A6 10 36 68 65 6C 6C 6F</code> followed by 32 parity bytes (<code>native/tests/test_cli_frame.c</code>, <code>soundwave_app/test/native/cli_compat_test.dart</code>).</p>
+<p>There is no length field. The demodulator returns every symbol in its input, including noise after the frame, so the receiver tries lengths from the shortest upwards and takes the first one whose RS decode (if enabled) and CRC-32 both verify. This keeps the on-air format of the deployed app and its link layer unchanged. A false accept needs a wrong length to pass both RS decoding and a 32-bit CRC; without RS it needs a CRC-32 collision at one of at most 219 candidate lengths, about <span class="arithmatex">\(219 \cdot 2^{-32} \approx 5 \times 10^{-8}\)</span> per frame. A length field would not remove the search for the end of the frame in a stream; it would add two bytes that themselves need protection.</p>
+<p>The OFDM modulator additionally whitens the frame bits (PRBS15) on air. That is part of the modem, not of the byte format.</p>
+<p>The TX/RX sequence diagrams, threading and persistence are described in the <a href="../architecture/overview/">architecture overview</a>. Band, rate and airtime per configuration are in <a href="../architecture/signal-chain/">Signal chain &amp; parameters</a>.</p>
+<h3 id="link-layer-fragmentation-file-transfer--arq-89-100">Link Layer: Fragmentation, File Transfer &amp; ARQ (#89, #100)<a class="headerlink" href="#link-layer-fragmentation-file-transfer--arq-89-100" title="Permanent link">&para;</a></h3>
+<p>Implemented in pure Dart (<code>soundwave_app/lib/engine/</code>): <code>link_frame.dart</code>
+(formats), <code>fragmentation.dart</code> (fragmenter/reassembler), <code>link_receiver.dart</code>
+(RX policy), <code>arq.dart</code> (stop-and-wait sender). It runs inside the PHY frame
+payload (<code>[CRC-32][payload &lt;= 219 B][RS parity]</code>, see <code>frame_codec.dart</code>).</p>
+<p><strong>Payload discrimination.</strong> A PHY payload whose first byte is <code>0xFA</code> is a link
+frame; anything else is legacy raw UTF-8 text (<code>0xFA</code> never occurs in UTF-8).
+Short text with ARQ off is still sent as a legacy frame, so old receivers keep
+working. Longer text, files, and everything sent with ARQ on use link frames.</p>
+<table>
+<thead>
+<tr>
+<th>Frame</th>
+<th>Layout (little-endian)</th>
+<th>Size</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DATA</td>
+<td><code>FA 01 flags src:u16 msgId:u16 index:u16 count:u16 chunk</code></td>
+<td>11 + 1..208 B</td>
+</tr>
+<tr>
+<td>ACK</td>
+<td><code>FA 02 00 src:u16 dst:u16 msgId:u16 index:u16</code></td>
+<td>11 B</td>
+</tr>
+<tr>
+<td>NACK</td>
+<td><code>FA 03 reason src:u16 dst:u16 msgId:u16 index:u16</code></td>
+<td>11 B</td>
+</tr>
+</tbody>
+</table>
+<p><code>flags</code> bit 0 = ACK requested. <code>src</code>/<code>dst</code> are random per-app 16-bit node ids;
+frames with <code>src</code> equal to the local id are the device hearing its own speaker
+and are ignored.</p>
+<p><strong>Message envelope</strong> (what gets fragmented): <code>kind:u8 (1 text, 2 file) |
+length:u32 | crc32(content):u32 | [file: nameLen:u8 name mimeLen:u8 mime] |
+content</code>. Content is limited to 1 MiB (about 5,050 fragments). The
+reassembler delivers a message only when all <code>count</code> fragments are present
+and the envelope CRC-32 verifies.</p>
+<p><strong>Reassembly.</strong> Fragments are buffered per <code>(src, msgId)</code> in any order.
+Duplicates are dropped, and ids that were already delivered are remembered
+for 10 minutes so retransmissions are not delivered twice. At most 8
+concurrent messages are kept (the least recently updated one is evicted).
+An incomplete message is abandoned after an idle timeout of
+30 s + (maxRetries + 2) x (2 x max-frame airtime + largest backoff), and the
+failure is reported on <code>RxEngine.transfers</code>.</p>
+<p><strong>ARQ (stop-and-wait).</strong> Only one side can transmit at a time, and frames are
+long compared with the turnaround, so the sender waits for each fragment's ACK
+before sending the next. The wait is
+<code>airtime + responseAllowance + ackTimeout x 2^attempt (+ up to 10 % jitter)</code>.
+<code>responseAllowance</code> is the ACK's airtime plus the RX decode latency, computed
+from <code>FrameGeometry</code>. A NACK triggers an immediate retransmission. After
+<code>maxRetries</code> retransmissions of one fragment the transfer fails with
+<code>TxMaxRetriesError</code>. When a receiver sees a CRC/RS failure while exactly one
+ARQ transfer is in progress, it NACKs that transfer's lowest missing fragment.
+Otherwise it stays silent and the sender's timeout covers the loss. Identical
+replies within 150 ms are debounced, and a genuine retransmission is always
+ACKed again because it means the earlier ACK was lost.</p>
+<p><strong>Settings</strong> (<code>arq_enabled</code> default off, <code>arq_max_retries</code> 1/3/5,
+<code>arq_ack_timeout_ms</code> 200-2000, added on top of the airtime). With ARQ off,
+fragments are broadcast once, paced by their airtime, and receivers never
+transmit. With ARQ on, <strong>both</strong> devices must enable it and listen. The app
+starts listening automatically before an ARQ file send. Received files are
+saved under <code>&lt;app documents&gt;/Soundwave/received/</code> with sanitized,
+non-overwriting names (<code>services/received_file_store.dart</code>).</p>
+<hr />
+<h2 id="3-ffi-memory-ownership-contracts--buffer-lifecycle">3. FFI Memory Ownership Contracts &amp; Buffer Lifecycle<a class="headerlink" href="#3-ffi-memory-ownership-contracts--buffer-lifecycle" title="Permanent link">&para;</a></h2>
+<p>When calling C code from Dart via <code>dart:ffi</code>, managing memory safely across the language boundary is paramount to prevent memory leaks and dangling pointer crashes.</p>
+<h3 id="memory-rules">Memory Rules<a class="headerlink" href="#memory-rules" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Caller Allocates, Callee Fills</strong>:</li>
+<li>The Dart caller (<code>SoundwaveNative</code>) MUST allocate memory buffers using <code>ffi.calloc</code> or <code>ffi.malloc</code> before passing pointers to C functions.</li>
+<li>
+<p>Native C functions write into pre-allocated memory buffers and return written lengths via output parameter pointers (<code>size_t*</code>).</p>
+</li>
+<li>
+<p><strong>Caller Frees</strong>:</p>
+</li>
+<li>Any memory allocated by Dart MUST be freed by Dart using <code>calloc.free(ptr)</code> inside a <code>try ... finally</code> block after the native call completes.</li>
+<li>
+<p>Native C functions in <code>libsoundwave</code> DO NOT retain or free pointers passed to them.</p>
+</li>
+<li>
+<p><strong>Buffer Length Estimation Formulas</strong>:</p>
+</li>
+<li><strong>RS Parity Allocation</strong>: <span class="arithmatex">\(N_{\text{parity}} = 2t = N_{\text{block}} - K_{\text{data}}\)</span> bytes (default 32 bytes for <span class="arithmatex">\(RS(255, 223)\)</span>).</li>
+<li><strong>CSS Audio Samples</strong>: <span class="arithmatex">\(N_{\text{samples}} = (10 + \lceil N_{\text{bits}} / SF \rceil) \times 2^{SF} \times \text{round}(f_s / B)\)</span> floats (10-chirp preamble, one chirp per SF bits). <code>FrameGeometry</code> in <code>lib/engine/frame_geometry.dart</code> mirrors this.</li>
+<li><strong>OFDM Audio Samples</strong>: <span class="arithmatex">\(N_{\text{samples}} = (2 + \lceil N_{\text{bits}} / B_{\text{sym}} \rceil) \times (N_{\text{fft}} + N_{\text{cp}}) + \lfloor N_{\text{cp}}/2 \rfloor\)</span>, where <span class="arithmatex">\(B_{\text{sym}}\)</span> is the number of data subcarriers in the configured band times bits per subcarrier (see <a href="../architecture/signal-chain/#ofdm-mode">Signal chain</a>).</li>
+<li>In practice, call once with a too-small capacity: the API returns <code>SW_ERR_OVERFLOW</code> and writes the required length.</li>
+</ol>
+<h3 id="memory-ownership-pattern-example-dart-ffi">Memory Ownership Pattern Example (Dart FFI)<a class="headerlink" href="#memory-ownership-pattern-example-dart-ffi" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// Example: safe FFI allocation (pattern used in lib/native/soundwave_native.dart)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">Pointer</span><span class="o">&lt;</span><span class="n">Uint8</span><span class="o">&gt;</span><span class="w"> </span><span class="n">dataPtr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">calloc</span><span class="o">&lt;</span><span class="n">Uint8</span><span class="o">&gt;</span><span class="p">(</span><span class="n">dataLen</span><span class="p">);</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">Pointer</span><span class="o">&lt;</span><span class="n">Uint8</span><span class="o">&gt;</span><span class="w"> </span><span class="n">parityPtr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">calloc</span><span class="o">&lt;</span><span class="n">Uint8</span><span class="o">&gt;</span><span class="p">(</span><span class="m">32</span><span class="p">);</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">Pointer</span><span class="o">&lt;</span><span class="n">Size</span><span class="o">&gt;</span><span class="w"> </span><span class="n">parityLenPtr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">calloc</span><span class="o">&lt;</span><span class="n">Size</span><span class="o">&gt;</span><span class="p">();</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="c1">// Copy Dart list into native memory</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="n">dataPtr</span><span class="p">.</span><span class="n">asTypedList</span><span class="p">(</span><span class="n">dataLen</span><span class="p">).</span><span class="n">setAll</span><span class="p">(</span><span class="m">0</span><span class="p">,</span><span class="w"> </span><span class="n">dataBytes</span><span class="p">);</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="c1">// Call C API</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_bindings</span><span class="p">.</span><span class="n">sw_rs_encode</span><span class="p">(</span><span class="n">dataPtr</span><span class="p">,</span><span class="w"> </span><span class="n">dataLen</span><span class="p">,</span><span class="w"> </span><span class="n">parityPtr</span><span class="p">,</span><span class="w"> </span><span class="n">parityLenPtr</span><span class="p">);</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">result</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="m">0</span><span class="p">)</span><span class="w"> </span><span class="k">throw</span><span class="w"> </span><span class="n">Exception</span><span class="p">(</span><span class="s2">"RS Encode Failed: </span><span class="si">$</span><span class="n">result</span><span class="s2">"</span><span class="p">);</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">  </span><span class="c1">// Read back native results</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">writtenLen</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parityLenPtr</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">  </span><span class="n">List</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">parityBytes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parityPtr</span><span class="p">.</span><span class="n">asTypedList</span><span class="p">(</span><span class="n">writtenLen</span><span class="p">).</span><span class="n">toList</span><span class="p">();</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">parityBytes</span><span class="p">;</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="p">}</span><span class="w"> </span><span class="k">finally</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">  </span><span class="c1">// Free native memory guaranteed</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">  </span><span class="n">calloc</span><span class="p">.</span><span class="n">free</span><span class="p">(</span><span class="n">dataPtr</span><span class="p">);</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">  </span><span class="n">calloc</span><span class="p">.</span><span class="n">free</span><span class="p">(</span><span class="n">parityPtr</span><span class="p">);</span>
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">  </span><span class="n">calloc</span><span class="p">.</span><span class="n">free</span><span class="p">(</span><span class="n">parityLenPtr</span><span class="p">);</span>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="4-multi-platform-setup--build-guide">4. Multi-Platform Setup &amp; Build Guide<a class="headerlink" href="#4-multi-platform-setup--build-guide" title="Permanent link">&para;</a></h2>
+<h3 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Required Toolchain</th>
+<th>Native Build System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>macOS</strong></td>
+<td>Xcode Command Line Tools, Clang, CMake <span class="arithmatex">\(\ge 3.20\)</span>, Flutter 3.47</td>
+<td>CMake + AppleClang</td>
+</tr>
+<tr>
+<td><strong>Linux (Ubuntu/Debian)</strong></td>
+<td><code>build-essential</code>, <code>cmake</code>, <code>libasound2-dev</code>, Flutter 3.47</td>
+<td>CMake + GCC/Clang</td>
+</tr>
+<tr>
+<td><strong>Windows</strong></td>
+<td>Visual Studio 2022 (Desktop C++), CMake <span class="arithmatex">\(\ge 3.20\)</span>, Flutter 3.47</td>
+<td>CMake + MSVC</td>
+</tr>
+<tr>
+<td><strong>Android</strong></td>
+<td>Android Studio, Android NDK (r26+), CMake <span class="arithmatex">\(\ge 3.20\)</span>, Flutter 3.47</td>
+<td>CMake + NDK Clang</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="step-1-building-the-native-cc-core-library">Step 1: Building the Native C/C++ Core Library<a class="headerlink" href="#step-1-building-the-native-cc-core-library" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># 1. Clone repository (dependencies are vendored; no submodules)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/PxA-Labs/ultrasonic-phy-layer.git
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nb">cd</span><span class="w"> </span>ultrasonic-phy-layer
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># 2. Create build directory</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>build<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>build
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># 3. Configure CMake (Release mode)</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>cmake<span class="w"> </span>../native<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="c1"># 4. Build native shared &amp; static libraries + test executables</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>cmake<span class="w"> </span>--build<span class="w"> </span>.<span class="w"> </span>--parallel
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="c1"># 5. Run test suite via CTest</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>ctest<span class="w"> </span>--output-on-failure
+</code></pre></div>
+<h3 id="cmake-presets-optional">CMake Presets (Optional)<a class="headerlink" href="#cmake-presets-optional" title="Permanent link">&para;</a></h3>
+<p>We provide standard <code>CMakePresets.json</code> configurations in <code>native/</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span>native
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>cmake<span class="w"> </span>--preset<span class="w"> </span>release
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>cmake<span class="w"> </span>--build<span class="w"> </span>--preset<span class="w"> </span>release
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>ctest<span class="w"> </span>--preset<span class="w"> </span>release
+</code></pre></div>
+<p>Available presets: <code>default</code>, <code>debug</code>, <code>release</code>, <code>asan</code>, <code>ubsan</code>, <code>fuzz</code> (see <a href="#sanitizers--fuzzing">Sanitizers &amp; Fuzzing</a>).</p>
+<hr />
+<h3 id="step-2-running-the-flutter-app">Step 2: Running the Flutter App<a class="headerlink" href="#step-2-running-the-flutter-app" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># 1. Navigate to Flutter app directory</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">cd</span><span class="w"> </span>soundwave_app
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># 2. Fetch Dart dependencies</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>flutter<span class="w"> </span>pub<span class="w"> </span>get
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># 3. Bindings in lib/native/ are hand-written: update soundwave_native.dart</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1">#    and bindings.dart by hand if soundwave_api.h changes.</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># 4. Run app on local desktop target</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>flutter<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>macos<span class="w">    </span><span class="c1"># macOS</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>flutter<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>linux<span class="w">    </span><span class="c1"># Linux</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>flutter<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>windows<span class="w">  </span><span class="c1"># Windows</span>
+</code></pre></div>
+<hr />
+<h3 id="native-library-for-flutter-tests">Native library for Flutter tests<a class="headerlink" href="#native-library-for-flutter-tests" title="Permanent link">&para;</a></h3>
+<p><code>SoundwaveNative</code> loads <code>libsoundwave</code> from <code>native/build/</code> (then the legacy <code>build/</code>). Set <code>SOUNDWAVE_LIB=/abs/path/to/libsoundwave.{so,dylib,dll}</code> to pin a specific build, for example a sanitizer build or the one CI produces. <code>test/native/loopback_test.dart</code> runs real TX → audio → RX round trips (CSS and OFDM) against it. Locally it is skipped when no library loads, while CI sets <code>SOUNDWAVE_REQUIRE_NATIVE=1</code> so a missing library fails the job.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>cmake<span class="w"> </span>-S<span class="w"> </span>native<span class="w"> </span>-B<span class="w"> </span>native/build<span class="w"> </span>-DSW_BUILD_TESTS<span class="o">=</span>OFF<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>native/build<span class="w"> </span>--target<span class="w"> </span>soundwave_shared
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">cd</span><span class="w"> </span>soundwave_app<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>flutter<span class="w"> </span><span class="nb">test</span>
+</code></pre></div>
+<hr />
+<h3 id="android-ndk--aaudio">Android (NDK + AAudio)<a class="headerlink" href="#android-ndk--aaudio" title="Permanent link">&para;</a></h3>
+<p>No separate native build step is needed: <code>soundwave_app/android/app/build.gradle.kts</code> points Gradle's <code>externalNativeBuild</code> at <code>native/CMakeLists.txt</code>, so <code>flutter build apk</code> / <code>flutter run</code> compiles <code>libsoundwave.so</code> with the NDK (<code>ndkVersion</code> comes from the Flutter SDK) for <code>arm64-v8a</code>, <code>armeabi-v7a</code> and <code>x86_64</code> and packages it under <code>lib/&lt;abi&gt;/</code>. Dart loads it with <code>DynamicLibrary.open('libsoundwave.so')</code>.</p>
+<p>Requirements: Android SDK with NDK and CMake 3.22+ (Gradle installs them on demand once the SDK licenses are accepted), JDK 17.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">cd</span><span class="w"> </span>soundwave_app
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>flutter<span class="w"> </span>build<span class="w"> </span>apk<span class="w"> </span>--debug<span class="w">                      </span><span class="c1"># all ABIs, debug-signed</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>flutter<span class="w"> </span>build<span class="w"> </span>apk<span class="w"> </span>--release<span class="w"> </span>--split-per-abi<span class="w">    </span><span class="c1"># app-&lt;abi&gt;-release.apk</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>flutter<span class="w"> </span>build<span class="w"> </span>appbundle<span class="w"> </span>--release<span class="w">              </span><span class="c1"># app-release.aab (Play Store)</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>unzip<span class="w"> </span>-l<span class="w"> </span>build/app/outputs/flutter-apk/app-arm64-v8a-release.apk<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>libsoundwave.so
+</code></pre></div>
+<p>Android specifics in the native build:</p>
+<ul>
+<li><strong>Audio backend:</strong> <code>audio_io.c</code> compiles only miniaudio's AAudio and OpenSL ES backends. AAudio is used on API 26+, OpenSL ES is the fallback. Both use the low-latency performance profile and the <em>unprocessed</em> input preset, because the default voice presets apply AGC, noise suppression and low-pass filtering that remove the 18–22 kHz band.</li>
+<li><strong>SIMD:</strong> NEON is required (<code>SW_REQUIRE_NEON</code>, a compile error otherwise) on <code>arm64-v8a</code> and <code>armeabi-v7a</code>. <code>x86_64</code> uses SSE4.2 and never AVX2, which the Android x86_64 ABI does not guarantee.</li>
+<li><strong>Linking:</strong> <code>m dl log</code>, a 16 KB page-aligned ELF (needed for Play Store uploads targeting Android 15+), and no versioned SONAME.</li>
+<li><strong>Permissions:</strong> the manifest declares <code>RECORD_AUDIO</code> and <code>MODIFY_AUDIO_SETTINGS</code>. On first launch, <code>MicPermissionGate</code> explains why the microphone is needed and then shows the system prompt. <code>NativeAudioService.startCapture()</code> checks the permission again and throws <code>MicrophonePermissionDenied</code> if it is missing.</li>
+</ul>
+<p><strong>Release signing:</strong> create <code>soundwave_app/android/key.properties</code> (it is gitignored) with <code>storeFile</code>, <code>storePassword</code>, <code>keyAlias</code> and <code>keyPassword</code>. <code>storeFile</code> is relative to <code>android/app/</code>. Without that file, release builds are debug-signed. In CI, the <code>build-android</code> job in <code>build.yml</code> writes the file from the <code>ANDROID_KEYSTORE_BASE64</code> (base64 of the <code>.jks</code>), <code>ANDROID_KEYSTORE_PASSWORD</code>, <code>ANDROID_KEY_ALIAS</code> and <code>ANDROID_KEY_PASSWORD</code> secrets when they are set. The job uploads <code>android-debug-apk</code>, <code>android-release-apks</code> and <code>android-release-aab</code>. It fails if <code>libsoundwave.so</code> is missing for any ABI, if the expected <code>sw_*</code> symbols are not exported, or if the 64-bit <code>.so</code> is not 16 KB aligned. To run it on a branch, use <code>gh workflow run build.yml --ref &lt;branch&gt;</code>.</p>
+<hr />
+<h2 id="5-testing--debugging-framework">5. Testing &amp; Debugging Framework<a class="headerlink" href="#5-testing--debugging-framework" title="Permanent link">&para;</a></h2>
+<h3 id="running-native-c-unit-tests">Running Native C Unit Tests<a class="headerlink" href="#running-native-c-unit-tests" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nb">cd</span><span class="w"> </span>native/build<span class="w">            </span><span class="c1"># test executables are in tests/ (MSVC: tests/Release/)</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>ctest<span class="w"> </span>-R<span class="w"> </span>test_ofdm<span class="w"> </span>--output-on-failure<span class="w">   </span><span class="c1"># run a subset by name</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>./tests/test_crc<span class="w">           </span><span class="c1"># Test CRC-32 checksums</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>./tests/test_rs_encoder<span class="w">    </span><span class="c1"># Test GF(2^8) &amp; Reed-Solomon encoder</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>./tests/test_rs_decoder<span class="w">    </span><span class="c1"># Test BMA, Chien search &amp; Forney decoder</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>./tests/test_modulator<span class="w">     </span><span class="c1"># Test CSS &amp; OFDM modulation</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>./tests/test_sync<span class="w">          </span><span class="c1"># Test Zadoff-Chu &amp; preamble timing sync</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>./tests/catch_tests<span class="w">        </span><span class="c1"># Run Catch2 C++ test runner</span>
+</code></pre></div>
+<h3 id="sanitizers--fuzzing">Sanitizers &amp; Fuzzing<a class="headerlink" href="#sanitizers--fuzzing" title="Permanent link">&para;</a></h3>
+<p>The DSP core treats every <code>sw_*</code> call as a trust boundary: Dart passes user-controlled settings and microphone samples straight into C. Sanitizer and fuzzing support is built in (issue #28).</p>
+<table>
+<thead>
+<tr>
+<th>CMake option</th>
+<th>Default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SW_ENABLE_ASAN</code></td>
+<td>OFF</td>
+<td>AddressSanitizer (+LeakSanitizer on Linux). GCC/Clang: <code>-fsanitize=address</code>; MSVC: <code>/fsanitize=address</code></td>
+</tr>
+<tr>
+<td><code>SW_ENABLE_UBSAN</code></td>
+<td>OFF</td>
+<td>UndefinedBehaviorSanitizer, fatal on the first report. With Clang it also traps float division by zero, which in DSP code signals a missing guard</td>
+</tr>
+<tr>
+<td><code>SW_ENABLE_FUZZER</code></td>
+<td>OFF</td>
+<td>Builds the <code>native/Fuzzing/</code> harnesses as real libFuzzer binaries (needs LLVM Clang; AppleClang has no libFuzzer)</td>
+</tr>
+<tr>
+<td><code>SW_FUZZ_SMOKE</code></td>
+<td>ON</td>
+<td>Builds the same harnesses with a standalone driver and registers them in CTest as <code>fuzz_*_smoke</code> (<code>SW_FUZZ_SMOKE_RUNS</code> random inputs each)</td>
+</tr>
+<tr>
+<td><code>SW_USE_SANITIZER</code>, <code>SW_BUILD_FUZZ</code></td>
+<td>OFF</td>
+<td>Deprecated aliases for ASan+UBSan and <code>SW_ENABLE_FUZZER</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nb">cd</span><span class="w"> </span>native
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>cmake<span class="w"> </span>--preset<span class="w"> </span>asan<span class="w">  </span><span class="o">&amp;&amp;</span><span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build/asan<span class="w">  </span><span class="o">&amp;&amp;</span><span class="w"> </span>ctest<span class="w"> </span>--test-dir<span class="w"> </span>build/asan<span class="w">  </span>--output-on-failure
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>cmake<span class="w"> </span>--preset<span class="w"> </span>ubsan<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build/ubsan<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>ctest<span class="w"> </span>--test-dir<span class="w"> </span>build/ubsan<span class="w"> </span>--output-on-failure
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="c1"># libFuzzer (Linux, or macOS with Homebrew LLVM)</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>cmake<span class="w"> </span>--preset<span class="w"> </span>fuzz<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build/fuzz
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>./build/fuzz/Fuzzing/fuzz_api<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
+</code></pre></div>
+<p><strong>Harnesses</strong> (<code>native/Fuzzing/</code>). Each one checks <em>properties</em>, not just "no crash":</p>
+<ul>
+<li><code>fuzz_crc</code>: the table, fast and FFI CRC paths agree, and every 1-bit error is detected.</li>
+<li><code>fuzz_rs</code>: arbitrary words decode only to valid codewords, and encode→corrupt(≤16)→decode restores the message with the exact error count.</li>
+<li><code>fuzz_packet</code>, <code>fuzz_fec</code>: decoding arbitrary bytes is safe, and encode→decode round-trips.</li>
+<li><code>fuzz_css</code>, <code>fuzz_ofdm</code>: raw samples (NaN/Inf/huge) through the internal entry points and the FFI wrappers.</li>
+<li><code>fuzz_api</code>: every <code>sw_*</code> function with fuzzed configs and exact-capacity output buffers. It includes modulate→perturb→demodulate round trips so deep demodulator paths get exercised.</li>
+</ul>
+<p><strong>Reproducing a CI crash.</strong> Download the <code>crash-&lt;target&gt;</code> artifact and replay it. The same command works with the libFuzzer and the smoke builds:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>./build/asan/Fuzzing/fuzz_api<span class="w"> </span>path/to/crash-&lt;sha1&gt;
+</code></pre></div>
+<p><strong>macOS note.</strong> On some macOS releases the AppleClang ASan runtime hangs during start-up. Homebrew LLVM works: configure with <code>-DCMAKE_C_COMPILER=$(brew --prefix llvm)/bin/clang -DCMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++</code>, which also gives you libFuzzer on macOS. When ASan is off, the CTest fuzz smoke tests on macOS automatically run under Guard Malloc (<code>libgmalloc</code>), which puts every allocation against a guard page so heap overruns still fault.</p>
+<p><strong>Canaries.</strong> In ASan builds, <code>asan_trigger_*</code> tests make deliberate overflow, use-after-free and (Linux) leak errors. They pass only when the sanitizer report appears, so a green run proves the sanitizer is actually active.</p>
+<p><strong>Static analysis.</strong> CI runs <code>cppcheck</code> (<code>native/.cppcheck-suppressions</code>) and <code>clang-tidy</code> (<code>native/.clang-tidy</code>). Clang Static Analyzer findings fail the build; bugprone/CERT checks are advisory.</p>
+<hr />
+<h2 id="6-code-style--commit-guidelines">6. Code Style &amp; Commit Guidelines<a class="headerlink" href="#6-code-style--commit-guidelines" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>C11 Code Standard</strong>: Use explicit fixed-width integers (<code>uint8_t</code>, <code>int32_t</code>, <code>size_t</code>).</li>
+<li><strong>Doxygen Documentation</strong>: All public functions in <code>soundwave_api.h</code> MUST have Doxygen docstrings (<code>/** ... */</code>).</li>
+<li><strong>Conventional Commits</strong>: Format commit messages as <code>type(scope): summary</code> (e.g. <code>feat(dsp-core): implement Reed-Solomon decoder (#18)</code>).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../architecture/signal-chain/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Signal chain &amp; parameters">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Signal chain & parameters
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../MATHEMATICAL_MODEL/" class="md-footer__link md-footer__link--next" aria-label="Next: Mathematical model">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Mathematical model
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 PxA Labs. Licensed under the Apache License 2.0.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

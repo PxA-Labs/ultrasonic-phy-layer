@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the paint method from the SpectrumPainter class, for the Dart programming language.">
+  <title>paint method - SpectrumPainter class - spectrum_analyzer_widget library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../widgets_viz_spectrum_analyzer_widget/">widgets&#47;viz&#47;spectrum_analyzer_widget.dart</a></li>
+    <li><a href="../../widgets_viz_spectrum_analyzer_widget/SpectrumPainter-class.html">SpectrumPainter</a></li>
+    <li class="self-crumb">paint method</li>
+  </ol>
+  <div class="self-name">paint</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="widgets_viz_spectrum_analyzer_widget&#47;SpectrumPainter-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">paint</span> method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+  <div>
+    <ol class="annotation-list">
+        <li>@<a href="https://api.flutter.dev/flutter/dart-core/override-constant.html">override</a></li>
+    </ol>
+  </div>
+<span class="returntype">void</span>
+<span class="name ">paint</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="paint-param-canvas"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-ui/Canvas-class.html">Canvas</a></span> <span class="parameter-name">canvas</span>, </span></li>
+<li><span class="parameter" id="paint-param-size"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-ui/Size-class.html">Size</a></span> <span class="parameter-name">size</span></span></li>
+</ol>)
+
+      <div class="features"><span class="feature">override</span></div>
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Called whenever the object needs to paint. The given <a href="https://api.flutter.dev/flutter/dart-ui/Canvas-class.html">Canvas</a> has its
+coordinate space configured such that the origin is at the top left of the
+box. The area of the box is the size of the <code>size</code> argument.</p>
+<p>Paint operations should remain inside the given area. Graphical
+operations outside the bounds may be silently ignored, clipped, or not
+clipped. It may sometimes be difficult to guarantee that a certain
+operation is inside the bounds (e.g., drawing a rectangle whose size is
+determined by user inputs). In that case, consider calling
+<a href="https://api.flutter.dev/flutter/dart-ui/Canvas/clipRect.html">Canvas.clipRect</a> at the beginning of <a href="../../widgets_viz_spectrum_analyzer_widget/SpectrumPainter/paint.html">paint</a> so everything that follows
+will be guaranteed to only draw within the clipped area.</p>
+<p>Implementations should be wary of correctly pairing any calls to
+<a href="https://api.flutter.dev/flutter/dart-ui/Canvas/save.html">Canvas.save</a>/<a href="https://api.flutter.dev/flutter/dart-ui/Canvas/saveLayer.html">Canvas.saveLayer</a> and <a href="https://api.flutter.dev/flutter/dart-ui/Canvas/restore.html">Canvas.restore</a>, otherwise all
+subsequent painting on this canvas may be affected, with potentially
+hilarious but confusing results.</p>
+<p>To paint text on a <a href="https://api.flutter.dev/flutter/dart-ui/Canvas-class.html">Canvas</a>, use a <a href="https://api.flutter.dev/flutter/painting/TextPainter-class.html">TextPainter</a>.</p>
+<p>To paint an image on a <a href="https://api.flutter.dev/flutter/dart-ui/Canvas-class.html">Canvas</a>:</p>
+<ol>
+<li>
+<p>Obtain an <a href="https://api.flutter.dev/flutter/painting/ImageStream-class.html">ImageStream</a>, for example by calling <a href="https://api.flutter.dev/flutter/painting/ImageProvider/resolve.html">ImageProvider.resolve</a>
+on an <a href="https://api.flutter.dev/flutter/painting/AssetImage-class.html">AssetImage</a> or <a href="https://api.flutter.dev/flutter/painting/NetworkImage-class.html">NetworkImage</a> object.</p>
+</li>
+<li>
+<p>Whenever the <a href="https://api.flutter.dev/flutter/painting/ImageStream-class.html">ImageStream</a>'s underlying <a href="https://api.flutter.dev/flutter/painting/ImageInfo-class.html">ImageInfo</a> object changes
+(see <a href="https://api.flutter.dev/flutter/painting/ImageStream/addListener.html">ImageStream.addListener</a>), create a new instance of your custom
+paint delegate, giving it the new <a href="https://api.flutter.dev/flutter/painting/ImageInfo-class.html">ImageInfo</a> object.</p>
+</li>
+<li>
+<p>In your delegate's <a href="../../widgets_viz_spectrum_analyzer_widget/SpectrumPainter/paint.html">paint</a> method, call the <a href="https://api.flutter.dev/flutter/dart-ui/Canvas/drawImage.html">Canvas.drawImage</a>,
+<a href="https://api.flutter.dev/flutter/dart-ui/Canvas/drawImageRect.html">Canvas.drawImageRect</a>, or <a href="https://api.flutter.dev/flutter/dart-ui/Canvas/drawImageNine.html">Canvas.drawImageNine</a> methods to paint the
+<a href="https://api.flutter.dev/flutter/painting/ImageInfo/image.html">ImageInfo.image</a> object, applying the <a href="https://api.flutter.dev/flutter/painting/ImageInfo/scale.html">ImageInfo.scale</a> value to
+obtain the correct rendering size.</p>
+</li>
+</ol>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">@override
+void paint(Canvas canvas, Size size) {
+  final plot = Rect.fromLTRB(
+    leftAxis,
+    4,
+    size.width - 4,
+    size.height - bottomAxis,
+  );
+  if (plot.width &lt;= 4 || plot.height &lt;= 4) return;
+
+  final spectrum = controller.spectrum;
+  final binCount = spectrum?.length ?? 0;
+  final binWidth = controller.binWidthHz;
+  final nyquist = binCount &gt; 1 ? (binCount - 1) * binWidth : 22050.0;
+  final fMin = minFrequencyHz.clamp(0.0, nyquist - 1);
+  final fMax = (maxFrequencyHz ?? nyquist).clamp(fMin + 1, nyquist);
+  final minDb = controller.minDb;
+  final maxDb = controller.maxDb;
+
+  double xOf(double hz) {
+    return plot.left + (hz - fMin) &#47; (fMax - fMin) * plot.width;
+  }
+
+  double yOf(double db) {
+    final t = ((db - minDb) &#47; (maxDb - minDb)).clamp(0.0, 1.0);
+    return plot.bottom - t * plot.height;
+  }
+
+  final background = colors.surfaceContainerHighest.withValues(alpha: 0.4);
+  canvas.drawRect(plot, Paint()..color = background);
+
+  &#47;&#47; Ultrasonic band highlight.
+  final bandL = xOf(bandLowHz.clamp(fMin, fMax));
+  final bandR = xOf(bandHighHz.clamp(fMin, fMax));
+  if (bandR &gt; bandL) {
+    final band = Rect.fromLTRB(bandL, plot.top, bandR, plot.bottom);
+    final bandColor = colors.primary.withValues(alpha: 0.14);
+    canvas.drawRect(band, Paint()..color = bandColor);
+    paintPlotText(
+      canvas,
+      &#39;${formatKhz(bandLowHz)}-${formatKhz(bandHighHz)} kHz&#39;,
+      Offset(bandL + 2, plot.top + 2),
+      labelStyle.copyWith(color: colors.primary),
+    );
+  }
+
+  &#47;&#47; Grid and axis labels.
+  final grid = Paint()
+    ..color = colors.outlineVariant.withValues(alpha: 0.6)
+    ..strokeWidth = 0.5;
+  final axisStyle = labelStyle.copyWith(color: colors.onSurfaceVariant);
+  for (var db = (maxDb &#47; 20).floor() * 20.0; db &gt;= minDb; db -= 20) {
+    final y = yOf(db);
+    canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), grid);
+    paintPlotText(canvas, db.toStringAsFixed(0), Offset(2, y - 6), axisStyle);
+  }
+  final step = frequencyTickStep(fMax - fMin);
+  for (var f = (fMin &#47; step).ceil() * step; f &lt;= fMax; f += step) {
+    final x = xOf(f);
+    canvas.drawLine(Offset(x, plot.top), Offset(x, plot.bottom), grid);
+    final at = Offset(x - 8, plot.bottom + 2);
+    paintPlotText(canvas, formatKhz(f), at, axisStyle);
+  }
+
+  if (spectrum == null || binCount &lt; 2) {
+    final at = plot.center - const Offset(50, 6);
+    paintPlotText(canvas, &#39;Waiting for audio...&#39;, at, axisStyle);
+    return;
+  }
+
+  canvas.save();
+  canvas.clipRect(plot);
+  final line = _tracePath(spectrum, binWidth, xOf, yOf);
+  final fill = Path.from(line)
+    ..lineTo(xOf(fMax), plot.bottom)
+    ..lineTo(xOf(fMin), plot.bottom)
+    ..close();
+  final fillColor = colors.primary.withValues(alpha: 0.18);
+  canvas.drawPath(fill, Paint()..color = fillColor);
+  canvas.drawPath(
+    line,
+    Paint()
+      ..color = colors.primary
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5,
+  );
+  final peaks = controller.peaks;
+  if (peaks != null &amp;&amp; peaks.length == binCount) {
+    canvas.drawPath(
+      _tracePath(peaks, binWidth, xOf, yOf),
+      Paint()
+        ..color = colors.tertiary.withValues(alpha: 0.8)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+  canvas.restore();
+
+  final peak = controller.peakBin(bandLowHz, bandHighHz);
+  if (peak != null &amp;&amp; spectrum[peak] &gt; kSpectrumFloorDb) {
+    final hz = peak * binWidth;
+    final p = Offset(xOf(hz), yOf(spectrum[peak]));
+    if (plot.contains(p)) {
+      canvas.drawCircle(p, 3, Paint()..color = colors.tertiary);
+      final label = &#39;${(hz &#47; 1000).toStringAsFixed(2)} kHz &#39;
+          &#39;${spectrum[peak].toStringAsFixed(0)} dB&#39;;
+      final y = clampTo(p.dy - 16, plot.top, plot.bottom - 12);
+      final at = Offset(clampTo(p.dx - 40, plot.left, plot.right - 80), y);
+      paintPlotText(
+        canvas,
+        label,
+        at,
+        labelStyle.copyWith(color: colors.tertiary),
+      );
+    }
+  }
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../widgets_viz_spectrum_analyzer_widget/">spectrum_analyzer_widget</a></li>
+    <li><a href="../../widgets_viz_spectrum_analyzer_widget/SpectrumPainter-class.html">SpectrumPainter</a></li>
+    <li class="self-crumb">paint method</li>
+</ol>
+
+    <h5>SpectrumPainter class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    soundwave
+      1.0.0+1
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

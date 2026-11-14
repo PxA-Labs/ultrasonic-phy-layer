@@ -1,0 +1,28 @@
+var soundwave__api_8h =
+[
+    [ "SW_API", "soundwave__api_8h.html#a1ede0e87c704b449807b3f662315f1ec", null ],
+    [ "SW_VERSION", "soundwave__api_8h.html#ad13f8dea3a5243219cd2109520fdefe4", null ],
+    [ "sw_agc_create", "soundwave__api_8h.html#a66d5e04c67cd807397d1e6b49da16fe5", null ],
+    [ "sw_agc_destroy", "soundwave__api_8h.html#a5511d93225b799e1e5bd74e4d6d215ca", null ],
+    [ "sw_agc_get_gain_db", "soundwave__api_8h.html#ad6914c730ca1b0e69a13acab810bab37", null ],
+    [ "sw_agc_process", "soundwave__api_8h.html#a3f1e84fb148f21748a4772323aef1ba0", null ],
+    [ "sw_agc_reset", "soundwave__api_8h.html#aff7627deaa1ca27fb7c113e088aaec73", null ],
+    [ "sw_audio_capture_read", "soundwave__api_8h.html#a16099a018803d8b0357078963215d04e", null ],
+    [ "sw_audio_capture_start", "soundwave__api_8h.html#a9cb0083be3b7af049f755ea49d6ca0fc", null ],
+    [ "sw_audio_capture_stop", "soundwave__api_8h.html#ac815a8b18df2555ffe7a313d625d53cd", null ],
+    [ "sw_audio_playback_start", "soundwave__api_8h.html#ab20f65f47821fc9ae77d46491efb7ba6", null ],
+    [ "sw_audio_playback_stop", "soundwave__api_8h.html#a09f8c5a577479a280d4592cc4ee94654", null ],
+    [ "sw_audio_playback_write", "soundwave__api_8h.html#a1e1a0333272d9a75083eea7d75361e58", null ],
+    [ "sw_config_validate", "soundwave__api_8h.html#a36516258c8f6af86f9dbc9bb0c8534c3", null ],
+    [ "sw_crc32", "soundwave__api_8h.html#a0d645945f13985e53b7b92e807d73ea6", null ],
+    [ "sw_css_demodulate", "soundwave__api_8h.html#ae6a9b2519fecde571986a7a17e612a07", null ],
+    [ "sw_css_modulate", "soundwave__api_8h.html#ac39e193fcea8632369cffdd860130c1f", null ],
+    [ "sw_detect_frame", "soundwave__api_8h.html#acaacc8e7bb83c39a03d0d717b9ced0f9", null ],
+    [ "sw_estimate_cfo", "soundwave__api_8h.html#a332be237c39b93070801e4b5233737a4", null ],
+    [ "sw_ofdm_demodulate", "soundwave__api_8h.html#a5a597c3e4938169042136192e052e7d1", null ],
+    [ "sw_ofdm_equalized_symbols", "soundwave__api_8h.html#a92002d322dcf7a669771cf016bbc2ebc", null ],
+    [ "sw_ofdm_modulate", "soundwave__api_8h.html#aa96d00b0ffc45a7b10e94fdeab79e5eb", null ],
+    [ "sw_rs_decode", "soundwave__api_8h.html#a04c1b56d1eb2bd9b9c25804fad00aad6", null ],
+    [ "sw_rs_encode", "soundwave__api_8h.html#a327ea8b26c92625c04d1267bff779998", null ],
+    [ "sw_version", "soundwave__api_8h.html#a08a5bebf9560f543ed8a2a15d00ba1a2", null ]
+];

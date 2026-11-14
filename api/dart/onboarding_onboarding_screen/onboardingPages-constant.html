@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the onboardingPages constant from the onboarding_screen library, for the Dart programming language.">
+  <title>onboardingPages constant - onboarding_screen library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../static-assets/styles.css?v1">
+  <link rel="icon" href="../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../index.html">soundwave</a></li>
+    <li><a href="../onboarding_onboarding_screen/">onboarding&#47;onboarding_screen.dart</a></li>
+    <li class="self-crumb">onboardingPages constant</li>
+  </ol>
+  <div class="self-name">onboardingPages</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+  <div
+      id="dartdoc-main-content"
+      class="main-content"
+      data-above-sidebar="onboarding_onboarding_screen&#47;onboarding_onboarding_screen-library-sidebar.html"
+      data-below-sidebar="">
+      <div>
+<h1><span class="kind-top-level-property">onboardingPages</span> top-level constant 
+ 
+</h1></div>
+
+        <section class="multi-line-signature">
+          
+          <a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../onboarding_onboarding_screen/OnboardingPageData-class.html">OnboardingPageData</a></span>&gt;</span>
+          const <span class="name ">onboardingPages</span>
+          
+
+        </section>
+        
+
+        
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">const List&lt;OnboardingPageData&gt; onboardingPages = [
+  OnboardingPageData(
+    icon: Icons.graphic_eq,
+    title: &#39;Welcome to Soundwave&#39;,
+    body: [
+      &#39;Soundwave sends short text messages between nearby devices&#39;,
+      &#39;using near-ultrasonic sound (about 18 to 20 kHz),&#39;,
+      &#39;played through an ordinary speaker and heard by a microphone.&#39;,
+      &#39;No network, Bluetooth or pairing is involved.&#39;,
+    ],
+  ),
+  OnboardingPageData(
+    icon: Icons.swap_horiz,
+    title: &#39;How it works&#39;,
+    body: [
+      &#39;Transmit: your message is framed with a checksum and&#39;,
+      &#39;error-correction data, modulated onto a high-frequency carrier&#39;,
+      &#39;and played through the speaker.&#39;,
+      &#39;Receive: the microphone listens for a sync preamble, demodulates&#39;,
+      &#39;the frame and checks it before showing the message.&#39;,
+      &#39;Range depends on your hardware and room, so start with the&#39;,
+      &#39;devices close together. Most adults hear little of this band,&#39;,
+      &#39;but children and pets may.&#39;,
+    ],
+  ),
+  OnboardingPageData(
+    icon: Icons.tune,
+    title: &#39;CSS or OFDM&#39;,
+    body: [
+      &#39;CSS (Chirp Spread Spectrum) sweeps each symbol across the band.&#39;,
+      &#39;It is slower but copes well with noise and echoes.&#39;,
+      &#39;OFDM splits the band into many subcarriers sent in parallel.&#39;,
+      &#39;It is faster but needs a quieter channel.&#39;,
+      &#39;Pick a mode or load a preset in Settings.&#39;,
+    ],
+  ),
+  OnboardingPageData(
+    icon: Icons.mic,
+    title: &#39;Microphone access&#39;,
+    body: [
+      &#39;To receive messages Soundwave needs the microphone.&#39;,
+      &#39;Audio is processed on this device to detect and decode frames.&#39;,
+      &#39;Without it you can still transmit.&#39;,
+    ],
+    asksMicPermission: true,
+  ),
+  OnboardingPageData(
+    icon: Icons.check_circle_outline,
+    title: &#39;You are ready&#39;,
+    body: [
+      &#39;Type a message on the Dashboard and tap Send on one device,&#39;,
+      &#39;and tap Start Listening on the other.&#39;,
+      &#39;You can replay this tutorial at any time from Settings.&#39;,
+    ],
+  ),
+];</code></pre>
+</section>
+
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../index.html">soundwave</a></li>
+    <li><a href="../onboarding_onboarding_screen/">onboarding_screen</a></li>
+    <li class="self-crumb">onboardingPages constant</li>
+</ol>
+
+    <h5>onboarding_screen library</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-left-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+  </div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    soundwave
+      1.0.0+1
+  </span>
+  
+</footer>
+
+
+<script src="../static-assets/highlight.pack.js?v1"></script>
+<script src="../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

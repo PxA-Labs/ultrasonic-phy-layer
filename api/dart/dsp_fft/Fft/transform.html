@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the transform method from the Fft class, for the Dart programming language.">
+  <title>transform method - Fft class - fft library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../dsp_fft/">dsp&#47;fft.dart</a></li>
+    <li><a href="../../dsp_fft/Fft-class.html">Fft</a></li>
+    <li class="self-crumb">transform method</li>
+  </ol>
+  <div class="self-name">transform</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="dsp_fft&#47;Fft-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">transform</span> method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+<span class="returntype">void</span>
+<span class="name ">transform</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="transform-param-re"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-typed_data/Float64List-class.html">Float64List</a></span> <span class="parameter-name">re</span>, </span></li>
+<li><span class="parameter" id="transform-param-im"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-typed_data/Float64List-class.html">Float64List</a></span> <span class="parameter-name">im</span></span></li>
+</ol>)
+
+      
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Forward DFT X<code>k</code> = sum x<code>n</code> e^(-j 2 pi k n / N), computed in place.</p>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">void transform(Float64List re, Float64List im) {
+  if (re.length != size || im.length != size) {
+    throw ArgumentError(&#39;re and im must both have length $size&#39;);
+  }
+  for (var i = 0; i &lt; size; i++) {
+    final j = _bitReverse[i];
+    if (j &gt; i) {
+      final tr = re[i];
+      re[i] = re[j];
+      re[j] = tr;
+      final ti = im[i];
+      im[i] = im[j];
+      im[j] = ti;
+    }
+  }
+  for (var len = 2; len &lt;= size; len &lt;&lt;= 1) {
+    final half = len &gt;&gt; 1;
+    final step = size ~&#47; len;
+    for (var start = 0; start &lt; size; start += len) {
+      for (var k = 0; k &lt; half; k++) {
+        final wr = _cos[k * step];
+        final wi = -_sin[k * step];
+        final a = start + k;
+        final b = a + half;
+        final tr = re[b] * wr - im[b] * wi;
+        final ti = re[b] * wi + im[b] * wr;
+        re[b] = re[a] - tr;
+        im[b] = im[a] - ti;
+        re[a] += tr;
+        im[a] += ti;
+      }
+    }
+  }
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../dsp_fft/">fft</a></li>
+    <li><a href="../../dsp_fft/Fft-class.html">Fft</a></li>
+    <li class="self-crumb">transform method</li>
+</ol>
+
+    <h5>Fft class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    soundwave
+      1.0.0+1
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

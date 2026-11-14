@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the build method from the SettingsScreen class, for the Dart programming language.">
+  <title>build method - SettingsScreen class - settings library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../screens_settings/">screens&#47;settings.dart</a></li>
+    <li><a href="../../screens_settings/SettingsScreen-class.html">SettingsScreen</a></li>
+    <li class="self-crumb">build method</li>
+  </ol>
+  <div class="self-name">build</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="screens_settings&#47;SettingsScreen-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">build</span> method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+  <div>
+    <ol class="annotation-list">
+        <li>@<a href="https://api.flutter.dev/flutter/dart-core/override-constant.html">override</a></li>
+    </ol>
+  </div>
+<span class="returntype"><a href="https://api.flutter.dev/flutter/widgets/Widget-class.html">Widget</a></span>
+<span class="name ">build</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="build-param-context"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a></span> <span class="parameter-name">context</span></span></li>
+</ol>)
+
+      <div class="features"><span class="feature">override</span></div>
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Describes the part of the user interface represented by this widget.</p>
+<p>The framework calls this method when this widget is inserted into the tree
+in a given <a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a> and when the dependencies of this widget change
+(e.g., an <a href="https://api.flutter.dev/flutter/widgets/InheritedWidget-class.html">InheritedWidget</a> referenced by this widget changes). This
+method can potentially be called in every frame and should not have any side
+effects beyond building a widget.</p>
+<p>The framework replaces the subtree below this widget with the widget
+returned by this method, either by updating the existing subtree or by
+removing the subtree and inflating a new subtree, depending on whether the
+widget returned by this method can update the root of the existing
+subtree, as determined by calling <a href="https://api.flutter.dev/flutter/widgets/Widget/canUpdate.html">Widget.canUpdate</a>.</p>
+<p>Typically implementations return a newly created constellation of widgets
+that are configured with information from this widget's constructor and
+from the given <a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a>.</p>
+<p>The given <a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a> contains information about the location in the
+tree at which this widget is being built. For example, the context
+provides the set of inherited widgets for this location in the tree. A
+given widget might be built with multiple different <a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a>
+arguments over time if the widget is moved around the tree or if the
+widget is inserted into the tree in multiple places at once.</p>
+<p>The implementation of this method must only depend on:</p>
+<ul>
+<li>the fields of the widget, which themselves must not change over time,
+and</li>
+<li>any ambient state obtained from the <code>context</code> using
+<a href="https://api.flutter.dev/flutter/widgets/BuildContext/dependOnInheritedWidgetOfExactType.html">BuildContext.dependOnInheritedWidgetOfExactType</a>.</li>
+</ul>
+<p>If a widget's <a href="../../screens_settings/SettingsScreen/build.html">build</a> method is to depend on anything else, use a
+<a href="https://api.flutter.dev/flutter/widgets/StatefulWidget-class.html">StatefulWidget</a> instead.</p>
+<p>See also:</p>
+<ul>
+<li><a href="https://api.flutter.dev/flutter/widgets/StatelessWidget-class.html">StatelessWidget</a>, which contains the discussion on performance considerations.</li>
+</ul>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">@override
+Widget build(BuildContext context) {
+  final state = context.watch&lt;AppState&gt;();
+  return Scaffold(
+    appBar: AppBar(title: const Text(&#39;Settings &amp; Configuration&#39;)),
+    body: ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        &#47;&#47; Preset Loader Section
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(&#39;Quick Configurations (Presets)&#39;,
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () =&gt; state.loadPreset(&#39;default&#39;),
+                      child: const Text(&#39;Defaults&#39;),
+                    ),
+                    OutlinedButton(
+                      onPressed: () =&gt; state.loadPreset(&#39;long_range&#39;),
+                      child: const Text(&#39;Long Range (Robust)&#39;),
+                    ),
+                    OutlinedButton(
+                      onPressed: () =&gt; state.loadPreset(&#39;high_speed&#39;),
+                      child: const Text(&#39;High Speed (OFDM)&#39;),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        &#47;&#47; Modulation Selector Section
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(&#39;Modulation Mode&#39;,
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton&lt;String&gt;(
+                    segments: const [
+                      ButtonSegment(
+                          value: &#39;CSS&#39;,
+                          label: Text(&#39;CSS (Chirp Spread Spectrum)&#39;)),
+                      ButtonSegment(
+                          value: &#39;OFDM&#39;,
+                          label: Text(&#39;OFDM (Orthogonal Freq Division)&#39;)),
+                    ],
+                    selected: {state.mode == 0 ? &#39;CSS&#39; : &#39;OFDM&#39;},
+                    onSelectionChanged: (v) =&gt;
+                        state.setMode(v.first == &#39;CSS&#39; ? 0 : 1),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        &#47;&#47; Mode-specific configuration card
+        if (state.mode == 0) _CssSettingsCard(state: state),
+        if (state.mode == 1) _OfdmSettingsCard(state: state),
+        const SizedBox(height: 16),
+
+        &#47;&#47; FEC Settings Section
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(&#39;FEC &amp; Error Correction&#39;,
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  title: const Text(&#39;Enable Reed-Solomon Correction&#39;),
+                  subtitle: const Text(
+                      &#39;RS(255,223): 32 parity bytes, corrects up to 16 &#39;
+                      &#39;byte errors per frame&#39;),
+                  value: state.enableRs,
+                  onChanged: (v) =&gt; state.setEnableRs(v),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        _LinkLayerCard(state: state),
+        const SizedBox(height: 16),
+
+        &#47;&#47; Audio Hardware &amp; Volume Card
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(&#39;Audio I&#47;O &amp; Level Controls&#39;,
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                DropdownButtonFormField&lt;String&gt;(
+                  isExpanded: true,
+                  initialValue: state.inputDevice?.name,
+                  decoration: const InputDecoration(
+                      labelText: &#39;Capture Device (Microphone)&#39;),
+                  items: state.inputDevices
+                      .map((d) =&gt; DropdownMenuItem(
+                          value: d.name, child: Text(d.name)))
+                      .toList(),
+                  onChanged: (val) {
+                    final dev =
+                        state.inputDevices.firstWhere((d) =&gt; d.name == val);
+                    state.setInputDevice(dev);
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField&lt;String&gt;(
+                  isExpanded: true,
+                  initialValue: state.outputDevice?.name,
+                  decoration: const InputDecoration(
+                      labelText: &#39;Playback Device (Speaker)&#39;),
+                  items: state.outputDevices
+                      .map((d) =&gt; DropdownMenuItem(
+                          value: d.name, child: Text(d.name)))
+                      .toList(),
+                  onChanged: (val) {
+                    final dev =
+                        state.outputDevices.firstWhere((d) =&gt; d.name == val);
+                    state.setOutputDevice(dev);
+                  },
+                ),
+                const SizedBox(height: 16),
+                Text(&#39;Playback Volume: ${(state.volume * 100).toInt()}%&#39;),
+                Semantics(
+                  label: &#39;Playback volume&#39;,
+                  child: Slider(
+                    value: state.volume,
+                    min: 0.0,
+                    max: 1.0,
+                    divisions: 10,
+                    label: &#39;${(state.volume * 100).toInt()}%&#39;,
+                    onChanged: (v) =&gt; state.setVolume(v),
+                  ),
+                ),
+                SwitchListTile(
+                  key: const Key(&#39;agc_toggle&#39;),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(&#39;Automatic Gain Control (AGC)&#39;),
+                  subtitle: const Text(
+                      &#39;Normalises microphone level before decoding &#39;
+                      &#39;(-20 to +32 dB). Turn off for manual gain testing.&#39;),
+                  value: state.agcEnabled,
+                  onChanged: state.setAgcEnabled,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const StorageCard(),
+        const SizedBox(height: 16),
+        const _AppearanceCard(),
+        const SizedBox(height: 24),
+      ],
+    ),
+  );
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../screens_settings/">settings</a></li>
+    <li><a href="../../screens_settings/SettingsScreen-class.html">SettingsScreen</a></li>
+    <li class="self-crumb">build method</li>
+</ol>
+
+    <h5>SettingsScreen class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    soundwave
+      1.0.0+1
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

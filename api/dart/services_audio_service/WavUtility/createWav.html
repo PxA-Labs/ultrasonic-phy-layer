@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the createWav method from the WavUtility class, for the Dart programming language.">
+  <title>createWav method - WavUtility class - audio_service library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../services_audio_service/">services&#47;audio_service.dart</a></li>
+    <li><a href="../../services_audio_service/WavUtility-class.html">WavUtility</a></li>
+    <li class="self-crumb">createWav static method</li>
+  </ol>
+  <div class="self-name">createWav</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="services_audio_service&#47;WavUtility-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">createWav</span> static method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+<span class="returntype"><a href="https://api.flutter.dev/flutter/dart-typed_data/Uint8List-class.html">Uint8List</a></span>
+<span class="name ">createWav</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="createWav-param-samples"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-typed_data/Float64List-class.html">Float64List</a></span> <span class="parameter-name">samples</span>, </span></li>
+<li><span class="parameter" id="createWav-param-sampleRate"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">sampleRate</span></span></li>
+</ol>)
+
+      
+
+    </section>
+    
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">static Uint8List createWav(Float64List samples, int sampleRate) {
+  final numSamples = samples.length;
+  final dataSize = numSamples * 2;
+  final wavBytes = Uint8List(44 + dataSize);
+  final byteData = ByteData.view(wavBytes.buffer);
+
+  &#47;&#47; RIFF header
+  wavBytes.setRange(0, 4, &#39;RIFF&#39;.codeUnits);
+  byteData.setUint32(4, 36 + dataSize, Endian.little);
+  wavBytes.setRange(8, 12, &#39;WAVE&#39;.codeUnits);
+
+  &#47;&#47; fmt chunk
+  wavBytes.setRange(12, 16, &#39;fmt &#39;.codeUnits);
+  byteData.setUint32(16, 16, Endian.little); &#47;&#47; Chunk size
+  byteData.setUint16(20, 1, Endian.little); &#47;&#47; PCM format
+  byteData.setUint16(22, 1, Endian.little); &#47;&#47; Mono
+  byteData.setUint32(24, sampleRate, Endian.little);
+  byteData.setUint32(28, sampleRate * 2, Endian.little); &#47;&#47; Byte rate
+  byteData.setUint16(32, 2, Endian.little); &#47;&#47; Block align
+  byteData.setUint16(34, 16, Endian.little); &#47;&#47; 16 bits per sample
+
+  &#47;&#47; data chunk
+  wavBytes.setRange(36, 40, &#39;data&#39;.codeUnits);
+  byteData.setUint32(40, dataSize, Endian.little);
+
+  &#47;&#47; Data payload
+  for (int i = 0; i &lt; numSamples; i++) {
+    double s = samples[i];
+    if (s &gt; 1.0) s = 1.0;
+    if (s &lt; -1.0) s = -1.0;
+    final intSample = (s * 32767.0).round();
+    byteData.setInt16(44 + i * 2, intSample, Endian.little);
+  }
+
+  return wavBytes;
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../services_audio_service/">audio_service</a></li>
+    <li><a href="../../services_audio_service/WavUtility-class.html">WavUtility</a></li>
+    <li class="self-crumb">createWav static method</li>
+</ol>
+
+    <h5>WavUtility class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    soundwave
+      1.0.0+1
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

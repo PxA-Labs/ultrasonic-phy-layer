@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the transmitPayload method from the TxEngine class, for the Dart programming language.">
+  <title>transmitPayload method - TxEngine class - tx_engine library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../engine_tx_engine/">engine&#47;tx_engine.dart</a></li>
+    <li><a href="../../engine_tx_engine/TxEngine-class.html">TxEngine</a></li>
+    <li class="self-crumb">transmitPayload method</li>
+  </ol>
+  <div class="self-name">transmitPayload</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="engine_tx_engine&#47;TxEngine-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">transmitPayload</span> method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+<span class="returntype"><a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Duration-class.html">Duration</a></span>&gt;</span></span>
+<span class="name ">transmitPayload</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="transmitPayload-param-payload"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-typed_data/Uint8List-class.html">Uint8List</a></span> <span class="parameter-name">payload</span></span></li>
+</ol>)
+
+      
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Frames, modulates and plays one PHY payload; returns its airtime.
+Playback is asynchronous: this returns once the audio is queued.</p>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">Future&lt;Duration&gt; transmitPayload(Uint8List payload) async {
+  &#47;&#47; [CRC-32][payload][RS parity] — see FrameCodec. Honours enable_rs.
+  final frame = FrameCodec(native).encode(
+    payload,
+    enableRs: _configMap[&#39;enable_rs&#39;] as bool? ?? true,
+  );
+  final frameSamples = _geometry.samplesForFrameBytes(frame.length);
+  if (frameSamples &gt; SoundwaveNative.maxFrameSamples) {
+    final seconds = (frameSamples &#47; _sampleRate).toStringAsFixed(0);
+    throw FrameTooLongError(
+        frameLimitError ?? &#39;A $seconds s frame is too long to send.&#39;);
+  }
+
+  &#47;&#47; Modulate using compute&#47;isolate to prevent UI lag
+  final Float32List samples;
+  if (_useIsolates) {
+    samples = await compute(_modulateTask, {
+      &#39;frame&#39;: frame,
+      &#39;config&#39;: _configMap,
+    });
+  } else {
+    final configPtr = SwConfig.fromMap(_configMap);
+    try {
+      if (_configMap[&#39;modulation&#39;] == 1) {
+        samples = native.ofdmModulate(frame, configPtr);
+      } else {
+        samples = native.cssModulate(frame, configPtr);
+      }
+    } finally {
+      calloc.free(configPtr);
+    }
+  }
+
+  &#47;&#47; Enqueue samples to AudioService and play
+  final doubleSamples = Float64List(samples.length);
+  for (int i = 0; i &lt; samples.length; i++) {
+    doubleSamples[i] = samples[i];
+  }
+
+  &#47;&#47; Start the device first: an output that only accepts audio while
+  &#47;&#47; running would otherwise lose the first frame.
+  await _audio.startPlayback();
+  await _audio.enqueueForPlayback(doubleSamples);
+
+  _totalBytesSent += payload.length;
+  _framesSent++;
+  if (!_metricsController.isClosed) {
+    _metricsController.add(TxMetrics(
+      bytesSent: payload.length,
+      timestamp: DateTime.now(),
+    ));
+  }
+  return _samplesToDuration(samples.length);
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../engine_tx_engine/">tx_engine</a></li>
+    <li><a href="../../engine_tx_engine/TxEngine-class.html">TxEngine</a></li>
+    <li class="self-crumb">transmitPayload method</li>
+</ol>
+
+    <h5>TxEngine class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    soundwave
+      1.0.0+1
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

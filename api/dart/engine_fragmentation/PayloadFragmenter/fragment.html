@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the fragment method from the PayloadFragmenter class, for the Dart programming language.">
+  <title>fragment method - PayloadFragmenter class - fragmentation library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../engine_fragmentation/">engine&#47;fragmentation.dart</a></li>
+    <li><a href="../../engine_fragmentation/PayloadFragmenter-class.html">PayloadFragmenter</a></li>
+    <li class="self-crumb">fragment method</li>
+  </ol>
+  <div class="self-name">fragment</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="engine_fragmentation&#47;PayloadFragmenter-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">fragment</span> method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+<span class="returntype"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../engine_link_frame/LinkFrame-class.html">LinkFrame</a></span>&gt;</span></span>
+<span class="name ">fragment</span>(<wbr><ol class="parameter-list"> <li><span class="parameter" id="fragment-param-message"><span class="type-annotation"><a href="../../engine_link_frame/LinkMessage-class.html">LinkMessage</a></span> <span class="parameter-name">message</span>, {</span></li>
+<li><span class="parameter" id="fragment-param-src"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">src</span>, </span></li>
+<li><span class="parameter" id="fragment-param-msgId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">msgId</span>, </span></li>
+<li><span class="parameter" id="fragment-param-ackRequested"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">ackRequested</span> = <span class="default-value">false</span>, </span></li>
+</ol>})
+
+      
+
+    </section>
+    
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">List&lt;LinkFrame&gt; fragment(
+  LinkMessage message, {
+  required int src,
+  required int msgId,
+  bool ackRequested = false,
+}) {
+  final envelope = message.encode();
+  final count = fragmentCount(envelope.length, maxChunk);
+  if (count &gt; 0xFFFF) {
+    throw ArgumentError(&#39;message needs $count fragments (max 65535)&#39;);
+  }
+  return [
+    for (var i = 0; i &lt; count; i++)
+      LinkFrame.data(
+        src: src,
+        msgId: msgId,
+        index: i,
+        count: count,
+        ackRequested: ackRequested,
+        chunk: Uint8List.sublistView(
+          envelope,
+          i * maxChunk,
+          (i + 1) * maxChunk &lt; envelope.length
+              ? (i + 1) * maxChunk
+              : envelope.length,
+        ),
+      ),
+  ];
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../engine_fragmentation/">fragmentation</a></li>
+    <li><a href="../../engine_fragmentation/PayloadFragmenter-class.html">PayloadFragmenter</a></li>
+    <li class="self-crumb">fragment method</li>
+</ol>
+
+    <h5>PayloadFragmenter class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    soundwave
+      1.0.0+1
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

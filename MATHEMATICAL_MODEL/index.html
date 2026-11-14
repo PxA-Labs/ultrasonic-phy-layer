@@ -1,0 +1,2567 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Ultrasonic physical-layer modem (C DSP core + Flutter app) for short-range data transfer over sound.">
+      
+      
+      
+        <link rel="canonical" href="https://pxa-labs.github.io/ultrasonic-phy-layer/MATHEMATICAL_MODEL/">
+      
+      
+        <link rel="prev" href="../DEVELOPER_GUIDE/">
+      
+      
+        <link rel="next" href="../API_REFERENCE/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>Mathematical model - Soundwave</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.342714a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#soundwave-physical-layer-mathematical-model" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Soundwave" class="md-header__button md-logo" aria-label="Soundwave" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Soundwave
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Mathematical model
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="cyan"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="cyan"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PxA-Labs/ultrasonic-phy-layer" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PxA-Labs/ultrasonic-phy-layer
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../getting-started/build/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../API_REFERENCE/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../lab/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Signal Lab
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../testing/FIELD_TEST_PLAN/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../development/contributing/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../legal/PRIVACY_POLICY/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Legal & store (drafts)
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Soundwave" class="md-nav__button md-logo" aria-label="Soundwave" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Soundwave
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PxA-Labs/ultrasonic-phy-layer" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PxA-Labs/ultrasonic-phy-layer
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Build from source
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Using the app
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CLI_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CLI guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Architecture
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/signal-chain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Signal chain & parameters
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DEVELOPER_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Developer guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Mathematical model
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Mathematical model
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-acoustic-wave-propagation--channel-modeling" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Acoustic Wave Propagation &amp; Channel Modeling
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Acoustic Wave Propagation &amp; Channel Modeling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-the-acoustic-wave-equation" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.1 The Acoustic Wave Equation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-frequency-dependent-attenuation-path-loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.2 Frequency-Dependent Attenuation (Path Loss)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-multipath-channel-impulse-response-cir" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.3 Multipath Channel Impulse Response (CIR)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-doppler-scaling-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.4 Doppler Scaling Effect
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-modulation-schemes" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Modulation Schemes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Modulation Schemes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-chirp-spread-spectrum-css" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1 Chirp Spread Spectrum (CSS)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.1 Chirp Spread Spectrum (CSS)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#211-parameters-and-sampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1.1 Parameters and sampling
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#212-symbol-waveform" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1.2 Symbol waveform
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#213-bits-to-symbols-gray-mapping-and-frame" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1.3 Bits to symbols (Gray mapping) and frame
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#214-demodulation-dechirp--fft" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1.4 Demodulation (dechirp + FFT)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#215-valid-sf-range-computed-441-khz" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1.5 Valid SF range (computed, 44.1 kHz)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#216-fec" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1.6 FEC
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-orthogonal-frequency-division-multiplexing-ofdm" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.2 Orthogonal Frequency Division Multiplexing (OFDM)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.2 Orthogonal Frequency Division Multiplexing (OFDM)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#221-transmitted-signal-formulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.2.1 Transmitted Signal Formulation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#222-discrete-time-processing-idftdft" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.2.2 Discrete-Time Processing (IDFT/DFT)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#223-ultrasonic-band-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.2.3 Ultrasonic Band Plan
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-synchronization--frame-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Synchronization &amp; Frame Detection
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Synchronization &amp; Frame Detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-css-preamble-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.1 CSS Preamble Detection
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-zadoff-chu-sequences-for-ofdm-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.2 Zadoff-Chu Sequences for OFDM Sync
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-carrier-frequency-offset-cfo-estimation" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.3 Carrier Frequency Offset (CFO) Estimation
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-demodulation--channel-equalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Demodulation &amp; Channel Equalization
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Demodulation &amp; Channel Equalization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#40-receiver-timing-and-fft-window-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.0 Receiver Timing and FFT Window Placement
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#41-channel-estimation" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.1 Channel Estimation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-equalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.2 Equalization
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-channel-coding--error-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Channel Coding &amp; Error Control
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Channel Coding &amp; Error Control">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-reed-solomon-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.1 Reed-Solomon Code
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-error-detection-crc-32" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.2 Error Detection (CRC-32)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-automatic-gain-control-agc" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Automatic Gain Control (AGC)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Automatic Gain Control (AGC)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-power-estimate" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.1 Power Estimate
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-desired-and-smoothed-gain" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.2 Desired and Smoothed Gain
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-peak-guard-and-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.3 Peak Guard and Output
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.4 Parameters
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    API
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            API
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API_REFERENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    C API
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/dart-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Dart API
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Signal Lab
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Testing
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Testing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/FIELD_TEST_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Field test plan
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/HARDWARE_PROFILING_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Hardware profiling plan
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Project
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Project
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CI_CD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CI/CD
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../TECH_STACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tech stack (planning)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PRD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    PRD
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ROADMAP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Roadmap
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Changelog
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Legal & store (drafts)
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Legal & store (drafts)
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../legal/PRIVACY_POLICY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Privacy policy
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../legal/TERMS_OF_SERVICE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Terms of service
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../store/PLAY_STORE_LISTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Play Store listing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../store/DATA_SAFETY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Play data safety
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-acoustic-wave-propagation--channel-modeling" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Acoustic Wave Propagation &amp; Channel Modeling
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Acoustic Wave Propagation &amp; Channel Modeling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-the-acoustic-wave-equation" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.1 The Acoustic Wave Equation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-frequency-dependent-attenuation-path-loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.2 Frequency-Dependent Attenuation (Path Loss)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-multipath-channel-impulse-response-cir" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.3 Multipath Channel Impulse Response (CIR)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-doppler-scaling-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.4 Doppler Scaling Effect
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-modulation-schemes" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Modulation Schemes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Modulation Schemes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-chirp-spread-spectrum-css" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1 Chirp Spread Spectrum (CSS)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.1 Chirp Spread Spectrum (CSS)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#211-parameters-and-sampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1.1 Parameters and sampling
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#212-symbol-waveform" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1.2 Symbol waveform
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#213-bits-to-symbols-gray-mapping-and-frame" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1.3 Bits to symbols (Gray mapping) and frame
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#214-demodulation-dechirp--fft" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1.4 Demodulation (dechirp + FFT)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#215-valid-sf-range-computed-441-khz" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1.5 Valid SF range (computed, 44.1 kHz)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#216-fec" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.1.6 FEC
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-orthogonal-frequency-division-multiplexing-ofdm" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.2 Orthogonal Frequency Division Multiplexing (OFDM)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.2 Orthogonal Frequency Division Multiplexing (OFDM)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#221-transmitted-signal-formulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.2.1 Transmitted Signal Formulation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#222-discrete-time-processing-idftdft" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.2.2 Discrete-Time Processing (IDFT/DFT)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#223-ultrasonic-band-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      2.2.3 Ultrasonic Band Plan
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-synchronization--frame-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Synchronization &amp; Frame Detection
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Synchronization &amp; Frame Detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-css-preamble-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.1 CSS Preamble Detection
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-zadoff-chu-sequences-for-ofdm-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.2 Zadoff-Chu Sequences for OFDM Sync
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-carrier-frequency-offset-cfo-estimation" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.3 Carrier Frequency Offset (CFO) Estimation
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-demodulation--channel-equalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Demodulation &amp; Channel Equalization
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Demodulation &amp; Channel Equalization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#40-receiver-timing-and-fft-window-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.0 Receiver Timing and FFT Window Placement
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#41-channel-estimation" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.1 Channel Estimation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-equalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.2 Equalization
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-channel-coding--error-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Channel Coding &amp; Error Control
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Channel Coding &amp; Error Control">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-reed-solomon-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.1 Reed-Solomon Code
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-error-detection-crc-32" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.2 Error Detection (CRC-32)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-automatic-gain-control-agc" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Automatic Gain Control (AGC)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Automatic Gain Control (AGC)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-power-estimate" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.1 Power Estimate
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-desired-and-smoothed-gain" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.2 Desired and Smoothed Gain
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-peak-guard-and-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.3 Peak Guard and Output
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.4 Parameters
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="soundwave-physical-layer-mathematical-model">Soundwave: Physical Layer Mathematical Model<a class="headerlink" href="#soundwave-physical-layer-mathematical-model" title="Permanent link">&para;</a></h1>
+<p>This document outlines the rigorous mathematical and physical formulations governing the physical layer (PHY) of the Soundwave communication system. Soundwave transmits digital data over short distances using ultrasonic acoustic waves (typically <span class="arithmatex">\(18 \text{ kHz}\)</span> to <span class="arithmatex">\(22 \text{ kHz}\)</span>) using consumer-grade speakers and microphones.</p>
+<hr />
+<h2 id="1-acoustic-wave-propagation--channel-modeling">1. Acoustic Wave Propagation &amp; Channel Modeling<a class="headerlink" href="#1-acoustic-wave-propagation--channel-modeling" title="Permanent link">&para;</a></h2>
+<p>Acoustic transmission differs significantly from radio frequency (RF) propagation due to the slow speed of sound (<span class="arithmatex">\(c \approx 343 \text{ m/s}\)</span> at <span class="arithmatex">\(20^\circ\text{C}\)</span> in air) and high attenuation in the ultrasonic range.</p>
+<h3 id="11-the-acoustic-wave-equation">1.1 The Acoustic Wave Equation<a class="headerlink" href="#11-the-acoustic-wave-equation" title="Permanent link">&para;</a></h3>
+<p>In a homogeneous, lossless fluid medium, acoustic pressure waves <span class="arithmatex">\(p(\mathbf{r}, t)\)</span> satisfy the three-dimensional wave equation:</p>
+<div class="arithmatex">\[\nabla^2 p(\mathbf{r}, t) - \frac{1}{c^2} \frac{\partial^2 p(\mathbf{r}, t)}{\partial t^2} = 0\]</div>
+<p>where:
+- <span class="arithmatex">\(\nabla^2\)</span> is the Laplacian operator.
+- <span class="arithmatex">\(\mathbf{r} = [x, y, z]^T\)</span> represents the spatial coordinates.
+- <span class="arithmatex">\(c\)</span> is the speed of sound.</p>
+<h3 id="12-frequency-dependent-attenuation-path-loss">1.2 Frequency-Dependent Attenuation (Path Loss)<a class="headerlink" href="#12-frequency-dependent-attenuation-path-loss" title="Permanent link">&para;</a></h3>
+<p>Sound propagation in air experiences frequency-dependent attenuation due to classical viscosity, thermal conduction, and molecular relaxation of Nitrogen (<span class="arithmatex">\(N_2\)</span>) and Oxygen (<span class="arithmatex">\(O_2\)</span>). The attenuation coefficient <span class="arithmatex">\(\alpha(f)\)</span> in <span class="arithmatex">\(\text{dB/m}\)</span> can be approximated via Stokes' Law of sound attenuation at high frequencies:</p>
+<div class="arithmatex">\[\alpha(f) \approx \frac{8\pi^2 \eta}{3 \rho_0 c^3} f^2\]</div>
+<p>where:
+- <span class="arithmatex">\(\eta\)</span> is the dynamic viscosity of air.
+- <span class="arithmatex">\(\rho_0\)</span> is the ambient density of air.
+- <span class="arithmatex">\(f\)</span> is the carrier frequency.</p>
+<p>The total path loss <span class="arithmatex">\(A(d, f)\)</span> over a distance <span class="arithmatex">\(d\)</span> (meters) for a signal with frequency <span class="arithmatex">\(f\)</span> is modeled as:</p>
+<div class="arithmatex">\[A(d, f) = d^{-\gamma} \cdot e^{-\alpha(f) d}\]</div>
+<p>where <span class="arithmatex">\(\gamma\)</span> is the path loss exponent (<span class="arithmatex">\(\gamma = 2\)</span> for free-space spherical wave spreading, and <span class="arithmatex">\(\gamma &lt; 2\)</span> in indoor waveguide-like corridors).</p>
+<h3 id="13-multipath-channel-impulse-response-cir">1.3 Multipath Channel Impulse Response (CIR)<a class="headerlink" href="#13-multipath-channel-impulse-response-cir" title="Permanent link">&para;</a></h3>
+<p>Indoor acoustic channels are highly reverberant. The channel impulse response <span class="arithmatex">\(h(t)\)</span> is represented as a discrete tapped delay line:</p>
+<div class="arithmatex">\[h(t) = \sum_{i=0}^{L-1} a_i(t) \delta(t - \tau_i(t))\]</div>
+<p>where:
+- <span class="arithmatex">\(L\)</span> is the number of resolvable propagation paths.
+- <span class="arithmatex">\(a_i(t)\)</span> is the time-varying path amplitude.
+- <span class="arithmatex">\(\tau_i(t)\)</span> is the time-varying path delay.
+- <span class="arithmatex">\(\delta(t)\)</span> is the Dirac delta function.</p>
+<p>The corresponding frequency response (transfer function) is:</p>
+<div class="arithmatex">\[H(f, t) = \sum_{i=0}^{L-1} a_i(t) e^{-j 2\pi f \tau_i(t)}\]</div>
+<h3 id="14-doppler-scaling-effect">1.4 Doppler Scaling Effect<a class="headerlink" href="#14-doppler-scaling-effect" title="Permanent link">&para;</a></h3>
+<p>Since the speed of sound <span class="arithmatex">\(c\)</span> is small, even slow relative motion between the transmitter and receiver creates significant Doppler shifts. The received signal <span class="arithmatex">\(y(t)\)</span> subject to a relative velocity <span class="arithmatex">\(v\)</span> is scaled in time:</p>
+<div class="arithmatex">\[y(t) = x\left( (1 + \beta) t - \tau_0 \right)\]</div>
+<p>where:
+- <span class="arithmatex">\(\beta = \frac{v}{c}\)</span> is the Doppler scaling factor.
+- <span class="arithmatex">\(\tau_0\)</span> is the initial propagation delay.</p>
+<p>The frequency shifts to:</p>
+<div class="arithmatex">\[f_{rx} = f_{tx} (1 + \beta)\]</div>
+<hr />
+<h2 id="2-modulation-schemes">2. Modulation Schemes<a class="headerlink" href="#2-modulation-schemes" title="Permanent link">&para;</a></h2>
+<p>Soundwave supports two physical layer modulation options: Chirp Spread Spectrum (CSS) for robustness at low rates, and Orthogonal Frequency Division Multiplexing (OFDM) for high throughput.</p>
+<h3 id="21-chirp-spread-spectrum-css">2.1 Chirp Spread Spectrum (CSS)<a class="headerlink" href="#21-chirp-spread-spectrum-css" title="Permanent link">&para;</a></h3>
+<p>CSS in Soundwave uses LoRa-style chirp symbols: every data symbol is the same linear up-chirp, cyclically shifted in frequency, so one chirp carries <span class="arithmatex">\(SF\)</span> bits. Implementation: <code>native/src/css/css_modulate.c</code> (transmitter) and <code>native/src/css/css_demodulate.c</code> (receiver).</p>
+<h4 id="211-parameters-and-sampling">2.1.1 Parameters and sampling<a class="headerlink" href="#211-parameters-and-sampling" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Meaning</th>
+<th>Config field / default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="arithmatex">\(f_s\)</span></td>
+<td>sample rate</td>
+<td><code>sample_rate</code>, 44 100 Hz</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(f_c\)</span></td>
+<td>band centre</td>
+<td><code>carrier_freq</code>, 19 000 Hz</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(SF\)</span></td>
+<td>spreading factor, <span class="arithmatex">\(6 \le SF \le 10\)</span></td>
+<td><code>sf</code>, 8</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(M = 2^{SF}\)</span></td>
+<td>chips per symbol (and symbol alphabet size)</td>
+<td></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(D = \operatorname{round}(f_s / B_{cfg})\)</span></td>
+<td>samples per chip, <span class="arithmatex">\(D \ge 1\)</span></td>
+<td>from <code>bandwidth</code> (2000 Hz)</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(B = f_s / D\)</span></td>
+<td>effective sweep bandwidth</td>
+<td></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(N = M D\)</span></td>
+<td>samples per symbol</td>
+<td></td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(T = M / B = N / f_s\)</span></td>
+<td>symbol duration</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>The configured bandwidth is quantised to <span class="arithmatex">\(f_s / D\)</span> so that a chip is a whole number of samples and every symbol is exactly <span class="arithmatex">\(N = MD\)</span> samples. At 44.1 kHz, <code>bandwidth</code> 2000 gives <span class="arithmatex">\(D = 22\)</span>, <span class="arithmatex">\(B = 2004.5\)</span> Hz; 4000 gives <span class="arithmatex">\(D = 11\)</span>, <span class="arithmatex">\(B = 4009.1\)</span> Hz. The receiver works at the chip rate <span class="arithmatex">\(B\)</span> after filtering, so <span class="arithmatex">\(D\)</span> is the oversampling factor of the audio stream. <code>symbol_duration</code> is <strong>not used</strong> by CSS: the symbol length follows from <span class="arithmatex">\(SF\)</span> and <span class="arithmatex">\(B\)</span>. The band <span class="arithmatex">\([f_c - B/2, f_c + B/2]\)</span> must lie in <span class="arithmatex">\((0, f_s/2]\)</span>; otherwise the configuration is rejected (<code>SW_ERR_BAD_PARAM</code>).</p>
+<h4 id="212-symbol-waveform">2.1.2 Symbol waveform<a class="headerlink" href="#212-symbol-waveform" title="Permanent link">&para;</a></h4>
+<p>Symbol value <span class="arithmatex">\(k \in \{0, \dots, M-1\}\)</span> is the base up-chirp started <span class="arithmatex">\(k\)</span> chips into its sweep. Its instantaneous frequency is</p>
+<div class="arithmatex">\[f_k(t) = f_c - \frac{B}{2} + B \left( \frac{k}{M} + \frac{t}{T} \bmod 1 \right), \qquad 0 \le t &lt; T,\]</div>
+<p>that is, it starts at <span class="arithmatex">\(f_c - B/2 + kB/M\)</span>, rises at <span class="arithmatex">\(B/T\)</span> Hz/s and wraps from <span class="arithmatex">\(f_c + B/2\)</span> back to <span class="arithmatex">\(f_c - B/2\)</span> at <span class="arithmatex">\(t_w = T(1 - k/M)\)</span>, which is sample <span class="arithmatex">\((M - k) D\)</span>. The transmitted sample is <span class="arithmatex">\(s[n] = A \cos(2\pi \varphi(n / f_s))\)</span> with <span class="arithmatex">\(\varphi\)</span> the integral of <span class="arithmatex">\(f_k\)</span> and <span class="arithmatex">\(A\)</span> = <code>amplitude</code> <span class="arithmatex">\(\in (0, 1]\)</span>, so <span class="arithmatex">\(\max_n |s[n]| \le A\)</span> (constant envelope); phase is carried across symbols so the signal is continuous. The down-chirp used in the preamble sweeps <span class="arithmatex">\(f_c + B/2 \to f_c - B/2\)</span>.</p>
+<h4 id="213-bits-to-symbols-gray-mapping-and-frame">2.1.3 Bits to symbols (Gray mapping) and frame<a class="headerlink" href="#213-bits-to-symbols-gray-mapping-and-frame" title="Permanent link">&para;</a></h4>
+<p>Bits are taken MSB first, <span class="arithmatex">\(SF\)</span> at a time (the last group is zero padded). A group with value <span class="arithmatex">\(v\)</span> is sent as the symbol <span class="arithmatex">\(k\)</span> whose Gray code equals <span class="arithmatex">\(v\)</span>, i.e. <span class="arithmatex">\(v = k \oplus (k \gg 1)\)</span>. The most likely demodulation error is a neighbouring bin (<span class="arithmatex">\(k \pm 1\)</span>, also across the wrap <span class="arithmatex">\(M-1 \leftrightarrow 0\)</span>), and neighbours differ in exactly one bit. A frame is</p>
+<div class="arithmatex">\[\underbrace{8 \times \text{base up-chirp } (k = 0)}_{\text{preamble}} \;\; \underbrace{2 \times \text{down-chirp}}_{\text{sync word}} \;\; \underbrace{\lceil n_{bits} / SF \rceil \times \text{data up-chirps}}_{\text{payload}}\]</div>
+<p>so it occupies <span class="arithmatex">\((10 + \lceil n_{bits}/SF \rceil) \cdot N\)</span> samples. Data symbols are always up-chirps; a payload can therefore contain base up-chirps (e.g. zero bytes) but never a down-chirp.</p>
+<h4 id="214-demodulation-dechirp--fft">2.1.4 Demodulation (dechirp + FFT)<a class="headerlink" href="#214-demodulation-dechirp--fft" title="Permanent link">&para;</a></h4>
+<ol>
+<li><strong>Complex baseband.</strong> <span class="arithmatex">\(z[n] = \text{LPF}\{ y[n] e^{-j 2\pi f_c n / f_s} \}\)</span> with a Hamming-windowed sinc low-pass of <span class="arithmatex">\(10D + 1\)</span> taps and cut-off <span class="arithmatex">\(0.6B\)</span>. It removes the negative-frequency image at <span class="arithmatex">\(-2f_c\)</span> and the noise outside the band; its group delay is compensated so <span class="arithmatex">\(z\)</span> is aligned with <span class="arithmatex">\(y\)</span>.</li>
+<li><strong>Chip samples.</strong> For data symbol <span class="arithmatex">\(i\)</span> starting at <span class="arithmatex">\(t_i = \hat{t}_0 + (10 + i) N\)</span> (fractional), take <span class="arithmatex">\(z\)</span> at <span class="arithmatex">\(t_i + mD\)</span>, <span class="arithmatex">\(m = 0, \dots, M-1\)</span> (linear interpolation), and remove the estimated frequency offset: <span class="arithmatex">\(v[m] = z(t_i + mD)\, e^{-j 2\pi \widehat{\Delta f} (t_i + mD)/f_s}\)</span>.</li>
+<li><strong>Dechirp.</strong> Multiply by the conjugate chip-rate base chirp <span class="arithmatex">\(c[m] = e^{j\pi(m^2/M - m)}\)</span>. Symbol <span class="arithmatex">\(k\)</span> becomes a tone of <span class="arithmatex">\(k/M\)</span> cycles per chip; at the chip rate the wrapped part of the chirp aliases onto the same tone.</li>
+<li><strong>FFT and decision.</strong> <span class="arithmatex">\(\hat{k} = \arg\max_k |\mathrm{FFT}_M\{v[m] c^*[m]\}[k]|^2\)</span>, then <span class="arithmatex">\(v = \hat{k} \oplus (\hat{k} \gg 1)\)</span> gives the <span class="arithmatex">\(SF\)</span> bits.</li>
+</ol>
+<p>The decision is a bank of <span class="arithmatex">\(M\)</span> matched filters computed by one <span class="arithmatex">\(M\)</span>-point FFT. Integrating <span class="arithmatex">\(M\)</span> chips gives a processing gain of <span class="arithmatex">\(10 \log_{10} M\)</span> dB (18.1 dB at SF6, 30.1 dB at SF10).</p>
+<h4 id="215-valid-sf-range-computed-441-khz">2.1.5 Valid SF range (computed, 44.1 kHz)<a class="headerlink" href="#215-valid-sf-range-computed-441-khz" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><span class="arithmatex">\(SF\)</span></th>
+<th><span class="arithmatex">\(N\)</span> at 2 kHz (<span class="arithmatex">\(D\)</span>=22)</th>
+<th><span class="arithmatex">\(T\)</span> at 2 kHz</th>
+<th>Raw rate at 2 kHz</th>
+<th><span class="arithmatex">\(N\)</span> at 4 kHz (<span class="arithmatex">\(D\)</span>=11)</th>
+<th><span class="arithmatex">\(T\)</span> at 4 kHz</th>
+<th>Raw rate at 4 kHz</th>
+<th>Bin spacing <span class="arithmatex">\(B/M\)</span> at 4 kHz</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>6</td>
+<td>1408</td>
+<td>31.9 ms</td>
+<td>187.9 bit/s</td>
+<td>704</td>
+<td>16.0 ms</td>
+<td>375.9 bit/s</td>
+<td>62.6 Hz</td>
+</tr>
+<tr>
+<td>7</td>
+<td>2816</td>
+<td>63.9 ms</td>
+<td>109.6 bit/s</td>
+<td>1408</td>
+<td>31.9 ms</td>
+<td>219.2 bit/s</td>
+<td>31.3 Hz</td>
+</tr>
+<tr>
+<td>8 (default)</td>
+<td>5632</td>
+<td>127.7 ms</td>
+<td>62.6 bit/s</td>
+<td>2816</td>
+<td>63.9 ms</td>
+<td>125.3 bit/s</td>
+<td>15.7 Hz</td>
+</tr>
+<tr>
+<td>9</td>
+<td>11264</td>
+<td>255.4 ms</td>
+<td>35.2 bit/s</td>
+<td>5632</td>
+<td>127.7 ms</td>
+<td>70.5 bit/s</td>
+<td>7.8 Hz</td>
+</tr>
+<tr>
+<td>10</td>
+<td>22528</td>
+<td>510.8 ms</td>
+<td>19.6 bit/s</td>
+<td>11264</td>
+<td>255.4 ms</td>
+<td>39.2 bit/s</td>
+<td>3.9 Hz</td>
+</tr>
+</tbody>
+</table>
+<p>Raw rate <span class="arithmatex">\(= SF \cdot B / M\)</span> (computed from the formulas above, not measured; preamble and FEC excluded). At 2 kHz the bin spacing is half the 4 kHz value.</p>
+<p>Why <span class="arithmatex">\(6 \le SF \le 10\)</span>:</p>
+<ul>
+<li><strong>Upper bound.</strong> A frequency error of half a bin moves the FFT peak to the wrong symbol. The preamble estimate below removes a static offset, but what changes during a frame is not tracked: a speaker/microphone clock mismatch of ±50 ppm per device is up to 2 Hz at 20 kHz, and 0.1 m/s of hand movement is a 5.5 Hz Doppler shift at 19 kHz. At SF10 the bin is already 3.9 Hz (4 kHz band) or 2.0 Hz (2 kHz band); SF11/12 would be 1–2 Hz (0.5–1 Hz at 2 kHz) with 0.5–2 s symbols. Symbols are also capped at 1 s (<code>CSS_MAX_SYMBOL_SEC</code>), which SF11 already exceeds at 2 kHz.</li>
+<li><strong>Lower bound.</strong> Below SF6 the processing gain is under 18 dB and the preamble correlation of noise or data (<span class="arithmatex">\(\approx 1/M\)</span>, see 3.1) gets close to the detection threshold.</li>
+<li><strong>Oversampling.</strong> For any <span class="arithmatex">\(B \le f_s/2\)</span>, <span class="arithmatex">\(D = \operatorname{round}(f_s/B) \ge 2\)</span> samples per chip. The symbol is an integer number of samples for every SF, so no fractional resampling is needed.</li>
+</ul>
+<h4 id="216-fec">2.1.6 FEC<a class="headerlink" href="#216-fec" title="Permanent link">&para;</a></h4>
+<p>CSS and OFDM share the frame FEC: Reed-Solomon RS(255,223) with 32 parity bytes (corrects 16 byte errors), on or off. There is no adjustable code rate; the former <code>coding_rate</code> setting had no effect and was removed from the app. The <code>sw_config_t.coding_rate</code> field remains for ABI compatibility and is ignored.</p>
+<h3 id="22-orthogonal-frequency-division-multiplexing-ofdm">2.2 Orthogonal Frequency Division Multiplexing (OFDM)<a class="headerlink" href="#22-orthogonal-frequency-division-multiplexing-ofdm" title="Permanent link">&para;</a></h3>
+<p>For high-rate communications, OFDM divides the transmission band into <span class="arithmatex">\(N_c\)</span> orthogonal subcarriers.</p>
+<h4 id="221-transmitted-signal-formulation">2.2.1 Transmitted Signal Formulation<a class="headerlink" href="#221-transmitted-signal-formulation" title="Permanent link">&para;</a></h4>
+<p>The baseband complex OFDM symbol <span class="arithmatex">\(x(t)\)</span> is formulated as:</p>
+<div class="arithmatex">\[x(t) = \sum_{k=0}^{N_c - 1} X_k e^{j 2\pi k \Delta f t}, \quad 0 \leq t \leq T_{sub}\]</div>
+<p>where:
+- <span class="arithmatex">\(X_k\)</span> is the complex modulation symbol (e.g., BPSK, QPSK, or QAM) mapped to the <span class="arithmatex">\(k\)</span>-th subcarrier.
+- <span class="arithmatex">\(\Delta f = \frac{1}{T_{sub}}\)</span> is the subcarrier spacing (ensuring orthogonality).
+- <span class="arithmatex">\(T_{sub}\)</span> is the active symbol duration.</p>
+<p>To eliminate Inter-Symbol Interference (ISI) caused by multipath delay spread, a Cyclic Prefix (CP) of duration <span class="arithmatex">\(T_{cp} &gt; \max(\tau_i)\)</span> is prepended, yielding the full symbol duration <span class="arithmatex">\(T_{sym} = T_{sub} + T_{cp}\)</span>:</p>
+<div class="arithmatex">\[x_{cp}(t) = \begin{cases} 
+x(t + T_{sub} - T_{cp}), &amp; 0 \leq t &lt; T_{cp} \\
+x(t - T_{cp}), &amp; T_{cp} \leq t \leq T_{sym}
+\end{cases}\]</div>
+<h4 id="222-discrete-time-processing-idftdft">2.2.2 Discrete-Time Processing (IDFT/DFT)<a class="headerlink" href="#222-discrete-time-processing-idftdft" title="Permanent link">&para;</a></h4>
+<p>Using a digital processor, modulation is performed using the Inverse Discrete Fourier Transform (IDFT):</p>
+<div class="arithmatex">\[x[n] = \frac{1}{\sqrt{N}} \sum_{k=0}^{N-1} X_k e^{j \frac{2\pi k n}{N}}, \quad 0 \leq n \leq N-1\]</div>
+<p>And demodulation extracts the subcarriers via the Discrete Fourier Transform (DFT) at the receiver:</p>
+<div class="arithmatex">\[Y_k = \frac{1}{\sqrt{N}} \sum_{n=0}^{N-1} y[n + N_{cp} - b] e^{-j \frac{2\pi k n}{N}}, \quad b = \lfloor N_{cp} / 4 \rfloor\]</div>
+<p>The FFT window starts <span class="arithmatex">\(b\)</span> samples inside the cyclic prefix rather than at its end (see section 4.0 for why).</p>
+<h4 id="223-ultrasonic-band-plan">2.2.3 Ultrasonic Band Plan<a class="headerlink" href="#223-ultrasonic-band-plan" title="Permanent link">&para;</a></h4>
+<p>The audio is real, so <span class="arithmatex">\(X_{N-k} = X_k^*\)</span> and only bins <span class="arithmatex">\(1 \le k \le N/2 - 1\)</span> are chosen freely. Bin <span class="arithmatex">\(k\)</span> sits at <span class="arithmatex">\(f_k = k f_s / N\)</span>. The occupied band is set by <code>carrier_freq</code> <span class="arithmatex">\(f_c\)</span> and <code>bandwidth</code> <span class="arithmatex">\(B\)</span> (defaults 19 kHz and 2 kHz, i.e. 18–20 kHz):</p>
+<div class="arithmatex">\[K_a = \{k_{lo}, \dots, k_{hi}\}, \quad k_{lo} = \left\lceil \frac{(f_c - B/2) N}{f_s} \right\rceil + 1, \quad k_{hi} = \left\lfloor \frac{(f_c + B/2) N}{f_s} \right\rfloor - 1\]</div>
+<p>The <span class="arithmatex">\(+1\)</span> / <span class="arithmatex">\(-1\)</span> leave one empty guard bin inside each band edge, so the main lobe of the outermost subcarrier stays (almost entirely) inside the band. Every bin outside <span class="arithmatex">\(K_a\)</span> (DC, the whole audible range, Nyquist) is zero on transmit, and the receiver uses only <span class="arithmatex">\(K_a\)</span> for timing, CFO, channel and noise estimation, equalization and demapping. A configuration is rejected unless <span class="arithmatex">\(f_c - B/2 &gt; 0\)</span>, <span class="arithmatex">\(f_c + B/2 \le f_s/2 - f_s/N\)</span> (one subcarrier spacing of guard below Nyquist) and <span class="arithmatex">\(|K_a| \ge 4\)</span>. Every 8th active bin, starting with <span class="arithmatex">\(k_{lo}\)</span>, is a pilot with value <span class="arithmatex">\(+1, -1, +1, \dots\)</span>; the other <span class="arithmatex">\(|K_a| - \lceil |K_a|/8 \rceil\)</span> bins carry data, so one OFDM symbol carries <span class="arithmatex">\((|K_a| - \lceil |K_a|/8 \rceil) \cdot m\)</span> bits with <span class="arithmatex">\(m = 1\)</span> (BPSK) or <span class="arithmatex">\(2\)</span> (QPSK). The code is <code>ofdm_layout_compute</code> (C) and <code>OfdmBand</code> (Dart), which use the same arithmetic.</p>
+<p><strong>Transmit windowing.</strong> A rectangular symbol has a sinc spectrum whose <span class="arithmatex">\(1/f^2\)</span> power sidelobes leave roughly <span class="arithmatex">\(-26\)</span> dB of the frame energy below 16 kHz even when every active bin is above 18 kHz. Each symbol therefore rises with a raised-cosine ramp <span class="arithmatex">\(r[n] = \tfrac12\left(1 - \cos\frac{\pi (n + 1/2)}{W}\right)\)</span> over its first <span class="arithmatex">\(W = \lfloor N_{cp}/2 \rfloor\)</span> samples, while the previous symbol continues with its cyclic suffix (its first <span class="arithmatex">\(W\)</span> body samples) weighted by <span class="arithmatex">\(r[W-1-n]\)</span>. Because <span class="arithmatex">\(r[n] + r[W-1-n] = 1\)</span> the cross-fade has unit gain. It lies inside the cyclic prefix, before the receiver's FFT window (which starts at <span class="arithmatex">\(N_{cp} - b \ge W\)</span>), so it costs no throughput; the frame only grows by the last symbol's fade-out:</p>
+<div class="arithmatex">\[\text{samples} = (2 + N_{sym}) (N + N_{cp}) + \lfloor N_{cp}/2 \rfloor\]</div>
+<p>The two preamble copies are joined without a cross-fade so that they stay sample-identical (section 3). To keep that one junction continuous anyway, the preamble's ZC sequence is multiplied by the common phase <span class="arithmatex">\(e^{j\varphi}\)</span> for which <span class="arithmatex">\(\text{Re}\{e^{j\varphi}(z[N - N_{cp}] - z[0])\} = 0\)</span>, with <span class="arithmatex">\(z[n] = \sum_{k \in K_a} X_k e^{j 2\pi k n / N}\)</span>: the first sample of the second copy's prefix then equals the natural continuation of the first copy.</p>
+<p><strong>Data whitening.</strong> With only a few data bins (8 at <span class="arithmatex">\(N = 256\)</span> in the default band, i.e. 16 bits per QPSK symbol), repeated payload bytes would produce identical consecutive OFDM symbols, which a repetition detector cannot tell from the preamble. Data bits are therefore XORed with the PRBS15 sequence <span class="arithmatex">\(x^{15} + x^{14} + 1\)</span> (seed all ones, restarted every frame, <code>ofdm_scramble</code>) before mapping and after demapping. The zero padding that fills the last symbol is whitened too: left constant, it would put the same point on every padded subcarrier, a coherent pulse with a crest factor of up to about 26 dB (see <em>Transmit level</em>). The receiver descrambles every demodulated bit, so padding still decodes as zeros.</p>
+<p><strong>Transmit level.</strong> A sum of <span class="arithmatex">\(2|K_a|\)</span> unit-magnitude subcarriers has RMS <span class="arithmatex">\(\sqrt{2|K_a|/N}\)</span> per sample (about 0.28–0.30 in the default band) but a peak that depends on <span class="arithmatex">\(N\)</span>, the band and the data, so the raw IDFT output can exceed full scale (raw peaks of about 1–3 in the default band and up to about 6 in wider bands, crest factors 9–19 dB; <code>native/tests/test_tx_peak.c</code> prints them). Clipping at the DAC would spread energy over the whole spectrum, including the audible band. The modulator therefore scales the whole frame by one gain</p>
+<div class="arithmatex">\[g = \frac{A}{\max_n |x[n]|}, \qquad A = \texttt{amplitude} \in (0, 1]\]</div>
+<p>(<code>ofdm_peak_normalize</code>), so the transmitted peak is exactly <span class="arithmatex">\(A\)</span> and the spectrum shape is unchanged. A real gain common to the whole frame is a flat channel: the receiver's preamble channel estimate absorbs it, so the equalized points are still unit-energy constellation points. The price is that the RMS level is <span class="arithmatex">\(A\)</span> divided by the frame's crest factor, which also varies a little from frame to frame. Peak-to-average power reduction (e.g. tone reservation on unused in-band bins) could raise the RMS level for the same peak; it is not implemented.</p>
+<p><code>native/tests/test_ofdm_spectrum.c</code> computes the transmit spectrum of a typical frame and requires at least 98.5 % of the energy in <span class="arithmatex">\([f_c - B/2, f_c + B/2]\)</span> and at most <span class="arithmatex">\(-40\)</span> dB below 16 kHz for every tested FFT size. The values it prints are listed in <a href="../architecture/signal-chain/#ofdm-mode">Signal chain &amp; parameters</a>.</p>
+<hr />
+<h2 id="3-synchronization--frame-detection">3. Synchronization &amp; Frame Detection<a class="headerlink" href="#3-synchronization--frame-detection" title="Permanent link">&para;</a></h2>
+<p>Proper timing and frequency synchronization are critical in acoustic communication to align the receiver's decoding window and correct for carrier frequency offsets.</p>
+<h3 id="31-css-preamble-detection">3.1 CSS Preamble Detection<a class="headerlink" href="#31-css-preamble-detection" title="Permanent link">&para;</a></h3>
+<p>The CSS receiver (<code>css_detect_frame()</code> in <code>native/src/css/css_demodulate.c</code>; <code>sync_detect_frame()</code> mode 0 and <code>sw_detect_frame()</code> call it) searches the <strong>whole</strong> buffer on the complex baseband <span class="arithmatex">\(z[n]\)</span> of section 2.1.4. For every lag <span class="arithmatex">\(m\)</span> it correlates the <span class="arithmatex">\(N\)</span>-sample window with the base up-chirp <span class="arithmatex">\(u[n]\)</span> and with the down-chirp <span class="arithmatex">\(u^*[n]\)</span> (FFT overlap-save, <span class="arithmatex">\(O(L \log N)\)</span>):</p>
+<div class="arithmatex">\[c_{up}[m] = \frac{1}{N}\left| \sum_{n=0}^{N-1} z[m+n]\, u^*[n] \right|^2, \qquad c_{dn}[m] = \frac{1}{N}\left| \sum_{n=0}^{N-1} z[m+n]\, u[n] \right|^2.\]</div>
+<p>A preamble starting at <span class="arithmatex">\(m\)</span> has slots <span class="arithmatex">\(m + iN\)</span>, <span class="arithmatex">\(i = 0..9\)</span>. With <span class="arithmatex">\(\bar{E}(m)\)</span> the mean window energy <span class="arithmatex">\(\sum_n |z|^2\)</span> of those 10 slots, it scores</p>
+<div class="arithmatex">\[U(m) = \frac{1}{8 \bar{E}(m)} \sum_{i=0}^{7} c_{up}[m + iN], \qquad D(m) = \frac{\min\left(c_{dn}[m + 8N],\ c_{dn}[m + 9N]\right)}{\bar{E}(m)}.\]</div>
+<p>By Cauchy-Schwarz both are at most 1 for a real preamble (equal energy in every slot), whatever the signal level. Normalising by the mean of all 10 slots rather than each slot's own energy means a slot holding only a fragment of signal (a preamble cut by the buffer end, a frame next to silence) cannot score like a whole chirp. Taking the weaker down slot stops a lock one symbol early or late, where one of the two slots holds an up-chirp. Candidates whose slots average more than 60 dB below the loudest window are ignored.</p>
+<p>Only lags with the whole 10-chirp preamble inside the buffer are scored, so a preamble near the end of the buffer is not judged on part of its chirps.</p>
+<ul>
+<li><strong>Threshold.</strong> In noise, <span class="arithmatex">\(\rho \approx 1/(1.2M)\)</span> (the low-pass passes about <span class="arithmatex">\(1.2M\)</span> complex degrees of freedom per window). Detection needs <span class="arithmatex">\(U \ge \gamma\)</span> and <span class="arithmatex">\(\max_{|\delta| \le 2D} D(m+\delta) \ge \gamma\)</span> with <span class="arithmatex">\(\gamma = \min(0.5, 4\theta/M)\)</span> and <span class="arithmatex">\(\theta\)</span> = <code>threshold</code> (default 3), i.e. 12/M: 0.19 at SF6, 0.012 at SF10. With <span class="arithmatex">\(\rho \approx \text{SNR}_{band}/(1+\text{SNR}_{band})\)</span> this corresponds to an in-band SNR of about −6 dB (SF6) to −19 dB (SF10).</li>
+<li><strong>Why data cannot fake it.</strong> Data symbols are up-chirps only. A shifted up-chirp correlated with the down-chirp template gives <span class="arithmatex">\(\rho \approx 1/(2M)\)</span> (stationary-phase estimate), the same order as noise, so the two-down-chirp term stays below <span class="arithmatex">\(\gamma\)</span> inside any payload, including payloads of zero bytes (runs of base up-chirps). The old waveform sent a down-chirp for every 1 bit, so the old 8-up/2-down preamble could occur inside data.</li>
+<li><strong>Peak selection.</strong> The start is the maximum of <span class="arithmatex">\(U + D\)</span> within one symbol after the first lag that passes. A later, stronger frame in the same buffer is not preferred over the first one.</li>
+<li><strong>Fractional timing and offset.</strong> A frequency offset <span class="arithmatex">\(\Delta f\)</span> delays the up-chirp correlation peak and advances the down-chirp peak by <span class="arithmatex">\(\Delta f / (B/T)\)</span> seconds, i.e. one chip per bin. With <span class="arithmatex">\(t_{up}\)</span>, <span class="arithmatex">\(t_{dn}\)</span> the parabola-refined peaks of <span class="arithmatex">\(U\)</span> and <span class="arithmatex">\(D\)</span> within <span class="arithmatex">\(\pm 2D\)</span> samples,</li>
+</ul>
+<div class="arithmatex">\[\hat{t}_0 = \frac{t_{up} + t_{dn}}{2}, \qquad \widehat{\Delta f} = \frac{t_{dn} - t_{up}}{2} \cdot \frac{B}{N} \text{ Hz}.\]</div>
+<p>The data symbols are demodulated at the fractional start <span class="arithmatex">\(\hat{t}_0\)</span> with <span class="arithmatex">\(\widehat{\Delta f}\)</span> removed (offsets up to about ±2 bins). <code>sw_detect_frame</code> reports <span class="arithmatex">\(\operatorname{round}(\hat{t}_0)\)</span> and the in-band SNR estimate <span class="arithmatex">\(10\log_{10}(\bar\rho / (1 - \bar\rho))\)</span>, where <span class="arithmatex">\(\bar\rho\)</span> is the preamble mean.</p>
+<h3 id="32-zadoff-chu-sequences-for-ofdm-sync">3.2 Zadoff-Chu Sequences for OFDM Sync<a class="headerlink" href="#32-zadoff-chu-sequences-for-ofdm-sync" title="Permanent link">&para;</a></h3>
+<p>For OFDM, a Zadoff-Chu (ZC) sequence is placed in the preamble. ZC sequences possess constant amplitude and zero autocorrelation properties. The <span class="arithmatex">\(u\)</span>-th root ZC sequence of length <span class="arithmatex">\(N_{ZC}\)</span> (where <span class="arithmatex">\(N_{ZC}\)</span> is prime) is defined as:</p>
+<div class="arithmatex">\[x_u[n] = e^{-j \frac{\pi u n(n+1)}{N_{ZC}}}, \quad 0 \leq n &lt; N_{ZC}\]</div>
+<p>The preamble uses root <span class="arithmatex">\(u = 1\)</span> with <span class="arithmatex">\(N_{ZC} = |K_a|\)</span> on the active bins (section 2.2.3), sent twice. Coarse timing is the Schmidl-Cox repetition metric over the period <span class="arithmatex">\(L = N + N_{cp}\)</span>, computed on the analytic signal. With a narrow band that peak is broad, so it is refined from the preamble itself. A window that starts <span class="arithmatex">\(s\)</span> samples away from the symbol body gives <span class="arithmatex">\(Y_k = H_k X_k e^{j 2\pi k s / N}\)</span>, so with <span class="arithmatex">\(D_k = (Y_{k+1} X_{k+1}^*)(Y_k X_k^*)^*\)</span> summed over adjacent active bins of both copies,</p>
+<div class="arithmatex">\[\hat{s} = \frac{N}{2\pi} \angle \sum_k D_k, \qquad \hat{\delta} = \hat{s} + b\]</div>
+<p>and the frame start is moved by <span class="arithmatex">\(-\operatorname{round}(\hat{\delta})\)</span> (two passes, <code>ofdm_refine_timing</code>). The same sums give a preamble score <span class="arithmatex">\(|\sum_k D_k| / \sum_k |D_k|\)</span>: close to 1 for the real preamble, about <span class="arithmatex">\(1/\sqrt{|K_a|}\)</span> for anything else. A Schmidl-Cox candidate that scores below 0.5 (some other repetition) is re-checked with a matched filter on the known two-copy preamble, and the better-scoring start is used (<code>ofdm_locate_preamble</code>).</p>
+<h3 id="33-carrier-frequency-offset-cfo-estimation">3.3 Carrier Frequency Offset (CFO) Estimation<a class="headerlink" href="#33-carrier-frequency-offset-cfo-estimation" title="Permanent link">&para;</a></h3>
+<p>A frequency offset <span class="arithmatex">\(\Delta f_c\)</span> introduces a phase rotation in the received samples:</p>
+<div class="arithmatex">\[y[n] = x[n] e^{j 2\pi \frac{\Delta f_c}{f_s} n}\]</div>
+<p>Using Schmidl-Cox sync with two identical consecutive training symbols of period <span class="arithmatex">\(N\)</span>, the CFO is estimated by checking the phase angle of the autocorrelation:</p>
+<div class="arithmatex">\[\Delta \hat{f}_c = \frac{f_s}{2\pi N} \angle \left( \sum_{n=0}^{N-1} y^*[n] y[n + N] \right)\]</div>
+<p>In the OFDM receiver the two training symbols are the two identical preamble symbols, each with its cyclic prefix, so the repetition period is <span class="arithmatex">\(L = N + N_{cp}\)</span>. The receiver evaluates the correlation in the frequency domain, on the same FFT windows that the channel estimate uses (section 4.0):</p>
+<div class="arithmatex">\[\Delta \hat{f}_c = \frac{f_s}{2\pi L} \angle \left( \sum_{k \in K_a} Y_1^*[k] \, Y_2[k] \right)\]</div>
+<p>A frequency offset rotates each active subcarrier of the second copy by <span class="arithmatex">\(e^{j 2\pi \Delta f_c L / f_s}\)</span> relative to the first. Both windows lie inside the repeated preamble for every timing error the receiver tolerates, so a noiseless frame gives exactly <span class="arithmatex">\(\Delta \hat{f}_c = 0\)</span>. The time-domain sum over a full window of <span class="arithmatex">\(L\)</span> samples does not have this property. With a timing error of <span class="arithmatex">\(\delta\)</span> samples, <span class="arithmatex">\(|\delta|\)</span> samples of that window fall outside the repetition and bias the estimate. Because the signal is real, its mirror-image spectrum leaks into the active band, and the leakage grows with the offset. The estimate is therefore run twice: the second pass estimates the small residual left after correcting with the first estimate, and the two are added.</p>
+<p>The received audio is real, so the timing metric and the CFO correction run on its analytic signal <span class="arithmatex">\(z[n]\)</span>. It is formed over a buffer of length <span class="arithmatex">\(M\)</span> with the DFT:</p>
+<div class="arithmatex">\[Z[k] = \begin{cases} X[k], &amp; k = 0 \text{ or } k = M/2 \ (M \text{ even}) \\ 2X[k], &amp; 0 &lt; k &lt; M/2 \\ 0, &amp; M/2 &lt; k &lt; M \end{cases}\]</div>
+<p>so that <span class="arithmatex">\(\text{Re}\{z[n]\} = x[n]\)</span> exactly, and the CFO-corrected real signal is <span class="arithmatex">\(\text{Re}\{z[n] e^{-j 2\pi \Delta\hat{f}_c n / f_s}\}\)</span>. Both the real and imaginary parts of each positive-frequency bin must be doubled. Doubling only the real part gives <span class="arithmatex">\(Z[k] = 2\,\text{Re}\,X[k] + j\,\text{Im}\,X[k]\)</span>, whose real part is <span class="arithmatex">\(\tfrac{3}{4}x[n] + \tfrac{1}{4}x[(-n) \bmod M]\)</span>. That adds a 25 % time-reversed copy of the whole buffer to the signal, which held the noiseless OFDM loopback EVM at about 28 to 45 %.</p>
+<hr />
+<h2 id="4-demodulation--channel-equalization">4. Demodulation &amp; Channel Equalization<a class="headerlink" href="#4-demodulation--channel-equalization" title="Permanent link">&para;</a></h2>
+<h3 id="40-receiver-timing-and-fft-window-placement">4.0 Receiver Timing and FFT Window Placement<a class="headerlink" href="#40-receiver-timing-and-fft-window-placement" title="Permanent link">&para;</a></h3>
+<p>Let the detected frame start be off by <span class="arithmatex">\(\delta\)</span> samples, so that each symbol's FFT window starts at <span class="arithmatex">\(N_{cp} - b + \delta\)</span> into the symbol. While <span class="arithmatex">\(-(N_{cp} - b) \le \delta \le b\)</span>, the window stays inside the current symbol plus its own cyclic prefix. It is then a cyclic shift of the transmitted block (ignoring multipath for this argument):</p>
+<div class="arithmatex">\[Y_k = H_k X_k \, e^{-j \frac{2\pi k (b - \delta)}{N}}\]</div>
+<p>The ramp is the same for the preamble and every data symbol, so it is part of the channel estimate <span class="arithmatex">\(\hat{H}[k]\)</span> and is removed exactly by equalization. The first <span class="arithmatex">\(W = \lfloor N_{cp}/2 \rfloor\)</span> samples of each symbol hold the transmit cross-fade (section 2.2.3), so the ISI-free range is <span class="arithmatex">\(-(N_{cp} - b - W) \le \delta \le b\)</span>, i.e. <span class="arithmatex">\(\pm N_{cp}/4\)</span> with these defaults; fine timing (section 3.2) keeps <span class="arithmatex">\(\delta\)</span> near 0. A data symbol is demodulated when its whole FFT window lies inside the received buffer, so a buffer that ends at the frame's last sample yields every symbol. If <span class="arithmatex">\(\delta &gt; b\)</span> (the window is late), it takes <span class="arithmatex">\(\delta - b\)</span> samples from the next symbol's cyclic prefix. That causes ISI and inter-carrier interference that no equalizer can remove: in a noiseless loopback, a window just one sample late already gives about 20 % EVM. The Schmidl-Cox timing peak of section 3 can land one or two samples off, so the receiver samples <span class="arithmatex">\(b = \lfloor N_{cp}/4 \rfloor\)</span> samples early. The cost is that the multipath delay spread the CP can absorb drops from <span class="arithmatex">\(N_{cp}\)</span> to <span class="arithmatex">\(N_{cp} - b\)</span>.</p>
+<h3 id="41-channel-estimation">4.1 Channel Estimation<a class="headerlink" href="#41-channel-estimation" title="Permanent link">&para;</a></h3>
+<p>The channel is estimated from the two identical Zadoff-Chu preamble symbols (section 3.2), which occupy every active subcarrier <span class="arithmatex">\(k \in K_a\)</span>. Let <span class="arithmatex">\(Y_1[k]\)</span> and <span class="arithmatex">\(Y_2[k]\)</span> be their DFTs and <span class="arithmatex">\(X_{ZC}[k]\)</span> the known preamble values. The Least Squares (LS) estimate averages the two copies:</p>
+<div class="arithmatex">\[\hat{H}_{LS}[k] = \frac{Y_1[k] + Y_2[k]}{2 X_{ZC}[k]}, \quad k \in K_a\]</div>
+<p>Data subcarriers lie inside <span class="arithmatex">\(K_a\)</span>, so they need no interpolation. Linear interpolation (<code>chanest_linear_interp</code>) only extends <span class="arithmatex">\(\hat{H}\)</span> to the guard and null bins:</p>
+<div class="arithmatex">\[\hat{H}[k] = \text{Interpolate}\left(\hat{H}_{LS}[k_a]\right)\]</div>
+<p>The two copies differ only by noise, <span class="arithmatex">\(Y_1 - Y_2 = W_1 - W_2\)</span>, which gives the per-subcarrier noise variance:</p>
+<div class="arithmatex">\[\hat{\sigma}_n^2 = \frac{1}{2|K_a|} \sum_{k \in K_a} \left| Y_1[k] - Y_2[k] \right|^2\]</div>
+<h3 id="42-equalization">4.2 Equalization<a class="headerlink" href="#42-equalization" title="Permanent link">&para;</a></h3>
+<p>To recover the transmitted data symbol <span class="arithmatex">\(X_k\)</span>, we apply equalization to correct for the channel frequency response <span class="arithmatex">\(\hat{H}[k]\)</span>:</p>
+<ul>
+<li>
+<p><strong>Zero-Forcing (ZF) Equalizer</strong> (simple, but amplifies noise in deep fades):
+  $<span class="arithmatex">\(\hat{X}_k = \frac{Y_k}{\hat{H}[k]}\)</span>$</p>
+</li>
+<li>
+<p><strong>Minimum Mean Square Error (MMSE) Equalizer</strong> (balances noise enhancement and channel distortion):
+  $<span class="arithmatex">\(\hat{X}_k = \frac{Y_k \hat{H}^*[k]}{|\hat{H}[k]|^2 + \frac{\sigma_n^2}{\sigma_s^2}}\)</span>$</p>
+</li>
+</ul>
+<p>where <span class="arithmatex">\(\frac{\sigma_n^2}{\sigma_s^2}\)</span> is the inverse Signal-to-Noise Ratio (<span class="arithmatex">\(\text{SNR}^{-1}\)</span>). The BPSK and QPSK data symbols have unit energy (<span class="arithmatex">\(\sigma_s^2 = 1\)</span>), so the receiver uses <span class="arithmatex">\(\hat{\sigma}_n^2\)</span> from section 4.1, clamped to <span class="arithmatex">\([0, 10]\)</span>. In a noiseless channel MMSE therefore reduces to ZF.</p>
+<p><strong>Common phase tracking.</strong> The channel estimate comes from the preamble only. A residual CFO error <span class="arithmatex">\(\epsilon\)</span> rotates data symbol <span class="arithmatex">\(m\)</span> by about <span class="arithmatex">\(2\pi \epsilon (m + 2) L / f_s\)</span>, and with about 10 active bins the CFO estimate is not precise enough to hold the phase over a long frame. Before equalization each data symbol is therefore derotated by the angle of its pilots against the channel estimate:</p>
+<div class="arithmatex">\[\theta_m = \angle \sum_{p} Y_m[k_p] \left(\hat{H}[k_p] X_p\right)^*\]</div>
+<hr />
+<h2 id="5-channel-coding--error-control">5. Channel Coding &amp; Error Control<a class="headerlink" href="#5-channel-coding--error-control" title="Permanent link">&para;</a></h2>
+<p>Acoustic environments are prone to burst noise (e.g. key clicks, claps). We apply Forward Error Correction (FEC) to guarantee error-free recovery.</p>
+<h3 id="51-reed-solomon-code">5.1 Reed-Solomon Code<a class="headerlink" href="#51-reed-solomon-code" title="Permanent link">&para;</a></h3>
+<p>A Reed-Solomon code <span class="arithmatex">\(RS(n, k)\)</span> over the Galois Field <span class="arithmatex">\(GF(2^m)\)</span> converts <span class="arithmatex">\(k\)</span> data symbols into an <span class="arithmatex">\(n\)</span>-symbol codeword.</p>
+<ul>
+<li><strong>Block Length</strong>: <span class="arithmatex">\(n = 2^m - 1\)</span> symbols.</li>
+<li><strong>Message Size</strong>: <span class="arithmatex">\(k\)</span> symbols.</li>
+<li><strong>Parity Bytes</strong>: <span class="arithmatex">\(2t = n - k\)</span> symbols.</li>
+<li><strong>Error Correction Capability</strong>: The code can correct up to <span class="arithmatex">\(t\)</span> symbol errors:
+  $<span class="arithmatex">\(t = \lfloor \frac{n - k}{2} \rfloor\)</span>$</li>
+</ul>
+<p>The generator polynomial <span class="arithmatex">\(g(x)\)</span> for the code is given by:</p>
+<div class="arithmatex">\[g(x) = \prod_{i=0}^{2t-1} \left( x - \alpha^{i + i_0} \right)\]</div>
+<p>where <span class="arithmatex">\(\alpha\)</span> is a primitive element of <span class="arithmatex">\(GF(2^m)\)</span> and <span class="arithmatex">\(i_0\)</span> is an integer offset (typically <span class="arithmatex">\(i_0 = 1\)</span>).</p>
+<h3 id="52-error-detection-crc-32">5.2 Error Detection (CRC-32)<a class="headerlink" href="#52-error-detection-crc-32" title="Permanent link">&para;</a></h3>
+<p>Before encoding with RS, the payload is appended with a Cyclic Redundancy Check (CRC-32) checksum to verify frame integrity post-decoding. The CRC-32 generator polynomial is:</p>
+<div class="arithmatex">\[G(x) = x^{32} + x^{26} + x^{23} + x^{22} + x^{16} + x^{12} + x^{11} + x^{10} + x^8 + x^7 + x^5 + x^4 + x^2 + x + 1\]</div>
+<hr />
+<h2 id="6-automatic-gain-control-agc">6. Automatic Gain Control (AGC)<a class="headerlink" href="#6-automatic-gain-control-agc" title="Permanent link">&para;</a></h2>
+<p>Microphone sensitivity, speaker volume and distance change the received level by tens of dB. The RX pipeline normalizes the level before frame detection (<code>native/src/agc/agc.c</code>, issue #92). For each input sample <span class="arithmatex">\(x[n]\)</span>:</p>
+<h3 id="61-power-estimate">6.1 Power Estimate<a class="headerlink" href="#61-power-estimate" title="Permanent link">&para;</a></h3>
+<p>A one-pole average of <span class="arithmatex">\(x^2\)</span> approximates a 10 ms RMS window:</p>
+<div class="arithmatex">\[p[n] = p[n-1] + \alpha_{rms}\left(x[n]^2 - p[n-1]\right)\]</div>
+<h3 id="62-desired-and-smoothed-gain">6.2 Desired and Smoothed Gain<a class="headerlink" href="#62-desired-and-smoothed-gain" title="Permanent link">&para;</a></h3>
+<div class="arithmatex">\[g_d[n] = \operatorname{clamp}\!\left(\frac{A_{target}}{\sqrt{p[n] + \epsilon}},\; g_{min},\; g_{max}\right)\]</div>
+<div class="arithmatex">\[g[n] = g[n-1] + \alpha\left(g_d[n] - g[n-1]\right), \qquad \alpha = \begin{cases} \alpha_{att} &amp; g_d[n] &lt; g[n-1] \text{ (attack)} \\ \alpha_{rel} &amp; \text{otherwise (release)} \end{cases}\]</div>
+<p>Each one-pole coefficient follows from its time constant <span class="arithmatex">\(\tau\)</span>:</p>
+<div class="arithmatex">\[\alpha_k = 1 - e^{-1/(\tau_k f_s)}\]</div>
+<h3 id="63-peak-guard-and-output">6.3 Peak Guard and Output<a class="headerlink" href="#63-peak-guard-and-output" title="Permanent link">&para;</a></h3>
+<p>A frame arriving after silence would otherwise be multiplied by the silence gain for the first milliseconds. The gain is therefore capped instantly on peaks:</p>
+<div class="arithmatex">\[g[n] \leftarrow \min\!\left(g[n],\; \frac{L_{peak}}{|x[n]|}\right), \qquad y[n] = g[n]\, x[n], \quad |y[n]| \le L_{peak}\]</div>
+<p>Non-finite samples produce <span class="arithmatex">\(y[n] = 0\)</span> and leave <span class="arithmatex">\(p\)</span> and <span class="arithmatex">\(g\)</span> unchanged.</p>
+<h3 id="64-parameters">6.4 Parameters<a class="headerlink" href="#64-parameters" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="arithmatex">\(A_{target}\)</span></td>
+<td>0.25 (−12 dBFS)</td>
+<td>Output RMS target</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\tau_{rms}\)</span></td>
+<td>10 ms</td>
+<td>Power-estimate window</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\tau_{att}\)</span> / <span class="arithmatex">\(\tau_{rel}\)</span></td>
+<td>1 ms / 100 ms</td>
+<td>Gain attack / release</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\([g_{min}, g_{max}]\)</span></td>
+<td>[0.1, 40] = [−20, +32] dB</td>
+<td>Gain range</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(L_{peak}\)</span></td>
+<td>1.0</td>
+<td>Output peak limit (full scale)</td>
+</tr>
+</tbody>
+</table>
+<p>The reported gain is <span class="arithmatex">\(G_{dB} = 20\log_{10} g\)</span>. Measured (<code>test_agc</code>): chirps 30 dB below to 10 dB above target settle within ±0.11 dB; convergence takes 10 ms after silence; cost is about 0.01 ms per 10 ms chunk.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../DEVELOPER_GUIDE/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Developer guide">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Developer guide
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../API_REFERENCE/" class="md-footer__link md-footer__link--next" aria-label="Next: C API">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                C API
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 PxA Labs. Licensed under the Apache License 2.0.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

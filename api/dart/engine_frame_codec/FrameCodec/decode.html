@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the decode method from the FrameCodec class, for the Dart programming language.">
+  <title>decode method - FrameCodec class - frame_codec library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../engine_frame_codec/">engine&#47;frame_codec.dart</a></li>
+    <li><a href="../../engine_frame_codec/FrameCodec-class.html">FrameCodec</a></li>
+    <li class="self-crumb">decode method</li>
+  </ol>
+  <div class="self-name">decode</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="engine_frame_codec&#47;FrameCodec-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">decode</span> method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+<span class="returntype"><a href="../../engine_frame_codec/DecodedFrame-class.html">DecodedFrame</a>?</span>
+<span class="name ">decode</span>(<wbr><ol class="parameter-list"> <li><span class="parameter" id="decode-param-bytes"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-typed_data/Uint8List-class.html">Uint8List</a></span> <span class="parameter-name">bytes</span>, {</span></li>
+<li><span class="parameter" id="decode-param-enableRs"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">enableRs</span> = <span class="default-value">true</span>, </span></li>
+</ol>})
+
+      
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Finds and verifies the frame at the start of <code>bytes</code> (demodulator output,
+possibly followed by garbage). Returns null if no length verifies.</p>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">DecodedFrame? decode(Uint8List bytes, {bool enableRs = true}) {
+  final overhead = crcLength + (enableRs ? parityLength : 0);
+  final maxLen = bytes.length &lt; overhead + maxPayload
+      ? bytes.length
+      : overhead + maxPayload;
+
+  for (var len = overhead + 1; len &lt;= maxLen; len++) {
+    Uint8List packet;
+    var corrected = 0;
+    if (enableRs) {
+      final dataLen = len - parityLength;
+      try {
+        final res = native.rsDecode(
+          Uint8List.sublistView(bytes, 0, dataLen),
+          Uint8List.sublistView(bytes, dataLen, len),
+        );
+        packet = res[&#39;message&#39;] as Uint8List;
+        corrected = res[&#39;errors_corrected&#39;] as int? ?? 0;
+      } on SwException {
+        continue; &#47;&#47; uncorrectable at this length
+      }
+    } else {
+      packet = Uint8List.sublistView(bytes, 0, len);
+    }
+    if (packet.length &lt;= crcLength) continue;
+
+    final stored = ByteData.sublistView(packet, 0, crcLength)
+        .getUint32(0, Endian.little);
+    final payload = Uint8List.fromList(packet.sublist(crcLength));
+    if (native.crc32(payload) == stored) {
+      return DecodedFrame(
+        payload: payload,
+        frameLength: len,
+        errorsCorrected: corrected,
+      );
+    }
+  }
+  return null;
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">soundwave</a></li>
+    <li><a href="../../engine_frame_codec/">frame_codec</a></li>
+    <li><a href="../../engine_frame_codec/FrameCodec-class.html">FrameCodec</a></li>
+    <li class="self-crumb">decode method</li>
+</ol>
+
+    <h5>FrameCodec class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    soundwave
+      1.0.0+1
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

@@ -1,0 +1,1890 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Ultrasonic physical-layer modem (C DSP core + Flutter app) for short-range data transfer over sound.">
+      
+      
+      
+        <link rel="canonical" href="https://pxa-labs.github.io/ultrasonic-phy-layer/architecture/signal-chain/">
+      
+      
+        <link rel="prev" href="../overview/">
+      
+      
+        <link rel="next" href="../../DEVELOPER_GUIDE/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>Signal chain & parameters - Soundwave</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#signal-chain--parameters" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Soundwave" class="md-header__button md-logo" aria-label="Soundwave" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Soundwave
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Signal chain & parameters
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="cyan"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="cyan"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PxA-Labs/ultrasonic-phy-layer" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PxA-Labs/ultrasonic-phy-layer
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/build/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../overview/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../API_REFERENCE/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../lab/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Signal Lab
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/FIELD_TEST_PLAN/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../development/contributing/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../legal/PRIVACY_POLICY/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Legal & store (drafts)
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Soundwave" class="md-nav__button md-logo" aria-label="Soundwave" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Soundwave
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PxA-Labs/ultrasonic-phy-layer" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PxA-Labs/ultrasonic-phy-layer
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Build from source
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Using the app
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CLI_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CLI guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Architecture
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Signal chain & parameters
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Signal chain & parameters
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#css-chirp-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      CSS (chirp) mode
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ofdm-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      OFDM mode
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#receiver-chain-both-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Receiver chain (both modes)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-has-been-verified-and-how" class="md-nav__link">
+    <span class="md-ellipsis">
+      What has been verified, and how
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../DEVELOPER_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Developer guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MATHEMATICAL_MODEL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Mathematical model
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    API
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            API
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API_REFERENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    C API
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dart-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Dart API
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Signal Lab
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Testing
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Testing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/FIELD_TEST_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Field test plan
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/HARDWARE_PROFILING_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Hardware profiling plan
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Project
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Project
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CI_CD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CI/CD
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../TECH_STACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tech stack (planning)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../PRD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    PRD
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ROADMAP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Roadmap
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Changelog
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Legal & store (drafts)
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Legal & store (drafts)
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../legal/PRIVACY_POLICY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Privacy policy
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../legal/TERMS_OF_SERVICE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Terms of service
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../store/PLAY_STORE_LISTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Play Store listing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../store/DATA_SAFETY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Play data safety
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#css-chirp-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      CSS (chirp) mode
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ofdm-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      OFDM mode
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#receiver-chain-both-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Receiver chain (both modes)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-has-been-verified-and-how" class="md-nav__link">
+    <span class="md-ellipsis">
+      What has been verified, and how
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="signal-chain--parameters">Signal chain &amp; parameters<a class="headerlink" href="#signal-chain--parameters" title="Permanent link">&para;</a></h1>
+<p>This page lists what the modulators <strong>actually generate</strong> on the current code, and the band, rate and airtime numbers that follow from it.</p>
+<div class="admonition info">
+<p class="admonition-title">How to read the numbers</p>
+<ul>
+<li><strong>Derived</strong> values are computed from the formulas in <code>native/src/css/css_modulate.c</code>, <code>native/src/ofdm/ofdm_modulate.c</code> and <code>soundwave_app/lib/engine/frame_geometry.dart</code>. They are exact for the code, but they are not measurements.</li>
+<li><strong>Simulated</strong> values come from CI tests that add white Gaussian noise in software.</li>
+<li><strong>Measured over the air</strong>: none yet. See the <a href="../../testing/FIELD_TEST_PLAN/">field test plan</a>.</li>
+<li><strong>Targets</strong> come from the <a href="../../PRD/">PRD</a> and are goals, not results.</li>
+</ul>
+</div>
+<h2 id="css-chirp-mode">CSS (chirp) mode<a class="headerlink" href="#css-chirp-mode" title="Permanent link">&para;</a></h2>
+<p><strong>Implementation (derived from code).</strong> <code>sw_css_modulate</code> sends LoRa-style chirp symbols: each data symbol is the base up-chirp cyclically shifted by <span class="arithmatex">\(k\)</span> chips, <span class="arithmatex">\(k &lt; M = 2^{SF}\)</span>, so <strong>one chirp carries SF bits</strong> (Gray mapped, MSB first). The band is <code>carrier_freq</code> ± <span class="arithmatex">\(B/2\)</span>, where <span class="arithmatex">\(B = f_s / D\)</span> and <span class="arithmatex">\(D = \operatorname{round}(f_s / \text{bandwidth})\)</span> samples per chip. A symbol lasts <span class="arithmatex">\(T = M/B\)</span> (<span class="arithmatex">\(N = MD\)</span> samples). Every frame starts with 8 base up-chirps and 2 down-chirps; data are up-chirps only. <code>symbol_duration</code> is not used by CSS. Formulas, the receiver and the reasons for the SF range are in <a href="../../MATHEMATICAL_MODEL/#21-chirp-spread-spectrum-css">Mathematical model §2.1</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th><span class="arithmatex">\(f_c\)</span> / bandwidth / SF</th>
+<th>Occupied band</th>
+<th>Samples per chirp (44.1 kHz)</th>
+<th>Chirp duration</th>
+<th>Raw bit rate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default (app and CLI)</td>
+<td>19 kHz / 2 kHz / 8</td>
+<td>18.0–20.0 kHz</td>
+<td>5632</td>
+<td>127.7 ms</td>
+<td>62.6 bit/s</td>
+</tr>
+<tr>
+<td>App preset <em>Long Range</em></td>
+<td>18 kHz / 2 kHz / 10</td>
+<td>17.0–19.0 kHz</td>
+<td>22528</td>
+<td>510.8 ms</td>
+<td>19.6 bit/s</td>
+</tr>
+<tr>
+<td>4 kHz band, SF6 (fastest)</td>
+<td>19 kHz / 4 kHz / 6</td>
+<td>17.0–21.0 kHz</td>
+<td>704</td>
+<td>16.0 ms</td>
+<td>375.9 bit/s</td>
+</tr>
+<tr>
+<td>4 kHz band, SF7</td>
+<td>19 kHz / 4 kHz / 7</td>
+<td>17.0–21.0 kHz</td>
+<td>1408</td>
+<td>31.9 ms</td>
+<td>219.2 bit/s</td>
+</tr>
+</tbody>
+</table>
+<p>All rates are derived from the formulas (raw rate <span class="arithmatex">\(= SF \cdot B / M\)</span>, before preamble and FEC), not measured. Before this change CSS sent one bit per 20 ms chirp (50 bit/s) whatever <code>sf</code> was set to; see the <a href="../../MATHEMATICAL_MODEL/#215-valid-sf-range-computed-441-khz">SF table</a> for every SF at 2 and 4 kHz.</p>
+<p>Airtime (derived) for the app frame format (<code>CRC 4 B + payload + RS 32 B</code>, plus the 10-chirp preamble):</p>
+<table>
+<thead>
+<tr>
+<th>Payload</th>
+<th>Frame bytes</th>
+<th>Default (SF8, 2 kHz)</th>
+<th>Long Range (SF10, 2 kHz)</th>
+<th>SF6, 4 kHz</th>
+<th>SF7, 4 kHz</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2 B</td>
+<td>38</td>
+<td>6.1 s</td>
+<td>20.9 s</td>
+<td>1.0 s</td>
+<td>1.7 s</td>
+</tr>
+<tr>
+<td>219 B (maximum)</td>
+<td>255</td>
+<td>33.8 s</td>
+<td>109.3 s</td>
+<td>5.6 s</td>
+<td>9.6 s</td>
+</tr>
+</tbody>
+</table>
+<p>Note that the lower part of a 17–21 kHz band is audible to many people.</p>
+<h2 id="ofdm-mode">OFDM mode<a class="headerlink" href="#ofdm-mode" title="Permanent link">&para;</a></h2>
+<p><strong>Implementation (derived from code).</strong> <code>sw_ofdm_modulate</code> builds a <strong>real-valued</strong> OFDM signal with an <span class="arithmatex">\(N\)</span>-point IFFT and Hermitian symmetry. Data and pilot subcarriers are placed <strong>only inside the configured band</strong> <span class="arithmatex">\([f_c - B/2,\ f_c + B/2]\)</span> (<code>carrier_freq</code> ± <code>bandwidth</code>/2; default 19 kHz ± 1 kHz = <strong>18–20 kHz</strong>). See <a href="../../MATHEMATICAL_MODEL/#223-ultrasonic-band-plan">Mathematical model §2.2.3</a>.</p>
+<ul>
+<li>Subcarrier spacing: <span class="arithmatex">\(\Delta f = f_s / N\)</span>.</li>
+<li>Active bins <span class="arithmatex">\(k_{lo} = \lceil (f_c - B/2) N / f_s \rceil + 1\)</span> to <span class="arithmatex">\(k_{hi} = \lfloor (f_c + B/2) N / f_s \rfloor - 1\)</span>: one empty guard bin inside each band edge. DC, the audible range, the Nyquist bin and their mirrors stay empty on TX and RX.</li>
+<li>Rejected configurations (<code>SW_ERR_BAD_PARAM</code>): band reaching DC, band edge closer than <span class="arithmatex">\(\Delta f\)</span> to Nyquist, fewer than 4 active bins.</li>
+<li>Every 8th active bin (starting with the first) is a pilot (+1, −1, …). The rest carry BPSK (1 bit) or QPSK (2 bits). Data bits are whitened with PRBS15 so repeated payload bytes never produce identical symbols. Pilots track the common phase of each data symbol.</li>
+<li>Preamble: two identical Zadoff-Chu OFDM symbols (root 1) on the active bins, joined phase-continuously. They are used for timing (Schmidl-Cox, then phase-slope fine timing), CFO, the channel estimate and the noise estimate.</li>
+<li>Each symbol has a cyclic prefix of <code>cp_length</code> samples (C default <span class="arithmatex">\(N/8\)</span> when 0; the app and CLI default is 64). Its first <span class="arithmatex">\(\lfloor N_{cp}/2\rfloor\)</span> samples carry a raised-cosine cross-fade with the previous symbol; the frame ends with a <span class="arithmatex">\(\lfloor N_{cp}/2\rfloor\)</span>-sample fade-out.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th><span class="arithmatex">\(N\)</span> / CP, band</th>
+<th><span class="arithmatex">\(\Delta f\)</span></th>
+<th>Active / pilot / data bins</th>
+<th>Subcarrier centres</th>
+<th>Symbol (incl. CP)</th>
+<th>Raw rate BPSK / QPSK</th>
+<th>Max app frame (255 B, QPSK)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>256 / 64, 18–20 kHz (default)</td>
+<td>172.3 Hz</td>
+<td>10 / 2 / 8</td>
+<td>18.26–19.81 kHz</td>
+<td>320 samples (7.26 ms)</td>
+<td>1.10 / 2.21 kbit/s</td>
+<td>944 ms</td>
+</tr>
+<tr>
+<td>256 / 32, 18–20 kHz</td>
+<td>172.3 Hz</td>
+<td>10 / 2 / 8</td>
+<td>18.26–19.81 kHz</td>
+<td>288 (6.53 ms)</td>
+<td>1.23 / 2.45 kbit/s</td>
+<td>849 ms</td>
+</tr>
+<tr>
+<td>512 / 64, 18–20 kHz</td>
+<td>86.1 Hz</td>
+<td>22 / 3 / 19</td>
+<td>18.09–19.90 kHz</td>
+<td>576 (13.06 ms)</td>
+<td>1.45 / 2.91 kbit/s</td>
+<td>732 ms</td>
+</tr>
+<tr>
+<td>1024 / 128, 18–20 kHz</td>
+<td>43.1 Hz</td>
+<td>45 / 6 / 39</td>
+<td>18.04–19.94 kHz</td>
+<td>1152 (26.12 ms)</td>
+<td>1.49 / 2.99 kbit/s</td>
+<td>759 ms</td>
+</tr>
+<tr>
+<td>2048 / 128, 18–20 kHz</td>
+<td>21.5 Hz</td>
+<td>91 / 12 / 79</td>
+<td>18.02–19.96 kHz</td>
+<td>2176 (49.34 ms)</td>
+<td>1.60 / 3.20 kbit/s</td>
+<td>742 ms</td>
+</tr>
+<tr>
+<td>2048 / 128, 18–21 kHz (<em>High Speed</em> preset)</td>
+<td>21.5 Hz</td>
+<td>138 / 18 / 120</td>
+<td>18.02–20.97 kHz</td>
+<td>2176 (49.34 ms)</td>
+<td>2.43 / 4.86 kbit/s</td>
+<td>544 ms</td>
+</tr>
+</tbody>
+</table>
+<p>All values are <strong>computed</strong> from the code at <span class="arithmatex">\(f_s\)</span> = 44.1 kHz (not measured). Raw rates are data bits per symbol over the symbol time, before CRC, RS parity and preamble overhead. The rate scales with the band: about <span class="arithmatex">\(2B \cdot \tfrac{7}{8} \cdot \tfrac{N}{N+N_{cp}}\)</span> bit/s for QPSK, minus the guard bins. The app's settings screen shows the same computed band and rate for the current configuration.</p>
+<p><strong>Transmit spectrum (simulated, <code>native/tests/test_ofdm_spectrum.c</code>).</strong> Periodogram of a 46-byte frame (CRC + 10-byte payload + RS parity), QPSK. The test requires ≥ 98.5 % of the energy inside the configured band and ≤ −40 dB below 16 kHz. The ~1 % outside the band is the main lobe of the outermost subcarriers, within a few hundred hertz of the band edges.</p>
+<table>
+<thead>
+<tr>
+<th><span class="arithmatex">\(N\)</span> / CP, band</th>
+<th>Energy in band</th>
+<th>Energy below 16 kHz</th>
+<th>Energy below 17 kHz</th>
+<th>Raw peak (before normalization)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>256 / 32, 18–20 kHz</td>
+<td>98.69 %</td>
+<td>−44.7 dB</td>
+<td>−33.8 dB</td>
+<td>1.11</td>
+</tr>
+<tr>
+<td>256 / 64, 18–20 kHz (default)</td>
+<td>98.99 %</td>
+<td>−53.9 dB</td>
+<td>−44.4 dB</td>
+<td>1.11</td>
+</tr>
+<tr>
+<td>512 / 64, 18–20 kHz</td>
+<td>99.23 %</td>
+<td>−46.5 dB</td>
+<td>−42.0 dB</td>
+<td>1.06</td>
+</tr>
+<tr>
+<td>1024 / 128, 18–20 kHz</td>
+<td>99.24 %</td>
+<td>−42.2 dB</td>
+<td>−39.1 dB</td>
+<td>1.10</td>
+</tr>
+<tr>
+<td>2048 / 128, 18–20 kHz</td>
+<td>99.43 %</td>
+<td>−47.5 dB</td>
+<td>−44.1 dB</td>
+<td>1.19 (2.16 before padding whitening)</td>
+</tr>
+<tr>
+<td>256 / 64, 18–21 kHz</td>
+<td>99.39 %</td>
+<td>−42.9 dB</td>
+<td>−39.1 dB</td>
+<td>1.41</td>
+</tr>
+<tr>
+<td>2048 / 128, 18–21 kHz (<em>High Speed</em>)</td>
+<td>99.37 %</td>
+<td>−56.0 dB</td>
+<td>−49.7 dB</td>
+<td>1.54 (2.47 before padding whitening)</td>
+</tr>
+</tbody>
+</table>
+<p>Before this change the OFDM modulator ignored <code>carrier_freq</code> and <code>bandwidth</code> and spread energy over 5.7–21.9 kHz (N = 256): only about 11–15 % of the energy fell in 18–20 kHz and about −2 dB (≈ 60 %) was below 16 kHz (pure-Python model of the old modulator, same frame; peak samples 7–19).</p>
+<p>The raw IDFT peaks above exceed full scale (and did more before the last symbol's zero padding was whitened, see <a href="../../MATHEMATICAL_MODEL/#223-ultrasonic-band-plan">data whitening</a>); across the configurations in <code>test_tx_peak</code> they reach about 2–6 with crest factors of 9–19 dB. The modulator therefore normalises every frame to a peak of exactly <code>amplitude</code> (default 0.8) with one gain per frame (see <em>Transmit level</em> in the <a href="../../MATHEMATICAL_MODEL/#223-ultrasonic-band-plan">mathematical model</a>); the energy fractions above do not depend on the level. The app and <code>soundwave-cli</code> play or write the samples unscaled, and <code>native/tests/test_tx_peak.c</code> checks max |sample| ≤ <code>amplitude</code> across FFT sizes, CP lengths, BPSK/QPSK, bands and worst-case payloads.</p>
+<div class="admonition warning">
+<p class="admonition-title">Not measured over the air</p>
+<p>The band plan and spectrum are exact properties of the transmitted samples. Whether a given speaker and microphone pass 18–20 kHz, and what SNR they achieve there, has not been measured; see the <a href="../../testing/FIELD_TEST_PLAN/">field test plan</a>. Many devices roll off above 18–20 kHz, which is why the default band stops at 20 kHz.</p>
+</div>
+<h2 id="receiver-chain-both-modes">Receiver chain (both modes)<a class="headerlink" href="#receiver-chain-both-modes" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>AGC</strong> (optional, app default on): target RMS 0.25, attack 1 ms, release 100 ms, gain range −20 to +32 dB (<a href="../../MATHEMATICAL_MODEL/#6-automatic-gain-control-agc">math §6</a>).</li>
+<li><strong>Frame detection</strong> (<code>sw_detect_frame</code>): CSS converts to complex baseband and scores every lag on all 10 preamble chirps with normalised up-/down-chirp correlations over the whole buffer; the first preamble wins, and the up/down peak split gives fractional timing and the frequency offset (<a href="../../MATHEMATICAL_MODEL/#31-css-preamble-detection">math §3.1</a>). OFDM uses the Schmidl-Cox metric on the repeated ZC preamble as presence gate, then the earliest strong peak of a normalised matched filter on the known preamble, refined from the preamble's phase slope.</li>
+<li><strong>CFO</strong>: Schmidl-Cox on the two repeated preamble symbols (OFDM), computed on the analytic signal.</li>
+<li><strong>CSS</strong>: dechirp each symbol at the chip rate and take the <span class="arithmatex">\(2^{SF}\)</span>-point FFT peak (Gray demapping). <strong>OFDM</strong>: the FFT window backs off <span class="arithmatex">\(\lfloor N_{cp}/4\rfloor\)</span> samples into the CP (after the transmit cross-fade). Then a least-squares channel estimate from the preamble, a noise-variance estimate, per-symbol pilot phase correction, ZF or MMSE equalization, and de-whitening.</li>
+<li><strong>Demapping</strong> to bits, then in the app <code>FrameCodec.decode</code>: RS(255,223) decoding (up to 16 byte errors) and CRC-32 verification.</li>
+</ol>
+<h2 id="what-has-been-verified-and-how">What has been verified, and how<a class="headerlink" href="#what-has-been-verified-and-how" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Claim</th>
+<th>Evidence</th>
+<th>Kind</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CSS and OFDM loopback decode correctly</td>
+<td><code>native/tests/test_e2e.c</code>, <code>integration_loopback.c</code>, Flutter <code>test/native/loopback_test.dart</code></td>
+<td>Simulation (digital loopback)</td>
+</tr>
+<tr>
+<td>CSS BER &lt; 10⁻³ for SNR ≥ 3 dB; OFDM BER &lt; 10⁻² for SNR ≥ 10 dB</td>
+<td><code>native/tests/test_ber.c</code> assertions (8-byte payloads, AWGN over the whole frame)</td>
+<td>Simulation</td>
+</tr>
+<tr>
+<td>CSS BER ≤ 0.5 % for every SF 6..10 at −7 dB full-band SNR (≈ +3.4 dB in a 2 kHz band); sync after 0 / 37 ms / 1 s of silence, noise or CSS data; preamble-like payloads; ±1 bin frequency offset</td>
+<td><code>native/tests/test_css.c</code></td>
+<td>Simulation</td>
+</tr>
+<tr>
+<td>Noiseless OFDM loopback EVM &lt; 1 %</td>
+<td><code>native/tests/test_constellation.c</code></td>
+<td>Simulation</td>
+</tr>
+<tr>
+<td>AGC settles within ±0.11 dB for inputs −30 to +10 dB around target</td>
+<td><code>native/tests/test_agc.c</code></td>
+<td>Simulation</td>
+</tr>
+<tr>
+<td>BER &lt; 10⁻⁵ at 10 dB SNR, range ≥ 5 m</td>
+<td><a href="../../PRD/">PRD</a></td>
+<td><strong>Target, not yet tested</strong></td>
+</tr>
+<tr>
+<td>Audio latency &lt; 50 ms, startup &lt; 2 s, memory &lt; 120 MB, CPU &lt; 15 %</td>
+<td><a href="../../PRD/">PRD</a></td>
+<td><strong>Target, not yet tested</strong>; see <a href="../../testing/HARDWARE_PROFILING_PLAN/">profiling plan</a></td>
+</tr>
+</tbody>
+</table>
+<p>Atmospheric absorption in this band grows roughly with the square of frequency. The standard model is ISO 9613-1 (<em>Acoustics — Attenuation of sound during propagation outdoors — Part 1: Calculation of the absorption of sound by the atmosphere</em>). The project has not yet published any absorption or range figures that were checked against that standard or against measurement.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../overview/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Overview">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Overview
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../DEVELOPER_GUIDE/" class="md-footer__link md-footer__link--next" aria-label="Next: Developer guide">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Developer guide
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 PxA Labs. Licensed under the Apache License 2.0.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
