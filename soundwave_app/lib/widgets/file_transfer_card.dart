@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../engine/arq.dart';
 import '../engine/link_frame.dart';
 import '../engine/link_receiver.dart';
+import '../engine/transfer_notice.dart';
 import '../export/file_gateway.dart';
 import '../state/app_state.dart';
 
@@ -144,7 +145,10 @@ class _FileTransferCardState extends State<FileTransferCard> {
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.insert_drive_file),
-                  title: Text('${f.fileName} (${_size(f.size)})'),
+                  title: Text(
+                    '${f.fileName} (${_size(f.size)}'
+                    '${f.transferTime != null && f.transferTime! > Duration.zero ? ', ${formatTransferDuration(f.transferTime!)}' : ''})',
+                  ),
                   subtitle: Text(f.savedPath ?? 'Not saved: ${f.error}'),
                 ),
             ],

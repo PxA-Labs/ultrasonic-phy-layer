@@ -76,6 +76,9 @@ class ReceivedFileRecord {
   final String? savedPath;
   final String? error;
 
+  /// How long the transfer took (start of the first frame to reassembly).
+  final Duration? transferTime;
+
   const ReceivedFileRecord({
     required this.fileName,
     required this.mimeType,
@@ -83,6 +86,7 @@ class ReceivedFileRecord {
     required this.timestamp,
     this.savedPath,
     this.error,
+    this.transferTime,
   });
 }
 

@@ -101,6 +101,11 @@ class TxTransferProgress {
   final int contentBytes;
   final String? error;
 
+  /// Time since the transfer started (first fragment handed to the PHY);
+  /// for [TxTransferState.completed], the whole transfer including the
+  /// final ACK wait.
+  final Duration elapsed;
+
   const TxTransferProgress({
     required this.msgId,
     required this.fragmentsDone,
@@ -110,6 +115,7 @@ class TxTransferProgress {
     required this.contentBytes,
     this.fileName,
     this.error,
+    this.elapsed = Duration.zero,
   });
 
   double get fraction => fragmentCount == 0 ? 0 : fragmentsDone / fragmentCount;
@@ -142,6 +148,10 @@ class ArqSender {
   final Duration Function() responseAllowance;
 
   final math.Random _random;
+
+  /// Clock for transfer timing (injectable for tests).
+  final DateTime Function() _now;
+
   final StreamController<TxTransferProgress> _progress =
       StreamController<TxTransferProgress>.broadcast();
 
@@ -158,7 +168,9 @@ class ArqSender {
     required this.transmit,
     Duration Function()? responseAllowance,
     math.Random? random,
+    DateTime Function()? now,
   })  : responseAllowance = responseAllowance ?? (() => Duration.zero),
+        _now = now ?? DateTime.now,
         _random = random ?? math.Random(),
         _nextMsgId = (random ?? math.Random()).nextInt(0x10000);
 
@@ -208,6 +220,7 @@ class ArqSender {
     final frames = PayloadFragmenter(maxChunk: maxChunk).fragment(message,
         src: nodeId, msgId: msgId, ackRequested: config.enabled);
     var retries = 0;
+    final started = _now();
 
     void emit(int done, TxTransferState state, [String? error]) {
       if (_progress.isClosed) return;
@@ -220,6 +233,7 @@ class ArqSender {
         fileName: message.fileName,
         contentBytes: message.content.length,
         error: error,
+        elapsed: _now().difference(started),
       ));
     }
 
