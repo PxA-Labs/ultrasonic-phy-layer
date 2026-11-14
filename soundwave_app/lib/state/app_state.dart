@@ -3,6 +3,7 @@
 // Follows OpenSSF secure coding guidelines with robust bounds checks and lifecycle cleanup.
 
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:soundwave/engine/tx_engine.dart';
 import 'package:soundwave/engine/rx_engine.dart';
@@ -11,6 +12,12 @@ import 'package:soundwave/engine/signal_metrics.dart';
 import 'package:soundwave/engine/throughput_calculator.dart';
 import 'package:soundwave/services/audio_service.dart';
 import 'package:soundwave/state/settings_store.dart';
+import 'package:soundwave/export/message_exporter.dart';
+import 'package:soundwave/export/offline_decoder.dart';
+import 'package:soundwave/export/signal_importer.dart';
+import 'package:soundwave/export/signal_sample_store.dart';
+import 'package:soundwave/export/soundwave_storage.dart';
+import 'package:soundwave/export/wav_recorder.dart';
 
 class AppState extends ChangeNotifier {
   // Config fields
@@ -103,6 +110,7 @@ class AppState extends ChangeNotifier {
     }
 
     _subscribeToEngineMetrics();
+    _captureTap = _audio.audioStream.listen(_onCapturedAudio);
   }
 
   void _subscribeToEngineMetrics() {
@@ -391,6 +399,7 @@ class AppState extends ChangeNotifier {
       _rxSubscription = null;
       _rxEngine.stopListening();
       _isListening = false;
+      _finishRecordingQuietly(); // capture stops with listening
       _metrics = _metrics.copyWith(
         clearAgcGain: true,
         connectionState:
@@ -410,7 +419,7 @@ class AppState extends ChangeNotifier {
       final rxStream = _rxEngine.startListening();
       _rxSubscription = rxStream.listen((msg) {
         _lastSnr = msg.snr;
-        addMessage(msg.text, msg.snr);
+        addDecodedMessage(msg);
       }, onError: (err) {
         print('RX stream error: $err');
       });
@@ -550,6 +559,139 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---------------------------------------------------------------------
+  // WAV recording, message export, signal samples and import (#33)
+  // ---------------------------------------------------------------------
+
+  /// Where recordings, exports and signal samples are written.
+  SoundwaveStorage storage = SoundwaveStorage();
+
+  /// Decoder for imported signals (real RX pipeline on a background isolate).
+  SignalDecoder signalDecoder = OfflineDecoder.decodeInBackground;
+
+  /// Recent capture audio kept for "Save Signal Sample" (10 s at 48 kHz).
+  static const int recentAudioCapacity = 10 * 48000;
+
+  final List<MessageRecord> _messageRecords = [];
+  final RollingSampleBuffer _recentAudio =
+      RollingSampleBuffer(recentAudioCapacity);
+  StreamSubscription<Float64List>? _captureTap;
+  WavRecorder? _wavRecorder;
+  bool _recordingStarting = false;
+  File? _lastRecording;
+
+  /// Decoded messages, newest first, with the mode they were received in.
+  List<MessageRecord> get messageRecords => List.unmodifiable(_messageRecords);
+  bool get isRecording => _wavRecorder != null;
+  String? get activeRecordingPath => _wavRecorder?.path;
+  Duration get recordingDuration => _wavRecorder?.duration ?? Duration.zero;
+  File? get lastRecording => _lastRecording;
+  bool get hasRecentAudio => !_recentAudio.isEmpty;
+  String get modeName => _mode == 1 ? 'OFDM' : 'CSS';
+
+  void _onCapturedAudio(Float64List chunk) {
+    _recentAudio.add(chunk);
+    _wavRecorder?.addSamples(chunk);
+  }
+
+  /// Records captured audio to
+  /// `recordings/soundwave_recording_YYYYMMDD_HHmmss.wav` until
+  /// [stopRecording] (or until listening stops). Returns the file path.
+  Future<String> startRecording() async {
+    if (_wavRecorder != null || _recordingStarting) {
+      throw StateError('A recording is already in progress');
+    }
+    _recordingStarting = true;
+    try {
+      final dir = await storage.directory(StorageArea.recordings);
+      final recorder = WavRecorder(sampleRate: _sampleRate);
+      final path = await recorder.startRecording(dir);
+      if (_isDisposed) {
+        await recorder.stopRecording();
+        return path;
+      }
+      _wavRecorder = recorder;
+      notifyListeners();
+      return path;
+    } finally {
+      _recordingStarting = false;
+    }
+  }
+
+  /// Finalises the WAV header and returns the file (null if not recording).
+  Future<File?> stopRecording() async {
+    final recorder = _wavRecorder;
+    if (recorder == null) return null;
+    _wavRecorder = null;
+    notifyListeners();
+    final file = await recorder.stopRecording();
+    _lastRecording = file;
+    notifyListeners();
+    return file;
+  }
+
+  void _finishRecordingQuietly() {
+    final recorder = _wavRecorder;
+    if (recorder == null) return;
+    _wavRecorder = null;
+    recorder.stopRecording().then<void>(
+      (file) {
+        _lastRecording = file;
+        notifyListeners();
+      },
+      onError: (Object e) => debugPrint('Failed to finalise recording: $e'),
+    );
+  }
+
+  /// Logs a decoded message and keeps its full record for export.
+  void addDecodedMessage(
+    DecodedMessage msg, {
+    String? mode,
+    String logPrefix = '',
+  }) {
+    final record = MessageRecord.fromDecoded(msg, mode: mode ?? modeName);
+    _messageRecords.insert(0, record);
+    if (_messageRecords.length > 100) _messageRecords.removeLast();
+    addMessage('$logPrefix${msg.text}', msg.snr);
+  }
+
+  /// Writes all decoded messages (oldest first) to `exports/`.
+  Future<File> exportMessages(ExportFormat format) async {
+    final dir = await storage.directory(StorageArea.exports);
+    final chronological = _messageRecords.reversed.toList();
+    return const MessageExporter().export(chronological, format, dir);
+  }
+
+  /// Saves the recent capture audio plus a metadata sidecar (with the latest
+  /// decoded message, if any) to `samples/`.
+  Future<SavedSignalSample> saveSignalSample({String note = ''}) {
+    final latest = _messageRecords.isEmpty ? null : _messageRecords.first;
+    return SignalSampleStore(storage).save(
+      _recentAudio.snapshot(),
+      sampleRate: _sampleRate,
+      note: note,
+      message: latest,
+    );
+  }
+
+  /// Runs an imported signal through the RX pipeline with the current modem
+  /// settings and logs every decoded message.
+  Future<List<DecodedMessage>> decodeImportedSignal(
+    ImportedSignal signal,
+  ) async {
+    final config = Map<String, dynamic>.from(_configMap);
+    final mode = config['modulation'] == 1 ? 'OFDM' : 'CSS';
+    final decoded = await signalDecoder(
+      signal.samples,
+      config,
+      signal.sampleRate,
+    );
+    for (final m in decoded) {
+      addDecodedMessage(m, mode: mode, logPrefix: '[file] ');
+    }
+    return decoded;
+  }
+
   @override
   void notifyListeners() {
     if (_isDisposed) return;
@@ -563,6 +705,8 @@ class AppState extends ChangeNotifier {
     _rxSubscription?.cancel();
     _rxFrameEventsSubscription?.cancel();
     _txMetricsSubscription?.cancel();
+    _captureTap?.cancel();
+    _finishRecordingQuietly();
     _rxEngine.stopListening();
     super.dispose();
   }
