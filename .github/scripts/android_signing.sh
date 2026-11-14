@@ -27,6 +27,8 @@ note() { echo "::notice::$*"; }
 
 # Lower-case hex with no separators, e.g. "ab:CD:01" -> "abcd01".
 normalize_fp() { tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]'; }
+# Same, per line (for lists of fingerprints).
+normalize_lines() { tr -d ': \t' | tr '[:upper:]' '[:lower:]'; }
 
 cmd_configure() {
   local app_dir="${1:-}"
@@ -121,13 +123,24 @@ cmd_verify() {
       echo "== $apk"
       # The exit status is the verification result.
       out="$("$apksigner" verify --verbose --print-certs "$apk")" || die "apksigner rejected $apk"
-      echo "$out" | grep -E '^Verified using|^Signer #1 certificate (DN|SHA-256)' || true
-      if [ "$(echo "$out" | grep -c '^Signer #[0-9]* certificate DN')" -ne 1 ]; then
-        die "$apk must have exactly one signer"
+      echo "$out" | grep -E '^Verified using .*: true' || true
+      # Signer lines vary by build-tools version and scheme ("Signer #1
+      # certificate DN: ...", "Signer (minSdkVersion=..., ...) certificate
+      # ..."), and key rotation can list one certificate several times, so
+      # match any signer line and require exactly one distinct digest.
+      local digests
+      digests="$(echo "$out" | sed -n 's/^Signer.*certificate SHA-256 digest: *//p' | normalize_lines | sort -u)"
+      if [ -z "$digests" ]; then
+        echo "$out" >&2
+        die "could not read the signing certificate of $apk"
       fi
-      fp="$(echo "$out" | sed -n 's/^Signer #1 certificate SHA-256 digest: *//p' | normalize_fp)"
-      dn="$(echo "$out" | sed -n 's/^Signer #1 certificate DN: *//p')"
-      [ -n "$fp" ] || die "could not read the signing certificate of $apk"
+      if [ "$(echo "$digests" | wc -l | tr -d ' ')" -ne 1 ]; then
+        echo "$out" | grep -E '^Signer' >&2 || true
+        die "$apk must be signed by exactly one certificate"
+      fi
+      fp="$digests"
+      dn="$(echo "$out" | sed -n 's/^Signer.*certificate DN: *//p' | head -1)"
+      echo "Signer: $dn"
       fps+="$(basename "$apk") $fp"$'\n'
       dns+="$dn"$'\n'
     done

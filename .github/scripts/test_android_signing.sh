@@ -98,5 +98,48 @@ expect_fail "verify needs an input" "needs --apk-dir" "$tool" verify
 expect_fail "APK check without apksigner fails closed" "apksigner not found" \
   env -u ANDROID_HOME -u ANDROID_SDK_ROOT -u APKSIGNER "$tool" verify --apk-dir .
 
+# ---- APK path (stub apksigner replaying real output formats) -------------
+mkdir -p apks
+touch apks/app-arm64-v8a-release.apk apks/app-x86_64-release.apk
+cat > stub-apksigner <<'STUB'
+#!/usr/bin/env bash
+cat "$STUB_OUT"
+exit "${STUB_RC:-0}"
+STUB
+chmod +x stub-apksigner
+other_fp="$(fp_of other.aab)"
+debug_fp="$(fp_of debug.aab)"
+fmt_numbered() { # fp dn
+  printf 'Verifies\nVerified using v1 scheme (JAR signing): false\nVerified using v2 scheme (APK Signature Scheme v2): true\nNumber of signers: 1\nSigner #1 certificate DN: %s\nSigner #1 certificate SHA-256 digest: %s\nSigner #1 certificate SHA-1 digest: 00\n' "$2" "$1"
+}
+fmt_minsdk() { # fp dn  (v3.1 / rotation style; one cert listed twice)
+  printf 'Verifies\nVerified using v3.1 scheme (APK Signature Scheme v3.1): true\nSigner (minSdkVersion=33, maxSdkVersion=2147483647) certificate DN: %s\nSigner (minSdkVersion=33, maxSdkVersion=2147483647) certificate SHA-256 digest: %s\nSigner (minSdkVersion=24, maxSdkVersion=32) certificate DN: %s\nSigner (minSdkVersion=24, maxSdkVersion=32) certificate SHA-256 digest: %s\n' "$2" "$1" "$2" "$1"
+}
+apk_verify() { env APKSIGNER="$work/stub-apksigner" STUB_OUT="$work/stub.out" "$tool" verify --apk-dir apks "$@"; }
+
+fmt_numbered "$release_fp" "CN=Soundwave Upload, O=PxA Labs" > stub.out
+expect_ok "APKs: 'Signer #1' output format" apk_verify
+check "APKs: signer DN is printed" grep -q "Signer: CN=Soundwave Upload" "$work/log"
+expect_ok "APKs and AAB with the same certificate" apk_verify --aab release.aab --require-release-key
+expect_fail "APKs and AAB with different certificates" "different certificates" apk_verify --aab other.aab
+
+fmt_minsdk "$release_fp" "CN=Soundwave Upload, O=PxA Labs" > stub.out
+expect_ok "APKs: '(minSdkVersion=...)' format with a repeated certificate" apk_verify --aab release.aab
+
+{ fmt_numbered "$release_fp" "CN=Soundwave Upload"; printf 'Signer #2 certificate DN: CN=Someone Else\nSigner #2 certificate SHA-256 digest: %s\n' "$other_fp"; } > stub.out
+expect_fail "APKs: two signing certificates rejected" "exactly one certificate" apk_verify
+
+printf 'Verifies\nVerified using v2 scheme (APK Signature Scheme v2): true\n' > stub.out
+expect_fail "APKs: unreadable certificate fails closed" "could not read the signing certificate" apk_verify
+
+fmt_numbered "$debug_fp" "CN=Android Debug, O=Android, C=US" > stub.out
+expect_fail "APKs: debug certificate refused for publishing" "refusing to publish" apk_verify --require-release-key
+
+echo "DOES NOT VERIFY" > stub.out
+expect_fail "APKs: apksigner rejection propagates" "apksigner rejected" env STUB_RC=1 APKSIGNER="$work/stub-apksigner" STUB_OUT="$work/stub.out" "$tool" verify --apk-dir apks
+
+mkdir -p empty-apks
+expect_fail "APKs: empty directory rejected" "no APKs" env APKSIGNER="$work/stub-apksigner" "$tool" verify --apk-dir empty-apks
+
 echo "android_signing self-test: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
