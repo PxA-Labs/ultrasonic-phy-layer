@@ -29,3 +29,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Bundled copies of docs/legal/*.md (issue #97); kept identical by
+  # test/legal/legal_assets_sync_test.dart.
+  assets:
+    - assets/legal/
