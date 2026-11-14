@@ -64,7 +64,9 @@ jobs:
         working-directory: native
         run: |
           cmake -S . -B build-ffi -DCMAKE_BUILD_TYPE=Release -DSW_BUILD_TESTS=OFF
-          cmake --build build-ffi --target soundwave_shared -j "$(nproc)"
+          # soundwave-cli too: test/native/cli_compat_test.dart cross-decodes
+          # app and CLI WAV files.
+          cmake --build build-ffi --target soundwave_shared soundwave_cli -j "$(nproc)"
 
       - name: Run Flutter tests
         if: steps.check.outputs.exists == 'true'
@@ -73,6 +75,8 @@ jobs:
           # fail (instead of skipping) if the library cannot be loaded.
           SOUNDWAVE_LIB: ${{ github.workspace }}/native/build-ffi/libsoundwave.so
           SOUNDWAVE_REQUIRE_NATIVE: '1'
+          SOUNDWAVE_CLI: ${{ github.workspace }}/native/build-ffi/soundwave-cli
+          SOUNDWAVE_REQUIRE_CLI: '1'
         run: |
           mkdir -p build
           flutter test --coverage --file-reporter json:build/flutter-test-results.json
