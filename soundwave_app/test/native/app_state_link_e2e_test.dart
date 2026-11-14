@@ -4,7 +4,6 @@
 // replies, file saving (success and failure), transfer progress, the message
 // log and the live metrics. Skipped when libsoundwave cannot be loaded.
 
-import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
