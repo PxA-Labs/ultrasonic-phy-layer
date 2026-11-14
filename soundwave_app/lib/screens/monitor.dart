@@ -1,8 +1,9 @@
 // Signal Monitor screen — spectrum analyzer, waterfall spectrogram, OFDM
 // constellation and waveform (#71, #91).
 //
-// One SpectrumAnalyzer (Hann-windowed FFT) feeds both the spectrum and the
-// waterfall; the constellation comes from the receiver's equalizer output.
+// One spectrum pipeline (Hann-windowed FFT, on a worker isolate by default)
+// feeds both the spectrum and the waterfall; the constellation comes from
+// the receiver's equalizer output.
 
 import 'dart:async';
 import 'dart:typed_data';
@@ -11,7 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../dsp/constellation.dart';
-import '../dsp/spectrum_analyzer.dart';
+import '../dsp/spectrum_pipeline.dart';
 import '../state/app_state.dart';
 import '../widgets/viz/constellation_widget.dart';
 import '../widgets/viz/spectrum_analyzer_widget.dart';
@@ -19,7 +20,12 @@ import '../widgets/viz/waterfall_widget.dart';
 import '../widgets/viz/waveform_widget.dart';
 
 class MonitorScreen extends StatefulWidget {
-  const MonitorScreen({super.key});
+  const MonitorScreen({super.key, this.pipelineFactory});
+
+  /// Creates the spectrum pipeline; defaults to [SpectrumPipeline.preferred]
+  /// (a worker isolate, so FFTs never run on the UI thread). Tests inject
+  /// [InlineSpectrumPipeline.new] for synchronous results.
+  final SpectrumPipeline Function(SpectrumConfig config)? pipelineFactory;
 
   /// FFT length shared by the spectrum and waterfall.
   static const int fftSize = 1024;
@@ -43,7 +49,9 @@ class _MonitorScreenState extends State<MonitorScreen> {
   StreamSubscription<Float64List>? _audioSubscription;
   StreamSubscription<ConstellationFrame>? _constellationSubscription;
 
-  late SpectrumAnalyzer _analyzer;
+  SpectrumPipeline? _pipeline;
+  StreamSubscription<SpectrumBatch>? _batchSubscription;
+  late SpectrumConfig _config;
   late SpectrumController _spectrum;
   late WaterfallController _waterfall;
   final WaveformController _waveform = WaveformController();
@@ -86,17 +94,25 @@ class _MonitorScreenState extends State<MonitorScreen> {
     }
     _sampleRate = rate;
     _frameCount = 0;
-    _analyzer = SpectrumAnalyzer(
+    _config = SpectrumConfig(
       fftSize: MonitorScreen.fftSize,
       sampleRate: rate.toDouble(),
     );
-    _spectrum = SpectrumController(binWidthHz: _analyzer.binWidthHz);
+    _batchSubscription?.cancel();
+    _pipeline?.dispose();
+    final factory = widget.pipelineFactory ?? SpectrumPipeline.preferred;
+    final pipeline = factory(_config);
+    _pipeline = pipeline;
+    _batchSubscription = pipeline.batches.listen(_onBatch, onError: (e) {
+      debugPrint('Spectrum pipeline error: $e');
+    });
+    _spectrum = SpectrumController(binWidthHz: _config.binWidthHz);
     _waterfall = WaterfallController(
       rows: MonitorScreen.waterfallRows,
-      binCount: _analyzer.binCount,
-      binWidthHz: _analyzer.binWidthHz,
+      binCount: _config.binCount,
+      binWidthHz: _config.binWidthHz,
       secondsPerRow:
-          _analyzer.secondsPerFrame * MonitorScreen.waterfallDecimation,
+          _config.secondsPerFrame * MonitorScreen.waterfallDecimation,
     );
   }
 
@@ -106,9 +122,19 @@ class _MonitorScreenState extends State<MonitorScreen> {
       setState(() => _configure(_state.sampleRate));
     }
     _waveform.addSamples(chunk);
-    final dt = _analyzer.secondsPerFrame;
-    for (final frame in _analyzer.addSamples(chunk)) {
-      _spectrum.update(frame, dt);
+    _pipeline?.add(chunk);
+  }
+
+  void _onBatch(SpectrumBatch batch) {
+    if (_paused || !mounted) return;
+    final dt = _config.secondsPerFrame;
+    // Skipped frames still took time (peak-hold decay) and advance the
+    // waterfall's decimation phase.
+    var first = true;
+    _frameCount += batch.skipped;
+    for (final frame in batch.frames) {
+      _spectrum.update(frame, first ? dt * (1 + batch.skipped) : dt);
+      first = false;
       if (_frameCount++ % MonitorScreen.waterfallDecimation == 0) {
         _waterfall.addRow(frame);
       }
@@ -117,13 +143,15 @@ class _MonitorScreenState extends State<MonitorScreen> {
 
   void _togglePause() {
     setState(() => _paused = !_paused);
-    if (!_paused) _analyzer.reset();
+    if (!_paused) _pipeline?.reset();
   }
 
   @override
   void dispose() {
     _audioSubscription?.cancel();
     _constellationSubscription?.cancel();
+    _batchSubscription?.cancel();
+    _pipeline?.dispose();
     _spectrum.dispose();
     _waterfall.dispose();
     _waveform.dispose();
