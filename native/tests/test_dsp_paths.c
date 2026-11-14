@@ -270,8 +270,9 @@ static void test_css_sync_defaults(void) {
         CHECK(sync_detect_frame(x, len, &cfg, &start, &snr) == 1);
         CHECK(start + 1 >= offset && start <= offset + 1);
         CHECK(isfinite(snr) && snr > 10.0f);
-        // One sample short of the full preamble: not a frame yet.
-        CHECK(sync_detect_frame(x, offset + 10 * N - 1, &cfg, &start, &snr) == 0);
+        // Preamble cut 5 chips short: no lag holds all 10 chirps, and no
+        // lag may lock one symbol early on the 9 that are there.
+        CHECK(sync_detect_frame(x, offset + 10 * N - 5 * (size_t)g.D, &cfg, &start, &snr) == 0);
 
         if (t == 0) {
             // Too short for a 10-symbol preamble, bad arguments, unknown mode.

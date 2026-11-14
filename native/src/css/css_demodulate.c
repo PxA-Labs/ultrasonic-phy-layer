@@ -5,12 +5,14 @@
 //   1. z[n] = LPF{ r[n] e^{-j 2 pi fc n / fs} }   (full-rate complex baseband;
 //      windowed-sinc low-pass at 0.6 B removes the negative-frequency image
 //      and out-of-band noise)
-//   2. rho_up[m], rho_dn[m]: normalised correlation of every N-sample window
-//      with the base up-/down-chirp, |<z_m, c>|^2 / (|z_m|^2 |c|^2) in [0, 1]
-//   3. preamble metric at start m: U(m) = mean of rho_up over the 8 up-chirp
-//      slots, Dn(m) = mean of rho_dn over the 2 down-chirp slots. The first m
-//      where both exceed the threshold opens a one-symbol search region; the
-//      start is the maximum of U + Dn there. Data are up-chirps only, so Dn
+//   2. preamble metric at start m: U(m) = mean over the 8 up-chirp slots of
+//      |<z_slot, up>|^2 / (N * Ebar), Dn(m) the smaller of the same score
+//      for the 2 down-chirp slots with the down-chirp, Ebar = mean window
+//      energy of all 10 slots.
+//      Both lie in [0, 1] for a real preamble, whatever the signal level.
+//   3. The first m where both exceed the threshold opens a one-symbol search
+//      region; the start is the maximum of U + Dn there. Data are up-chirps
+//      only, so Dn
 //      stays at the noise level (~1 / (2M)) inside any payload.
 //   4. A carrier/Doppler offset delays the up-chirp correlation peak and
 //      advances the down-chirp peak by the same amount, so their midpoint is
@@ -89,6 +91,7 @@ done:
 // aligned: the FIR's group delay is compensated). Non-finite input samples
 // are treated as 0. Returns NULL on allocation failure.
 static kiss_fft_cpx* css_baseband(const float* r, size_t len, const css_geometry_t* g) {
+    if (len == 0 || len > CSS_MAX_INPUT || g->D < 1 || g->D > (1 << 20)) return NULL;
     size_t L = 10 * (size_t)g->D + 1;
     size_t h0 = (L - 1) / 2;
     double fcut = 0.6 / (double)g->D; // cycles per sample
@@ -143,6 +146,7 @@ static void base_chirp(const css_geometry_t* g, kiss_fft_cpx* up, kiss_fft_cpx* 
 
 // out[m] = max(a[m-W .. m+W]) (clipped to the array), van Herk / Gil-Werman.
 static int sliding_max(const float* a, size_t n, size_t W, float* out) {
+    if (n == 0 || W > ((SIZE_MAX / sizeof(float)) - n) / 2 - 1) return -1;
     size_t w = 2 * W + 1, L = n + 2 * W;
     float* p = (float*)calloc(L, sizeof(float));
     float* f = (float*)malloc(L * sizeof(float));
@@ -210,12 +214,12 @@ static int css_sync_bb(const kiss_fft_cpx* z, size_t len, const css_geometry_t* 
     kiss_fft_cpx* dn = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
     kiss_fft_cpx* C = (kiss_fft_cpx*)malloc(count * sizeof(kiss_fft_cpx));
     double* e = (double*)malloc((len + 1) * sizeof(double));
-    float* ru = (float*)malloc(count * sizeof(float));
-    float* rd = (float*)malloc(count * sizeof(float));
+    float* pu = (float*)malloc(count * sizeof(float)); // |<z_m, up>|^2 / N
+    float* pd = (float*)malloc(count * sizeof(float)); // |<z_m, down>|^2 / N
     float* U = NULL;
     float* Dn = NULL;
     float* Dp = NULL;
-    if (!up || !dn || !C || !e || !ru || !rd) goto done;
+    if (!up || !dn || !C || !e || !pu || !pd) goto done;
 
     base_chirp(g, up, dn);
     e[0] = 0.0;
@@ -230,28 +234,38 @@ static int css_sync_bb(const kiss_fft_cpx* z, size_t len, const css_geometry_t* 
     const double gate = CSS_ENERGY_GATE * emax;
 
     for (int pass = 0; pass < 2; pass++) {
-        float* rho = pass == 0 ? ru : rd;
+        float* pw = pass == 0 ? pu : pd;
         if (cxcorr(z, len, pass == 0 ? up : dn, N, C, count) != 0) goto done;
         for (size_t m = 0; m < count; m++) {
-            double E = e[m + N] - e[m];
-            double p = (double)C[m].r * C[m].r + (double)C[m].i * C[m].i;
-            rho[m] = E > gate ? clamp_rho(p / (E * (double)N)) : 0.0f;
+            double p = ((double)C[m].r * C[m].r + (double)C[m].i * C[m].i) / (double)N;
+            pw[m] = p < (double)FLT_MAX ? (float)p : FLT_MAX; // NaN stays NaN
         }
     }
     free(C); C = NULL;
-    free(e); e = NULL;
 
     U = (float*)malloc(nm * sizeof(float));
     Dn = (float*)malloc(nm * sizeof(float));
     Dp = (float*)malloc(nm * sizeof(float));
     if (!U || !Dn || !Dp) goto done;
+    // Each slot is normalised by the mean window energy of all 10 slots, so a
+    // slot holding only a fragment of signal (preamble cut by the buffer end,
+    // a frame next to silence) cannot score like a whole chirp, and
+    // rho = |<z, c>|^2 / (N * Ebar) <= 1 when the slots carry equal energy.
     for (size_t m = 0; m < nm; m++) {
-        double su = 0.0, sd = 0.0;
-        for (size_t i = 0; i < CSS_PREAMBLE_UP; i++) su += ru[m + i * N];
-        for (size_t i = CSS_PREAMBLE_UP; i < CSS_PREAMBLE_SYMBOLS; i++) sd += rd[m + i * N];
-        U[m] = (float)(su / CSS_PREAMBLE_UP);
-        Dn[m] = (float)(sd / CSS_PREAMBLE_DOWN);
+        double su = 0.0;
+        double ebar = (e[m + CSS_PREAMBLE_SYMBOLS * N] - e[m]) / CSS_PREAMBLE_SYMBOLS;
+        if (!(ebar > gate)) {
+            U[m] = Dn[m] = 0.0f;
+            continue;
+        }
+        for (size_t i = 0; i < CSS_PREAMBLE_UP; i++) su += pu[m + i * N];
+        // Both down slots must match (the weaker one counts): one symbol
+        // early or late, one of them holds an up-chirp.
+        float d0 = pd[m + CSS_PREAMBLE_UP * N], d1 = pd[m + (CSS_PREAMBLE_UP + 1) * N];
+        U[m] = clamp_rho(su / (CSS_PREAMBLE_UP * ebar));
+        Dn[m] = clamp_rho((double)(d0 < d1 ? d0 : d1) / ebar);
     }
+    free(e); e = NULL;
     // Down-chirp metric pooled over +/- W: with an offset the two peaks are
     // up to 2W apart, and U alone already pins the timing to within W.
     if (sliding_max(Dn, nm, W, Dp) != 0) goto done;
@@ -266,9 +280,8 @@ static int css_sync_bb(const kiss_fft_cpx* z, size_t len, const css_geometry_t* 
     }
     if (m0 == nm) { rc = 0; goto done; }
 
-    // The first qualifying start can be up to one symbol early (7 of 8 up
-    // slots plus 1 of 2 down slots still match); the true start maximises
-    // U + Dn within the next symbol.
+    // The first qualifying lag can sit on the rising edge of the peak; the
+    // start maximises U + Dn within the next symbol.
     size_t hi = m0 + N + 4 * D;
     if (hi > nm) hi = nm;
     size_t ms = m0;
@@ -298,7 +311,7 @@ static int css_sync_bb(const kiss_fft_cpx* z, size_t len, const css_geometry_t* 
     rc = 1;
 done:
     free(up); free(dn); free(C); free(e);
-    free(ru); free(rd); free(U); free(Dn); free(Dp);
+    free(pu); free(pd); free(U); free(Dn); free(Dp);
     return rc;
 }
 
@@ -319,7 +332,7 @@ uint8_t* css_demodulate(const float* samples, size_t len, sw_config cfg, size_t*
     if (!samples || !out_bytes || len > CSS_MAX_INPUT || css_geometry(&cfg, &g) != 0)
         return NULL;
     const size_t N = (size_t)g.N, M = (size_t)g.M, D = (size_t)g.D;
-    if (len < (CSS_PREAMBLE_SYMBOLS + 1) * N) return NULL;
+    if (N == 0 || M == 0 || len < 2 || len < (CSS_PREAMBLE_SYMBOLS + 1) * N) return NULL;
 
     kiss_fft_cpx* z = css_baseband(samples, len, &g);
     if (!z) return NULL;

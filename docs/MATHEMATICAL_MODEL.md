@@ -165,19 +165,21 @@ The FFT window starts $b$ samples inside the cyclic prefix rather than at its en
 Proper timing and frequency synchronization are critical in acoustic communication to align the receiver's decoding window and correct for carrier frequency offsets.
 
 ### 3.1 CSS Preamble Detection
-The CSS receiver (`css_detect_frame()` in `native/src/css/css_demodulate.c`; `sync_detect_frame()` mode 0 and `sw_detect_frame()` call it) searches the **whole** buffer on the complex baseband $z[n]$ of section 2.1.4. For every lag $m$ it computes the normalised correlation of the $N$-sample window with the base up-chirp $u[n]$ and with the down-chirp $u^*[n]$:
+The CSS receiver (`css_detect_frame()` in `native/src/css/css_demodulate.c`; `sync_detect_frame()` mode 0 and `sw_detect_frame()` call it) searches the **whole** buffer on the complex baseband $z[n]$ of section 2.1.4. For every lag $m$ it correlates the $N$-sample window with the base up-chirp $u[n]$ and with the down-chirp $u^*[n]$ (FFT overlap-save, $O(L \log N)$):
 
-$$\rho_{up}[m] = \frac{\left| \sum_{n=0}^{N-1} z[m+n] u^*[n] \right|^2}{\sum_n |z[m+n]|^2 \cdot N}, \qquad \rho_{dn}[m] \text{ likewise with } u[n],$$
+$$c_{up}[m] = \frac{1}{N}\left| \sum_{n=0}^{N-1} z[m+n]\, u^*[n] \right|^2, \qquad c_{dn}[m] = \frac{1}{N}\left| \sum_{n=0}^{N-1} z[m+n]\, u[n] \right|^2.$$
 
-so $0 \le \rho \le 1$ regardless of signal level (FFT overlap-save correlation, $O(L \log N)$). Windows more than 60 dB below the loudest window are ignored. A preamble starting at $m$ scores
+A preamble starting at $m$ has slots $m + iN$, $i = 0..9$. With $\bar{E}(m)$ the mean window energy $\sum_n |z|^2$ of those 10 slots, it scores
 
-$$U(m) = \frac{1}{8} \sum_{i=0}^{7} \rho_{up}[m + iN], \qquad D(m) = \frac{1}{2} \sum_{i=8}^{9} \rho_{dn}[m + iN].$$
+$$U(m) = \frac{1}{8 \bar{E}(m)} \sum_{i=0}^{7} c_{up}[m + iN], \qquad D(m) = \frac{\min\left(c_{dn}[m + 8N],\ c_{dn}[m + 9N]\right)}{\bar{E}(m)}.$$
+
+By Cauchy-Schwarz both are at most 1 for a real preamble (equal energy in every slot), whatever the signal level. Normalising by the mean of all 10 slots rather than each slot's own energy means a slot holding only a fragment of signal (a preamble cut by the buffer end, a frame next to silence) cannot score like a whole chirp. Taking the weaker down slot stops a lock one symbol early or late, where one of the two slots holds an up-chirp. Candidates whose slots average more than 60 dB below the loudest window are ignored.
 
 Only lags with the whole 10-chirp preamble inside the buffer are scored, so a preamble near the end of the buffer is not judged on part of its chirps.
 
 - **Threshold.** In noise, $\rho \approx 1/(1.2M)$ (the low-pass passes about $1.2M$ complex degrees of freedom per window). Detection needs $U \ge \gamma$ and $\max_{|\delta| \le 2D} D(m+\delta) \ge \gamma$ with $\gamma = \min(0.5, 4\theta/M)$ and $\theta$ = `threshold` (default 3), i.e. 12/M: 0.19 at SF6, 0.012 at SF10. With $\rho \approx \text{SNR}_{band}/(1+\text{SNR}_{band})$ this corresponds to an in-band SNR of about −6 dB (SF6) to −19 dB (SF10).
 - **Why data cannot fake it.** Data symbols are up-chirps only. A shifted up-chirp correlated with the down-chirp template gives $\rho \approx 1/(2M)$ (stationary-phase estimate), the same order as noise, so the two-down-chirp term stays below $\gamma$ inside any payload, including payloads of zero bytes (runs of base up-chirps). The old waveform sent a down-chirp for every 1 bit, so the old 8-up/2-down preamble could occur inside data.
-- **Peak selection.** The first lag that passes is at most one symbol early (7 of 8 up slots and 1 of 2 down slots still match), so the start is the maximum of $U + D$ within one symbol after it. A later, stronger frame in the same buffer is not preferred over the first one.
+- **Peak selection.** The start is the maximum of $U + D$ within one symbol after the first lag that passes. A later, stronger frame in the same buffer is not preferred over the first one.
 - **Fractional timing and offset.** A frequency offset $\Delta f$ delays the up-chirp correlation peak and advances the down-chirp peak by $\Delta f / (B/T)$ seconds, i.e. one chip per bin. With $t_{up}$, $t_{dn}$ the parabola-refined peaks of $U$ and $D$ within $\pm 2D$ samples,
 
 $$\hat{t}_0 = \frac{t_{up} + t_{dn}}{2}, \qquad \widehat{\Delta f} = \frac{t_{dn} - t_{up}}{2} \cdot \frac{B}{N} \text{ Hz}.$$

@@ -39,9 +39,9 @@ void main() {
     });
 
     test('CSS: rates grow as SF falls and as B grows (computed)', () {
-      double rate(int sf, double b) => FrameGeometry.fromConfig(
-              {'modulation': 0, 'sf': sf, 'bandwidth': b})
-          .rawBitRate;
+      double rate(int sf, double b) =>
+          FrameGeometry.fromConfig({'modulation': 0, 'sf': sf, 'bandwidth': b})
+              .rawBitRate;
       expect(rate(6, 4000), closeTo(375.9, 0.1));
       expect(rate(7, 4000), closeTo(219.3, 0.1));
       expect(rate(8, 2000), closeTo(62.6, 0.1));

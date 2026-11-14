@@ -280,6 +280,7 @@ class AppState extends ChangeNotifier {
   int get numPilots => _numPilots;
   double get carrierFreq => _carrierFreq;
   double get bandwidth => _bandwidth;
+
   /// CSS waveform derived from the current SF / bandwidth / sample rate:
   /// symbol duration 2^SF / B and SF bits per chirp (computed, not a knob).
   FrameGeometry get cssGeometry =>
