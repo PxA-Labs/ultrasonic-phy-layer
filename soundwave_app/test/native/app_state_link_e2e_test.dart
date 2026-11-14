@@ -109,6 +109,9 @@ void main() {
       // ARQ needs to hear ACKs, so sending switched A's receiver on.
       expect(a.state.isListening, isTrue);
       expect(a.state.transferError, isNull);
+      // Progress events reach AppState through a stream, after the send.
+      await waitUntil(
+          () => a.state.txTransfer?.state == TxTransferState.completed);
       expect(a.state.txTransfer?.state, TxTransferState.completed);
       expect(a.state.txTransfer!.fragmentCount, greaterThanOrEqualTo(3));
       expect(a.state.isTransmitting, isFalse);
@@ -137,6 +140,8 @@ void main() {
       await connect(arq: false, bSink: MemoryFileSink(failWith: 'disk full'));
       final data = Uint8List.fromList(List.generate(40, (i) => i));
       await a.state.sendFileBytes(data, fileName: 'x.txt');
+      await waitUntil(
+          () => a.state.txTransfer?.state == TxTransferState.completed);
       expect(a.state.txTransfer?.state, TxTransferState.completed);
 
       await waitUntil(() => b.state.receivedFiles.isNotEmpty);

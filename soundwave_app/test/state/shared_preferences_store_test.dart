@@ -69,8 +69,11 @@ void main() {
   test('modem settings survive an app restart through real prefs', () async {
     final first = AppState(
         audio: MockAudioService(), store: SharedPreferencesSettingsStore());
+    // Each setter saves asynchronously; let each save finish in turn.
     first.setMode(1);
+    await Future<void>.delayed(Duration.zero);
     first.setNumSubcarriers(512);
+    await Future<void>.delayed(Duration.zero);
     first.setAgcEnabled(false);
     await Future<void>.delayed(Duration.zero);
     first.dispose();
