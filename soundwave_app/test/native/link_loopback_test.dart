@@ -16,19 +16,21 @@ import 'package:soundwave/engine/tx_engine.dart';
 import 'package:soundwave/native/soundwave_native.dart';
 import 'package:soundwave/services/audio_service.dart';
 
-/// Audio endpoint whose speaker output is routed by the test.
+/// Audio endpoint whose speaker output is routed by the test. Like a real
+/// output device it only accepts audio once playback has been started.
 class BridgeAudio implements AudioService {
   final StreamController<Float64List> _mic =
       StreamController<Float64List>.broadcast();
   void Function(Float64List samples)? onPlay;
   Future<void> _micQueue = Future<void>.value();
+  bool _playing = false;
 
   @override
   Stream<Float64List> get audioStream => _mic.stream;
   @override
   bool get isCapturing => true;
   @override
-  bool get isPlaying => false;
+  bool get isPlaying => _playing;
   @override
   List<AudioDevice> get inputDevices => const [];
   @override
@@ -38,15 +40,16 @@ class BridgeAudio implements AudioService {
   @override
   Future<void> stopCapture() async {}
   @override
-  Future<void> startPlayback() async {}
+  Future<void> startPlayback() async => _playing = true;
   @override
-  Future<void> stopPlayback() async {}
+  Future<void> stopPlayback() async => _playing = false;
   @override
   void updateConfig(Map<String, dynamic> config) {}
 
   @override
-  Future<void> enqueueForPlayback(Float64List samples) async =>
-      onPlay?.call(Float64List.fromList(samples));
+  Future<void> enqueueForPlayback(Float64List samples) async {
+    if (_playing) onPlay?.call(Float64List.fromList(samples));
+  }
 
   /// Queues [signal] (with noise around it) for this microphone. Deliveries
   /// are serialised so two transmissions never interleave mid-frame.
@@ -165,13 +168,9 @@ void main() {
       a.rx.startListening();
       b.rx.startListening();
       // Capture subscriptions are attached asynchronously; audio sent before
-      // that would be lost.
+      // that would be lost. No settling time: the first frame must decode
+      // right after capture starts (rx_stream_start_test.dart).
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      // A live microphone is already running when a transfer starts: give
-      // both receivers 0.5 s of background noise first so AGC has settled
-      // (the first frame right after capture start can otherwise fail).
-      a.audio.hear(Float64List(0), rnd, trailing: 22050);
-      b.audio.hear(Float64List(0), rnd, trailing: 22050);
     }
 
     tearDown(() async {

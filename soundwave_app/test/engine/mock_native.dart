@@ -101,8 +101,12 @@ class MockSoundwaveNative implements SoundwaveNative {
     };
   }
 
+  /// Frames (CRC + payload + parity bytes) handed to the modulators.
+  final List<Uint8List> modulatedFrames = [];
+
   @override
   Float32List cssModulate(Uint8List bits, Pointer<SwConfig> config) {
+    modulatedFrames.add(Uint8List.fromList(bits));
     return Float32List.fromList(List.generate(100, (i) => i.toDouble()));
   }
 
@@ -114,6 +118,7 @@ class MockSoundwaveNative implements SoundwaveNative {
 
   @override
   Float32List ofdmModulate(Uint8List bits, Pointer<SwConfig> config) {
+    modulatedFrames.add(Uint8List.fromList(bits));
     return Float32List.fromList(List.generate(100, (i) => i.toDouble()));
   }
 
@@ -152,22 +157,37 @@ class MockSoundwaveNative implements SoundwaveNative {
     return Float32List(count);
   }
 
+  /// Playback device model: like miniaudio, audio can only be written to a
+  /// started device; [playbackWrites] records what reached it.
+  bool playbackRunning = false;
+  final List<Float32List> playbackWrites = [];
+
   @override
   Pointer<Void> audioPlaybackStart(Pointer<SwConfig> config) {
-    return Pointer<Void>.fromAddress(0);
+    playbackRunning = true;
+    return Pointer<Void>.fromAddress(0x1000);
   }
 
   @override
-  void audioPlaybackStop(Pointer<Void> handle) {}
+  void audioPlaybackStop(Pointer<Void> handle) {
+    playbackRunning = false;
+  }
 
   @override
-  void audioPlaybackWrite(Pointer<Void> handle, Float32List samples) {}
+  void audioPlaybackWrite(Pointer<Void> handle, Float32List samples) {
+    if (!playbackRunning) throw StateError('write to a stopped device');
+    playbackWrites.add(Float32List.fromList(samples));
+  }
 }
 
+/// Fake audio endpoint. Like a real output device it only accepts audio
+/// while playback is running: samples enqueued before [startPlayback] are
+/// dropped (and counted), so a caller that enqueues first is caught.
 class MockAudioService implements AudioService {
   bool isCapturing = false;
   bool isPlaying = false;
   Float64List? playbackQueue;
+  int droppedEnqueues = 0;
   void Function()? onPlaybackStarted;
   final StreamController<Float64List> _audioStreamController =
       StreamController<Float64List>.broadcast();
@@ -193,6 +213,10 @@ class MockAudioService implements AudioService {
 
   @override
   Future<void> enqueueForPlayback(Float64List samples) async {
+    if (!isPlaying) {
+      droppedEnqueues++;
+      return;
+    }
     playbackQueue = samples;
   }
 

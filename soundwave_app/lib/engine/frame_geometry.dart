@@ -8,6 +8,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:soundwave/engine/frame_codec.dart';
+import 'package:soundwave/native/soundwave_native.dart' show SoundwaveNative;
 
 class FrameGeometry {
   /// Samples occupied by the synchronisation preamble.
@@ -145,6 +146,46 @@ class FrameGeometry {
   int get maxFrameSamples => samplesForFrameBytes(FrameCodec.crcLength +
       FrameCodec.maxPayload +
       (enableRs ? FrameCodec.parityLength : 0));
+
+  /// Airtime the TX path aims for per frame. Long frames are fragile (one
+  /// noise burst or a moved phone loses the whole frame), stall ARQ (each
+  /// attempt waits a frame's airtime) and give no progress feedback. 15 s
+  /// keeps OFDM frames full (219-byte payloads take ~1 s) and only splits
+  /// slow CSS settings (a full frame is ~34 s at SF8 and ~110 s at SF10,
+  /// 2 kHz; the latter does not even fit [SoundwaveNative.maxFrameSamples]).
+  static const double targetFrameAirtimeSeconds = 15.0;
+
+  int _frameBytes(int payload) =>
+      FrameCodec.crcLength + payload + (enableRs ? FrameCodec.parityLength : 0);
+
+  /// Sample budget for one transmitted frame that must carry at least
+  /// [minPayload] bytes: [targetFrameAirtimeSeconds], stretched to twice the
+  /// smallest such frame when that alone takes more than half of it, and
+  /// never above [SoundwaveNative.maxFrameSamples]. The stretch matters for
+  /// slow CSS settings (SF10 / 2 kHz: a 12-byte link frame already takes
+  /// ~25 s, mostly preamble and FEC): frames there stay at most twice the
+  /// minimum, so at least half of their airtime carries payload.
+  int txFrameSampleBudget({int minPayload = 1}) {
+    final smallest = samplesForFrameBytes(_frameBytes(minPayload));
+    final target = (targetFrameAirtimeSeconds * sampleRate).floor();
+    return math.min(
+        SoundwaveNative.maxFrameSamples, math.max(target, 2 * smallest));
+  }
+
+  /// Largest payload (at most [FrameCodec.maxPayload]) whose frame takes no
+  /// more than [maxSamples] samples; 0 if not even one byte fits.
+  int maxPayloadWithin(int maxSamples) {
+    var lo = 0, hi = FrameCodec.maxPayload;
+    while (lo < hi) {
+      final mid = (lo + hi + 1) ~/ 2;
+      if (samplesForFrameBytes(_frameBytes(mid)) <= maxSamples) {
+        lo = mid;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return lo;
+  }
 
   /// Window handed to frame detection: a full preamble plus margin on both
   /// sides so a preamble straddling the window edge is found next time.

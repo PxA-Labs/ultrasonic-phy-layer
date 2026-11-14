@@ -20,6 +20,17 @@ import 'package:soundwave/engine/link_frame.dart';
 import 'package:soundwave/engine/arq.dart';
 import 'package:soundwave/engine/rx_engine.dart' show RxEngine;
 
+/// The current modem settings cannot carry even the smallest frame within
+/// the sample limit of the native layer (e.g. CSS SF10 at a very narrow
+/// bandwidth). Shown to the user instead of a native overflow error.
+class FrameTooLongError implements Exception {
+  final String message;
+  const FrameTooLongError(this.message);
+
+  @override
+  String toString() => message;
+}
+
 class TxEngine {
   final SoundwaveNative? _native;
   final AudioService _audio;
@@ -94,16 +105,52 @@ class TxEngine {
         (RxEngine.retryStepSymbols + 2) * g.samplesPerSymbol);
   }
 
-  /// Sends [text]. Fits-in-one-frame text without ARQ uses the legacy raw
-  /// frame; everything else goes through the link layer.
+  FrameGeometry get _geometry => FrameGeometry.fromConfig(_configMap);
+
+  /// Largest PHY payload per frame for the current config: frames stay
+  /// within [FrameGeometry.txFrameSampleBudget] (about 15 s of airtime, and
+  /// always within the native sample limit). 219 bytes for OFDM; less for
+  /// slow CSS settings (e.g. 74 bytes at SF10 / 2 kHz).
+  int get maxFramePayload {
+    final g = _geometry;
+    return g.maxPayloadWithin(
+        g.txFrameSampleBudget(minPayload: LinkFrame.headerLength + 1));
+  }
+
+  /// Why nothing can be sent with the current config, or null if it can.
+  String? get frameLimitError {
+    if (maxFramePayload > LinkFrame.headerLength) return null;
+    final g = _geometry;
+    final seconds = g.airtimeSeconds(FrameCodec.crcLength +
+        LinkFrame.headerLength +
+        1 +
+        (g.enableRs ? FrameCodec.parityLength : 0));
+    final limit = SoundwaveNative.maxFrameSamples / g.sampleRate;
+    return 'These modem settings are too slow to send anything: the '
+        'shortest frame needs ${seconds.toStringAsFixed(0)} s of airtime '
+        '(limit ${limit.toStringAsFixed(0)} s). Use a lower spreading '
+        'factor or a wider bandwidth.';
+  }
+
+  /// Link-layer chunk per fragment so every fragment's frame respects
+  /// [maxFramePayload]. Throws [FrameTooLongError] if no frame fits.
+  int get linkChunkBytes {
+    final error = frameLimitError;
+    if (error != null) throw FrameTooLongError(error);
+    return maxFramePayload - LinkFrame.headerLength;
+  }
+
+  /// Sends [text]. Text that fits one frame (see [maxFramePayload]) without
+  /// ARQ uses the legacy raw frame; everything else goes through the link
+  /// layer, fragmented to frames of at most [maxFramePayload] bytes.
   Future<void> sendMessage(String text) async {
     final payload = Uint8List.fromList(utf8.encode(text));
     final arq = arqConfig;
-    if (!arq.enabled && payload.length <= FrameCodec.maxPayload) {
+    if (!arq.enabled && payload.length <= maxFramePayload) {
       await transmitPayload(payload);
       return;
     }
-    await _arq.send(LinkMessage.text(text), arq);
+    await _arq.send(LinkMessage.text(text), arq, maxChunk: linkChunkBytes);
   }
 
   /// Sends binary [data] (up to [LinkMessage.maxContentBytes]) as a file,
@@ -112,10 +159,11 @@ class TxEngine {
     Uint8List data, {
     String fileName = 'data.bin',
     String mimeType = LinkMessage.defaultMime,
-  }) =>
+  }) async =>
       _arq.send(
         LinkMessage.file(data, fileName: fileName, mimeType: mimeType),
         arqConfig,
+        maxChunk: linkChunkBytes,
       );
 
   /// Feeds an ACK/NACK received by the RX engine to the ARQ sender.
@@ -137,6 +185,12 @@ class TxEngine {
       payload,
       enableRs: _configMap['enable_rs'] as bool? ?? true,
     );
+    final frameSamples = _geometry.samplesForFrameBytes(frame.length);
+    if (frameSamples > SoundwaveNative.maxFrameSamples) {
+      final seconds = (frameSamples / _sampleRate).toStringAsFixed(0);
+      throw FrameTooLongError(
+          frameLimitError ?? 'A $seconds s frame is too long to send.');
+    }
 
     // Modulate using compute/isolate to prevent UI lag
     final Float32List samples;
@@ -164,8 +218,10 @@ class TxEngine {
       doubleSamples[i] = samples[i];
     }
 
-    await _audio.enqueueForPlayback(doubleSamples);
+    // Start the device first: an output that only accepts audio while
+    // running would otherwise lose the first frame.
     await _audio.startPlayback();
+    await _audio.enqueueForPlayback(doubleSamples);
 
     _totalBytesSent += payload.length;
     _framesSent++;

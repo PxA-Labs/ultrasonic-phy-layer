@@ -71,8 +71,15 @@ abstract class AudioService {
   Future<void> stopCapture();
   Stream<Float64List> get audioStream;
 
+  /// Starts the output device. Samples enqueued before this call are not
+  /// lost: they are held and played as soon as playback starts.
   Future<void> startPlayback();
+
+  /// Stops the output device and discards audio not yet handed to it.
   Future<void> stopPlayback();
+
+  /// Queues [samples] for playback. Callers should start playback first;
+  /// audio queued while stopped is held until [startPlayback].
   Future<void> enqueueForPlayback(Float64List samples);
 
   bool get isCapturing;
@@ -96,6 +103,7 @@ abstract class AudioService {
 // Preferred: Native Audio Service using C miniaudio bridge via dart:ffi
 class NativeAudioService implements AudioService {
   final Map<String, dynamic> _configMap;
+  final SoundwaveNative _native;
   late final Pointer<SwConfig> _nativeConfig;
   Pointer<Void>? _captureHandle;
   Pointer<Void>? _playbackHandle;
@@ -104,13 +112,18 @@ class NativeAudioService implements AudioService {
   bool _isCapturing = false;
   bool _isPlaying = false;
 
+  /// Audio enqueued while playback was stopped; written once it starts (the
+  /// native playback ring only exists while the device runs).
+  final List<Float32List> _pendingPlayback = [];
+
   final StreamController<Float64List> _audioStreamController =
       StreamController<Float64List>.broadcast();
 
-  NativeAudioService(this._configMap) {
+  /// [native] defaults to the loaded library (which must load, or this
+  /// throws and [AudioService.preferred] falls back).
+  NativeAudioService(this._configMap, {SoundwaveNative? native})
+      : _native = native ?? SoundwaveNative.instance {
     _nativeConfig = SwConfig.fromMap(_configMap);
-    // Initialize native library to verify FFI library loads
-    SoundwaveNative.instance;
   }
 
   @override
@@ -139,7 +152,7 @@ class NativeAudioService implements AudioService {
     // AAudio/OpenSL ES capture needs RECORD_AUDIO granted at runtime.
     await MicPermission.ensureGranted();
 
-    _captureHandle = SoundwaveNative.instance.audioCaptureStart(_nativeConfig);
+    _captureHandle = _native.audioCaptureStart(_nativeConfig);
     _isCapturing = true;
 
     // Poll the native capture ring buffer every 10ms
@@ -147,7 +160,7 @@ class NativeAudioService implements AudioService {
       if (!_isCapturing || _captureHandle == null) return;
       try {
         // Read 10ms of samples at 44100Hz (~441 float samples)
-        final samples = SoundwaveNative.instance.audioCaptureRead(
+        final samples = _native.audioCaptureRead(
           _captureHandle!,
           441,
         );
@@ -172,7 +185,7 @@ class NativeAudioService implements AudioService {
     _captureTimer = null;
 
     if (_captureHandle != null) {
-      SoundwaveNative.instance.audioCaptureStop(_captureHandle!);
+      _native.audioCaptureStop(_captureHandle!);
       _captureHandle = null;
     }
     _isCapturing = false;
@@ -182,18 +195,22 @@ class NativeAudioService implements AudioService {
   Future<void> startPlayback() async {
     if (_isPlaying) return;
 
-    _playbackHandle = SoundwaveNative.instance.audioPlaybackStart(
-      _nativeConfig,
-    );
+    _playbackHandle = _native.audioPlaybackStart(_nativeConfig);
     _isPlaying = true;
+    final pending = List<Float32List>.of(_pendingPlayback);
+    _pendingPlayback.clear();
+    for (final samples in pending) {
+      _native.audioPlaybackWrite(_playbackHandle!, samples);
+    }
   }
 
   @override
   Future<void> stopPlayback() async {
+    _pendingPlayback.clear();
     if (!_isPlaying) return;
 
     if (_playbackHandle != null) {
-      SoundwaveNative.instance.audioPlaybackStop(_playbackHandle!);
+      _native.audioPlaybackStop(_playbackHandle!);
       _playbackHandle = null;
     }
     _isPlaying = false;
@@ -201,10 +218,13 @@ class NativeAudioService implements AudioService {
 
   @override
   Future<void> enqueueForPlayback(Float64List samples) async {
-    if (!_isPlaying || _playbackHandle == null) return;
-
     final floatSamples = PlaybackGuard.toPlaybackSamples(samples);
-    SoundwaveNative.instance.audioPlaybackWrite(_playbackHandle!, floatSamples);
+    if (!_isPlaying || _playbackHandle == null) {
+      // Not running yet: hold the audio instead of silently dropping it.
+      _pendingPlayback.add(floatSamples);
+      return;
+    }
+    _native.audioPlaybackWrite(_playbackHandle!, floatSamples);
   }
 
   @override
@@ -243,13 +263,24 @@ class NativeAudioService implements AudioService {
 
 // Fallback: Audio Service using record and audioplayers packages
 class RecordAudioService implements AudioService {
-  final AudioRecorder _recorder = AudioRecorder();
-  final AudioPlayer _player = AudioPlayer();
+  // Created on first use: constructing them talks to the platform plugins.
+  AudioRecorder? _recorderInstance;
+  AudioPlayer? _playerInstance;
   StreamSubscription<List<int>>? _recordSubscription;
   bool _isCapturing = false;
   bool _isPlaying = false;
 
+  /// Plays one rendered WAV clip (tests); null uses an audioplayers player.
+  final Future<void> Function(Uint8List wav)? _playWav;
+
+  /// Audio enqueued while playback is stopped, played on [startPlayback].
   final List<double> _playbackQueue = [];
+
+  RecordAudioService({Future<void> Function(Uint8List wav)? playWav})
+      : _playWav = playWav;
+
+  AudioRecorder get _recorder => _recorderInstance ??= AudioRecorder();
+  AudioPlayer get _player => _playerInstance ??= AudioPlayer();
 
   final StreamController<Float64List> _audioStreamController =
       StreamController<Float64List>.broadcast();
@@ -323,30 +354,36 @@ class RecordAudioService implements AudioService {
 
   @override
   Future<void> startPlayback() async {
-    _playbackQueue.clear();
     _isPlaying = true;
+    await _flush(); // audio enqueued before the start
   }
 
   @override
   Future<void> stopPlayback() async {
-    await _player.stop();
     _isPlaying = false;
     _playbackQueue.clear();
+    await _playerInstance?.stop();
   }
 
   @override
   Future<void> enqueueForPlayback(Float64List samples) async {
-    if (!_isPlaying) return;
-
     _playbackQueue.addAll(samples);
+    // Each enqueue is a whole frame or tone: play it now rather than waiting
+    // for more audio that may never come (a short frame would never play).
+    if (_isPlaying) await _flush();
+  }
 
-    // If queue reaches critical size or at normal block size, render and play it
-    if (_playbackQueue.length >= 8192) {
-      final chunk = Float64List.fromList(_playbackQueue);
-      _playbackQueue.clear();
-      PlaybackGuard.clampInPlace(chunk);
+  Future<void> _flush() async {
+    if (_playbackQueue.isEmpty) return;
+    final chunk = Float64List.fromList(_playbackQueue);
+    _playbackQueue.clear();
+    PlaybackGuard.clampInPlace(chunk);
 
-      final wavBytes = WavUtility.createWav(chunk, 44100);
+    final wavBytes = WavUtility.createWav(chunk, 44100);
+    final play = _playWav;
+    if (play != null) {
+      await play(wavBytes);
+    } else {
       await _player.play(BytesSource(wavBytes));
     }
   }
