@@ -32,6 +32,15 @@ class InMemorySettingsStore implements SettingsStore {
   }
 }
 
+/// Persists settings in SharedPreferences, one key per setting.
+///
+/// Callers fire [save] without awaiting it (a settings setter saves on every
+/// change), so several saves can be in flight at once. Writes are therefore
+/// serialised through one queue shared by every instance (they all write the
+/// same preferences file): saves issued while a write is running are merged,
+/// latest value per key, into a single pending write, and each write applies
+/// its whole snapshot without yielding between keys. [load] waits for queued
+/// writes first, so a read never observes a half-applied save.
 class SharedPreferencesSettingsStore implements SettingsStore {
   /// Key namespace, so independent stores (modem settings, UI preferences)
   /// never overwrite each other's values.
@@ -39,8 +48,16 @@ class SharedPreferencesSettingsStore implements SettingsStore {
 
   SharedPreferencesSettingsStore({this.prefix = 'soundwave.modem.'});
 
+  /// Tail of the write queue; completes when every queued write has finished.
+  static Future<void> _idle = Future<void>.value();
+
+  /// Prefixed values waiting for the next write, merged latest-wins.
+  static Map<String, Object>? _pending;
+  static Future<void>? _pendingWrite;
+
   @override
   Future<Map<String, Object>> load() async {
+    await _idle;
     final prefs = await SharedPreferences.getInstance();
     final out = <String, Object>{};
     for (final key in prefs.getKeys()) {
@@ -52,21 +69,44 @@ class SharedPreferencesSettingsStore implements SettingsStore {
   }
 
   @override
-  Future<void> save(Map<String, Object> values) async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> save(Map<String, Object> values) {
+    final batch = _pending ??= <String, Object>{};
     for (final e in values.entries) {
-      final key = '$prefix${e.key}';
+      batch['$prefix${e.key}'] = e.value;
+    }
+    return _pendingWrite ??= _enqueue();
+  }
+
+  static Future<void> _enqueue() {
+    final write = _idle.then((_) {
+      // Detach the batch: saves from now on start the next write.
+      final batch = _pending!;
+      _pending = null;
+      _pendingWrite = null;
+      return _write(batch);
+    });
+    _idle = write.then<void>((_) {}, onError: (Object _) {});
+    return write;
+  }
+
+  static Future<void> _write(Map<String, Object> batch) async {
+    final prefs = await SharedPreferences.getInstance();
+    // Issue every set before awaiting any, so the in-memory preferences take
+    // the whole snapshot at once.
+    final writes = <Future<bool>>[];
+    for (final e in batch.entries) {
       final v = e.value;
       if (v is bool) {
-        await prefs.setBool(key, v);
+        writes.add(prefs.setBool(e.key, v));
       } else if (v is int) {
-        await prefs.setInt(key, v);
+        writes.add(prefs.setInt(e.key, v));
       } else if (v is double) {
-        await prefs.setDouble(key, v);
+        writes.add(prefs.setDouble(e.key, v));
       } else if (v is String) {
-        await prefs.setString(key, v);
+        writes.add(prefs.setString(e.key, v));
       }
     }
+    await Future.wait(writes);
   }
 }
 

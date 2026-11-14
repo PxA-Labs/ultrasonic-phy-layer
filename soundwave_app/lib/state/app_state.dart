@@ -737,8 +737,12 @@ class AppState extends ChangeNotifier {
   String get modeName => _mode == 1 ? 'OFDM' : 'CSS';
 
   void _onCapturedAudio(Float64List chunk) {
+    final wasEmpty = _recentAudio.isEmpty;
     _recentAudio.add(chunk);
     _wavRecorder?.addSamples(chunk);
+    // [hasRecentAudio] only changes on the first non-empty chunk; notify then
+    // (so "Save Signal Sample" enables) rather than on every audio chunk.
+    if (wasEmpty && !_recentAudio.isEmpty && !_isDisposed) notifyListeners();
   }
 
   /// Records captured audio to
