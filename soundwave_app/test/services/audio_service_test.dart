@@ -87,16 +87,6 @@ void main() {
     });
   });
 
-  group('RecordAudioService Lifecycle Checks', () {
-    test('1. Basic status fields getter verification', () {
-      final service = RecordAudioService();
-      expect(service.isCapturing, isFalse);
-      expect(service.isPlaying, isFalse);
-      expect(service.inputDevices.first.name, contains('Microphone'));
-      expect(service.outputDevices.first.name, contains('Speaker'));
-    });
-  });
-
   group('PlaybackGuard (playback safety net)', () {
     test('in-range samples pass through unchanged and are not counted', () {
       final before = PlaybackGuard.clippedSamples;
@@ -120,6 +110,16 @@ void main() {
       expect(f[3], closeTo(0.3, 1e-7));
       expect(x[0], 1.5, reason: 'toPlaybackSamples must not modify its input');
       expect(PlaybackGuard.clippedSamples, before + 3);
+    });
+  });
+
+  group('RecordAudioService Lifecycle Checks', () {
+    test('1. Basic status fields getter verification', () {
+      final service = RecordAudioService();
+      expect(service.isCapturing, isFalse);
+      expect(service.isPlaying, isFalse);
+      expect(service.inputDevices.first.name, contains('Microphone'));
+      expect(service.outputDevices.first.name, contains('Speaker'));
     });
   });
 }

@@ -24,6 +24,7 @@
 
 #include "soundwave_api.h"
 #include "soundwave/ofdm.h"
+#include "ofdm_gain_util.h"
 #include "kiss_fft.h"
 #include <math.h>
 #include <stdint.h>
@@ -95,6 +96,10 @@ static void check_spectrum(int N, int cp, float carrier, float bw) {
     size_t L = (size_t)N + (size_t)cp;
     size_t S = (FRAME_BYTES * 8 + (size_t)(2 * lay.num_data) - 1) / (size_t)(2 * lay.num_data);
     CHECK(len == (2 + S) * L + (size_t)OFDM_WOLA_LEN(cp));
+    // The modulator scales the frame by one gain g (peak normalization to
+    // cfg.amplitude); subcarrier magnitudes below are relative to it.
+    double g = ofdm_frame_gain(s, len, cfg);
+    CHECK(g > 0.0);
 
     // Periodogram of the whole frame.
     int M = 1;
@@ -125,9 +130,10 @@ static void check_spectrum(int N, int cp, float carrier, float bw) {
         double db16 = 10.0 * log10(below16 / total + 1e-30);
         double db17 = 10.0 * log10(below17 / total + 1e-30);
         printf("N=%4d cp=%3d band %5.0f-%5.0f Hz: bins %d..%d (%d data), %zu samples, "
-               "in band %.2f %%, <16 kHz %.1f dB, <17 kHz %.1f dB, peak %.2f\n",
+               "in band %.2f %%, <16 kHz %.1f dB, <17 kHz %.1f dB, peak %.2f (raw %.2f)\n",
                N, cp, f_lo, f_hi, lay.first_bin, lay.last_bin, lay.num_data, len,
-               100.0 * frac, db16, db17, peak);
+               100.0 * frac, db16, db17, peak, g > 0.0 ? peak / g : 0.0);
+        CHECK(peak <= cfg.amplitude);
         CHECK(frac >= MIN_INBAND_FRACTION);
         CHECK(db16 <= MAX_BELOW_16K_DB);
         CHECK(db17 <= MAX_BELOW_17K_DB);
@@ -153,10 +159,10 @@ static void check_spectrum(int N, int cp, float carrier, float bw) {
                 }
             }
         }
-        // Active bins carry unit-magnitude symbols; float32 IFFT/FFT
-        // round-off leaves ~1e-6 elsewhere.
-        CHECK(worst < 1e-4);
-        CHECK(active_min > 0.99);
+        // Active bins carry unit-magnitude symbols (times the frame gain
+        // g); float32 IFFT/FFT round-off leaves ~1e-6 elsewhere.
+        CHECK(worst < 1e-4 * g);
+        CHECK(active_min > 0.99 * g);
     }
     free(Y);
     free(s);

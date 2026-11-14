@@ -133,13 +133,20 @@ void main() {
       }, skip: skip);
     }
 
+    // CSS frames are long (a full-size SF10 frame lasts ~110 s and exceeds
+    // the app's per-frame sample cap), so CSS uses short payloads; the
+    // envelope is constant whatever the data.
+    final cssPayloads = <String, Uint8List>{
+      'text': payloads['text']!,
+      'alternating': Uint8List.fromList(List.generate(64, _alternating)),
+    };
     for (var sf = 6; sf <= 10; sf++) {
       final amp = sf.isEven ? 1.0 : 0.5;
       test('CSS SF$sf amp=$amp', () async {
         final cfg = _config(modulation: 0, sf: sf, amplitude: amp);
-        for (final key in ['text', 'alternating']) {
-          final s = await transmit(cfg, payloads[key]!);
-          expectWithinAmplitude(s, amp, 'CSS SF$sf $key');
+        for (final e in cssPayloads.entries) {
+          final s = await transmit(cfg, e.value);
+          expectWithinAmplitude(s, amp, 'CSS SF$sf ${e.key}');
         }
       }, skip: skip);
     }
