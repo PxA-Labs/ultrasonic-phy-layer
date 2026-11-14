@@ -263,7 +263,8 @@ class NativeAudioService implements AudioService {
 
 // Fallback: Audio Service using record and audioplayers packages
 class RecordAudioService implements AudioService {
-  final AudioRecorder _recorder = AudioRecorder();
+  // Created on first use: constructing them talks to the platform plugins.
+  AudioRecorder? _recorderInstance;
   AudioPlayer? _playerInstance;
   StreamSubscription<List<int>>? _recordSubscription;
   bool _isCapturing = false;
@@ -278,6 +279,7 @@ class RecordAudioService implements AudioService {
   RecordAudioService({Future<void> Function(Uint8List wav)? playWav})
       : _playWav = playWav;
 
+  AudioRecorder get _recorder => _recorderInstance ??= AudioRecorder();
   AudioPlayer get _player => _playerInstance ??= AudioPlayer();
 
   final StreamController<Float64List> _audioStreamController =

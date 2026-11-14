@@ -9,6 +9,7 @@ import 'dart:typed_data';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundwave/engine/arq.dart';
+import 'package:soundwave/engine/fragmentation.dart';
 import 'package:soundwave/engine/frame_geometry.dart';
 import 'package:soundwave/engine/link_frame.dart';
 import 'package:soundwave/engine/link_receiver.dart';
@@ -93,7 +94,12 @@ void main() {
         for (final f in native.frames)
           LinkFrame.decode(CapturingNative.payloadOf(f))!,
       ];
-      expect(frames, hasLength(3));
+      // CSS SF8 / 2 kHz: chunks are sized for ~15 s frames, not 208 bytes.
+      expect(tx.linkChunkBytes, lessThan(LinkFrame.maxChunk));
+      final count = PayloadFragmenter.fragmentCount(
+          LinkMessage.text(text).encode().length, tx.linkChunkBytes);
+      expect(count, greaterThan(3));
+      expect(frames, hasLength(count));
       expect(frames.every((f) => f.src == 0x0A0A && !f.ackRequested), isTrue);
       final rx = LinkReceiver(nodeId: 1);
       final out = [
@@ -102,7 +108,7 @@ void main() {
       ];
       expect(out.last.message!.text, text);
       expect(progress.last.state, TxTransferState.completed);
-      expect(progress.last.fragmentsDone, 3);
+      expect(progress.last.fragmentsDone, count);
     });
 
     test('sendBinary with ARQ waits for each ACK', () {
@@ -122,7 +128,11 @@ void main() {
             .then((_) => done = true);
         async.elapse(const Duration(minutes: 5));
         expect(done, isTrue);
-        expect(native.frames, hasLength(5));
+        final envelope =
+            LinkMessage.file(Uint8List(1000), fileName: 'z.bin').encode();
+        final count = PayloadFragmenter.fragmentCount(
+            envelope.length, tx.linkChunkBytes);
+        expect(native.frames, hasLength(count));
         expect(tx.retransmissions, 0);
         final f0 =
             LinkFrame.decode(CapturingNative.payloadOf(native.frames[0]))!;
