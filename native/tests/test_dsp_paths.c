@@ -237,55 +237,63 @@ static void test_ofdm_frame_buffer_negotiation(void) {
 /* Frame synchronisation                                                    */
 /* ------------------------------------------------------------------------ */
 
-// CSS preamble (8 up-chirps + 2 down-chirps) built from the documented
-// defaults: 18 kHz, 4 kHz sweep, 44.1 kHz, 882-sample (20 ms) symbols. A
-// zeroed sync config must fall back to exactly these values.
+// CSS preamble (8 base up-chirps + 2 down-chirps) from the documented
+// defaults: SF8, 19 kHz centre, 2 kHz band, 44.1 kHz -> 22 samples per chip,
+// N = 256 * 22 = 5632 samples per chirp. A zeroed sync config must fall back
+// to exactly these values. Every lag is scored on all 10 preamble chirps, so
+// a preamble right at the end of the buffer is located as accurately as one
+// followed by a frame body.
 static void test_css_sync_defaults(void) {
-    // The buffer extends well past the preamble, as a live capture with a
-    // frame body does. (sync_detect_frame only computes matched-filter power
-    // for the first len - 10N lags, so a preamble near the end of a short
-    // buffer is scored on fewer than its 10 chirps.)
-    const size_t N = 882, offset = 1500;
-    const size_t len = offset + 20 * N + 3000;
-    sw_signal up = css_generate_chirp(18000.0, 4000.0, (double)N / 44100.0, 0.8, 0.0,
-                                      44100.0);
-    sw_signal down = css_generate_chirp(18000.0, -4000.0, (double)N / 44100.0, 0.8,
-                                        0.0, 44100.0);
-    CHECK(up.data && down.data && up.length == N && down.length == N);
+    sw_config_t mc;
+    memset(&mc, 0, sizeof mc);
+    const uint8_t body[4] = {0xDE, 0xAD, 0xBE, 0xEF};
+    sw_signal frame = css_modulate(body, 32, mc);
+    css_geometry_t g;
+    CHECK(css_geometry(&mc, &g) == 0 && g.N == 5632 && g.sf == 8 && g.D == 22);
+    const size_t N = (size_t)g.N, offset = 1500;
+    CHECK(frame.data && frame.length == (10 + 4) * N);
 
-    float* x = (float*)malloc(len * sizeof(float));
-    CHECK(x != NULL);
-    for (size_t i = 0; i < len; i++) x[i] = 0.01f * ((float)(rng() % 2001) / 1000.0f - 1.0f);
-    for (int s = 0; s < 10; s++) {
-        const float* chirp = s < 8 ? up.data : down.data;
-        for (size_t i = 0; i < N; i++) x[offset + (size_t)s * N + i] += chirp[i];
+    const size_t lens[2] = {offset + frame.length + 3000, // with body and tail
+                            offset + 10 * N};             // ends with the preamble
+    for (int t = 0; t < 2; t++) {
+        const size_t len = lens[t];
+        float* x = (float*)malloc(len * sizeof(float));
+        CHECK(x != NULL);
+        for (size_t i = 0; i < len; i++)
+            x[i] = 0.01f * ((float)(rng() % 2001) / 1000.0f - 1.0f);
+        for (size_t i = 0; i < frame.length && offset + i < len; i++) x[offset + i] += frame.data[i];
+
+        sync_config_t cfg;
+        memset(&cfg, 0, sizeof cfg); // mode 0 (CSS), every parameter defaulted
+        size_t start = 0;
+        float snr = 0.0f;
+        CHECK(sync_detect_frame(x, len, &cfg, &start, &snr) == 1);
+        CHECK(start + 1 >= offset && start <= offset + 1);
+        CHECK(isfinite(snr) && snr > 10.0f);
+        // One sample short of the full preamble: not a frame yet.
+        CHECK(sync_detect_frame(x, offset + 10 * N - 1, &cfg, &start, &snr) == 0);
+
+        if (t == 0) {
+            // Too short for a 10-symbol preamble, bad arguments, unknown mode.
+            CHECK(sync_detect_frame(x, 10 * N - 1, &cfg, &start, &snr) == 0);
+            CHECK(sync_detect_frame(NULL, len, &cfg, &start, &snr) == 0);
+            CHECK(sync_detect_frame(x, len, NULL, &start, &snr) == 0);
+            CHECK(sync_detect_frame(x, len, &cfg, NULL, &snr) == 0);
+            CHECK(sync_detect_frame(x, len, &cfg, &start, NULL) == 0);
+            sync_config_t other = cfg;
+            other.sf = 11; // unsupported spreading factor
+            CHECK(sync_detect_frame(x, len, &other, &start, &snr) == 0);
+            other = cfg;
+            other.mode = 2;
+            CHECK(sync_detect_frame(x, len, &other, &start, &snr) == 0);
+            // OFDM mode needs two symbol periods.
+            other.mode = 1;
+            other.matched_filter_len = 0; // default 256 + 32
+            CHECK(sync_detect_frame(x, 2 * (256 + 32) - 1, &other, &start, &snr) == 0);
+        }
+        free(x);
     }
-
-    sync_config_t cfg;
-    memset(&cfg, 0, sizeof cfg); // mode 0 (CSS), every parameter defaulted
-    size_t start = 0;
-    float snr = 0.0f;
-    CHECK(sync_detect_frame(x, len, &cfg, &start, &snr) == 1);
-    CHECK(start + 2 >= offset && start <= offset + 2);
-    CHECK(isfinite(snr) && snr > 10.0f);
-
-    // Too short for a 10-symbol preamble, bad arguments, unknown mode.
-    CHECK(sync_detect_frame(x, 10 * N - 1, &cfg, &start, &snr) == 0);
-    CHECK(sync_detect_frame(NULL, len, &cfg, &start, &snr) == 0);
-    CHECK(sync_detect_frame(x, len, NULL, &start, &snr) == 0);
-    CHECK(sync_detect_frame(x, len, &cfg, NULL, &snr) == 0);
-    CHECK(sync_detect_frame(x, len, &cfg, &start, NULL) == 0);
-    sync_config_t other = cfg;
-    other.mode = 2;
-    CHECK(sync_detect_frame(x, len, &other, &start, &snr) == 0);
-    // OFDM mode needs two symbol periods.
-    other.mode = 1;
-    other.matched_filter_len = 0; // default 256 + 32
-    CHECK(sync_detect_frame(x, 2 * (256 + 32) - 1, &other, &start, &snr) == 0);
-
-    free(x);
-    free(up.data);
-    free(down.data);
+    free(frame.data);
     printf("PASS: CSS frame sync with default parameters finds the preamble\n");
 }
 

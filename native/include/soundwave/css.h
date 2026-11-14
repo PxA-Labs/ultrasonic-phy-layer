@@ -7,7 +7,7 @@
 // integer D samples per chip (see css_geometry). Frames are
 //   [8 base up-chirps][2 down-chirps][data up-chirps ...]
 // Data never contains a down-chirp, so the preamble cannot be reproduced by
-// a payload. See docs/MATHEMATICAL_MODEL.md section 2.
+// a payload. See docs/MATHEMATICAL_MODEL.md sections 2.1 and 3.1.
 
 #ifndef SOUNDWAVE_CSS_H
 #define SOUNDWAVE_CSS_H
@@ -18,7 +18,7 @@
 #include "soundwave/types.h"
 
 // Supported spreading factors for the frame-level modem. SF bounds are
-// justified in MATHEMATICAL_MODEL.md section 2.1 (bin spacing B / 2^SF vs.
+// justified in MATHEMATICAL_MODEL.md section 2.1.5 (bin spacing B / 2^SF vs.
 // clock/Doppler offsets; symbol duration <= 1 s).
 #define CSS_MIN_SF            6
 #define CSS_MAX_SF            10

@@ -1,5 +1,5 @@
 // CSS demodulator: complex baseband conversion, preamble search, dechirp + FFT
-// symbol decisions. References: MATHEMATICAL_MODEL.md sections 2.2-2.3.
+// symbol decisions. References: MATHEMATICAL_MODEL.md sections 2.1.4 and 3.1.
 //
 // Receiver chain
 //   1. z[n] = LPF{ r[n] e^{-j 2 pi fc n / fs} }   (full-rate complex baseband;
