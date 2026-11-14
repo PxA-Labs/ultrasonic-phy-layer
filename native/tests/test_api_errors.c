@@ -119,7 +119,9 @@ static void test_config_validation_table(void) {
     REJECT(sf, 13);
     // CSS only: the chirp band must fit below Nyquist and a symbol in 1 s.
     c = cfg_for(0); c.carrier_freq = 21500.0f;     CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
-    c = cfg_for(0); c.sf = 10; c.bandwidth = 500.0f;
+    // SF 10 at 1 kHz: a 1.02 s chirp (CSS rejects it). The same 18.5-19.5 kHz
+    // band still holds the 4 OFDM subcarriers the OFDM band plan needs.
+    c = cfg_for(0); c.sf = 10; c.bandwidth = 1000.0f;
     CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
     c.modulation = 1;                              CHECK(sw_config_validate(c) == SW_OK);
     REJECT(num_subcarriers, 100);  // not a power of two
