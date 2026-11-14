@@ -315,8 +315,13 @@ int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
     if (num_symbols > (size_t)INT_MAX || num_symbols + 3 > SIZE_MAX / sizeof(float) / L)
         return SW_ERR_BAD_PARAM; // would overflow the size computation below
     size_t total_samples = (2 + num_symbols) * L + (size_t)W;
+    if (*sample_len < 2 * L + (size_t)W) {
+        // Not even room for the preamble and its fade-out.
+        *sample_len = 0;
+        return SW_ERR_OVERFLOW;
+    }
     if (total_samples > *sample_len) {
-        *sample_len = total_samples;
+        *sample_len = total_samples; // required size
         return SW_ERR_OVERFLOW;
     }
 

@@ -311,9 +311,9 @@ class RxEngine {
     if (frame != null) {
       _onFrameDecoded(frame);
       final consumed = geometry.samplesForFrameBytes(frame.frameLength);
-      // Up to one symbol of trailing audio: detection may place the frame
-      // start a few samples late and only whole symbols are demodulated.
-      final end = consumed + geometry.samplesPerSymbol - 1;
+      // The frame's own samples: the demodulator returns every symbol whose
+      // FFT window fits, so no trailing audio is needed.
+      final end = consumed;
       _emitConstellation(
         end < n ? Float32List.sublistView(samples, 0, end) : samples,
         decoded: true,

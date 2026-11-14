@@ -402,12 +402,16 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     if (!(inv_snr >= 0.0f && inv_snr <= 10.0f)) inv_snr = 10.0f;
 
     // 6. Demodulate, Equalize & Demap each data symbol
-    // Every whole symbol in the input is demodulated (trailing noise too; the
-    // frame codec finds the frame length). The last symbol's OFDM_WOLA_LEN(cp)
-    // fade-out samples are not a symbol, so they do not count towards one.
-    // payload_len >= 3 * sym_len > OFDM_WOLA_LEN(cp) (checked above).
-    size_t usable = payload_len - (size_t)OFDM_WOLA_LEN(cp);
-    int num_symbols = (int)((usable - (size_t)2 * sym_len) / sym_len);
+    // Data symbol s (0-based) is demodulated when its FFT window
+    // [(2+s) L + cp - b, (2+s) L + cp - b + N) lies inside the input, i.e.
+    // payload_len >= (3+s) L - b. Every such symbol is returned (trailing
+    // noise too; the frame codec finds the frame length). A buffer that ends
+    // exactly at the frame's last sample -- or up to b samples earlier, as
+    // after a late detection -- therefore yields all of the frame's symbols,
+    // and the cp/2 fade-out tail (< L - b) never adds a symbol.
+    // payload_len >= 3 * sym_len (checked above).
+    size_t b_off = (size_t)OFDM_TIMING_BACKOFF(cp);
+    int num_symbols = (int)((payload_len + b_off) / sym_len) - 2;
     if (num_symbols <= 0) {
         ret_code = SW_ERR_SYNC;
         goto cleanup;

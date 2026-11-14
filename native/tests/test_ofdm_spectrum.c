@@ -231,7 +231,8 @@ static void test_repetitive_payloads_decode(void) {
             CHECK(sw_ofdm_modulate(p[i], 64 * 8, cfg, tx, &n) == SW_OK);
             const size_t lead = 700;
             size_t L = (size_t)(256 + cps[c]);
-            size_t total = lead + n + L - 1;
+            size_t total = lead + n; // no trailing padding
+            (void)L;
             memcpy(rx + lead, tx, n * sizeof(float));
 
             size_t start = 0;

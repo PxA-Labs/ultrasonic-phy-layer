@@ -79,13 +79,8 @@ static float* modulate(const uint8_t* payload, size_t nbytes, sw_config_t cfg,
         free(samples);
         return NULL;
     }
-    // Trailing silence shorter than one symbol: the detector may place the
-    // frame start a few samples late, and only whole symbols are demodulated.
-    size_t pad = (size_t)(cfg.num_subcarriers + cfg.cp_length - 1);
-    if (len + pad <= MAX_SAMPLES) {
-        memset(samples + len, 0, pad * sizeof(float));
-        len += pad;
-    }
+    // No trailing padding: a buffer that ends at the frame's last sample
+    // yields every data symbol (and nothing after it).
     *out_len = len;
     return samples;
 }
@@ -242,7 +237,7 @@ static loopback_t loopback(int ofdm_modulation, int cp, int equalizer,
 
     size_t sym = (size_t)(cfg.num_subcarriers + cp);
     size_t frame_syms = tx_len / sym - 2;
-    size_t n = lead + (tx_len - drop) + sym - 1; // + trailing silence < 1 symbol
+    size_t n = lead + (tx_len - drop); // ends at the frame's last sample
     if (n > MAX_SAMPLES) goto done;
     memcpy(rx + lead, tx + drop, (tx_len - drop) * sizeof(float));
     if (noise > 0.0) {

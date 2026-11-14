@@ -180,13 +180,15 @@ static void test_ofdm_frame_buffer_negotiation(void) {
     cfg.modulation = 1;
     ofdm_init(&cfg);
 
-    int idx_d[256], idx_p[256], idx_n[256], nd = 0, np = 0, nn = 0;
-    ofdm_allocate_subcarriers(256, idx_d, idx_p, idx_n, &nd, &np, &nn);
+    ofdm_layout_t lay;
+    CHECK(ofdm_layout_from_config(&cfg, &lay) == SW_OK); // default 18-20 kHz band
+    int nd = lay.num_data, np = lay.num_pilots;
     CHECK(nd > 0 && np > 0);
     const size_t sym = 256 + 32;
+    const size_t tail = OFDM_WOLA_LEN(32); // last symbol's fade-out
     const size_t bits = 64 * 8;
     const size_t bps = (size_t)nd * 2;
-    const size_t total = (2 + (bits + bps - 1) / bps) * sym;
+    const size_t total = (2 + (bits + bps - 1) / bps) * sym + tail;
 
     uint8_t payload[64];
     for (int i = 0; i < 64; i++) payload[i] = (uint8_t)rng();
@@ -212,7 +214,7 @@ static void test_ofdm_frame_buffer_negotiation(void) {
     // No payload: just the two preamble symbols.
     len = total;
     CHECK(ofdm_modulate_frame(&cfg, payload, 0, out, &len) == SW_OK);
-    CHECK(len == 2 * sym);
+    CHECK(len == 2 * sym + tail);
 
     // Invalid configurations and arguments.
     ofdm_config_t bad = cfg;
