@@ -24,6 +24,7 @@
 #include "kiss_fft.h"
 #include <string.h>
 #include <limits.h>
+#include <float.h>
 #include <math.h>
 #include <stdlib.h>
 
@@ -180,6 +181,14 @@ static double refine_peak(const float* a, size_t n, size_t c, size_t W) {
         if (d < -0.5) d = -0.5;
     }
     return (double)k + d;
+}
+
+// double -> kiss_fft_scalar without overflow (huge but finite inputs would
+// otherwise be undefined behaviour on the narrowing conversion).
+static kiss_fft_scalar to_scalar(double v) {
+    if (v > (double)FLT_MAX) return (kiss_fft_scalar)FLT_MAX;
+    if (v < -(double)FLT_MAX) return (kiss_fft_scalar)(-FLT_MAX);
+    return (kiss_fft_scalar)v; // also NaN
 }
 
 static float clamp_rho(double v) {
@@ -363,8 +372,8 @@ uint8_t* css_demodulate(const float* samples, size_t len, sw_config cfg, size_t*
             double ph = fmod(fstep * pos, 1.0);
             double cr = cos(CSS_TWO_PI_D * ph), ci = -sin(CSS_TWO_PI_D * ph);
             double wr = vr * cr - vi * ci, wi = vr * ci + vi * cr;
-            in[m].r = (kiss_fft_scalar)(wr * ref[m].r - wi * ref[m].i);
-            in[m].i = (kiss_fft_scalar)(wr * ref[m].i + wi * ref[m].r);
+            in[m].r = to_scalar(wr * ref[m].r - wi * ref[m].i);
+            in[m].i = to_scalar(wr * ref[m].i + wi * ref[m].r);
         }
         kiss_fft(fft, in, Y);
         size_t k = 0;

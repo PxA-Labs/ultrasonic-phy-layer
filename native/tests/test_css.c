@@ -358,6 +358,98 @@ static void test_frequency_offset(void) {
     printf("PASS: frequency offset estimated from up/down chirps and removed\n");
 }
 
+// Argument checks, hostile configs and inputs: rejected or handled, never UB.
+static void test_edge_cases(void) {
+    css_geometry_t g;
+    sw_config_t c = css_cfg(8, 2000.0f);
+    CHECK(css_geometry(NULL, &g) != 0 && css_geometry(&c, NULL) != 0);
+    c.carrier_freq = NAN;
+    CHECK(css_geometry(&c, &g) != 0);
+    c = css_cfg(8, 2000.0f);
+    c.bandwidth = INFINITY;
+    CHECK(css_geometry(&c, &g) != 0);
+    c = css_cfg(8, 2000.0f);
+    c.amplitude = NAN;
+    CHECK(css_geometry(&c, &g) != 0);
+    c = css_cfg(8, 2000.0f);
+    c.sample_rate = 500; // below 1 kHz
+    CHECK(css_geometry(&c, &g) != 0);
+    c = css_cfg(8, 2000.0f);
+    c.bandwidth = 1e-30f; // absurd samples per chip
+    CHECK(css_geometry(&c, &g) != 0);
+    c = css_cfg(8, 2000.0f);
+    c.carrier_freq = 500.0f; // band would start below 0 Hz
+    CHECK(css_geometry(&c, &g) != 0);
+    sw_config_t z;
+    memset(&z, 0, sizeof z); // every default
+    CHECK(css_geometry(&z, &g) == 0 && g.sf == 8 && g.D == 22 && g.fc == 19000.0);
+    CHECK(fabs(g.amplitude - 0.8) < 1e-9);
+
+    CHECK(css_frame_samples(&g, SIZE_MAX) == 0); // would overflow
+    uint8_t one = 0xA5;
+    size_t cap = 0;
+    float dummy = 0.0f;
+    CHECK(sw_css_modulate(&one, SIZE_MAX, z, &dummy, &cap) == SW_ERR_BAD_PARAM);
+    sw_signal empty = css_modulate(NULL, 8, z);
+    CHECK(empty.data == NULL && empty.length == 0);
+    empty = css_modulate(&one, 0, z);
+    CHECK(empty.data == NULL);
+
+    // A clean frame for the receiver-side cases.
+    sw_signal f = css_modulate(&one, 8, z);
+    CHECK(f.data != NULL);
+    size_t lead = 3000, n = lead + f.length + 500;
+    float* x = (float*)calloc(n, sizeof(float));
+    CHECK(x != NULL);
+    memcpy(x + lead, f.data, f.length * sizeof(float));
+    css_sync_result_t r;
+    CHECK(css_detect_frame(NULL, n, &g, 3.0f, &r) == -1);
+    CHECK(css_detect_frame(x, n, NULL, 3.0f, &r) == -1);
+    CHECK(css_detect_frame(x, n, &g, 3.0f, NULL) == -1);
+    CHECK(css_detect_frame(x, ((size_t)1 << 27) + 1, &g, 3.0f, &r) == -1); // too long
+    CHECK(css_detect_frame(x, 10 * (size_t)g.N - 1, &g, 3.0f, &r) == 0);  // too short
+    // Threshold: default for NaN / <= 0, capped for huge values.
+    const float thr[] = {NAN, -1.0f, 0.0f, 1e30f, 0.5f};
+    for (int i = 0; i < 5; i++) {
+        CHECK(css_detect_frame(x, n, &g, thr[i], &r) == 1);
+        CHECK(fabs(r.start - (double)lead) < 1.0 && r.rho > 0.9f && isfinite(r.snr_db));
+    }
+    size_t ob = 1;
+    CHECK(css_demodulate(NULL, n, z, &ob) == NULL && ob == 0);
+    CHECK(css_demodulate(x, n, z, NULL) == NULL);
+    c = z;
+    c.sf = 4;
+    CHECK(css_demodulate(x, n, c, &ob) == NULL);
+    // The preamble alone (no data symbol) yields nothing to decode.
+    CHECK(css_demodulate(x, lead + 10 * (size_t)g.N, z, &ob) == NULL && ob == 0);
+
+    // Non-finite and huge samples are treated as 0 / clamped, not propagated.
+    x[lead + 10] = NAN;
+    x[lead + 20] = INFINITY;
+    x[lead + 30] = -INFINITY;
+    uint8_t* out = css_demodulate(x, n, z, &ob);
+    CHECK(out != NULL && ob >= 1 && out[0] == one);
+    free(out);
+    for (size_t i = 0; i < lead; i++) x[i] = (i % 2) ? 3e38f : -3e38f;
+    out = css_demodulate(x, n, z, &ob); // must not crash; result unspecified
+    free(out);
+    CHECK(css_detect_frame(x, n, &g, 3.0f, &r) >= 0);
+
+    // sync_detect_frame (mode 0) rejects a nonsense sample rate / SF.
+    sync_config_t sc;
+    memset(&sc, 0, sizeof sc);
+    sc.sample_rate = NAN; // falls back to 44.1 kHz
+    size_t st = 0;
+    float snr = 0.0f;
+    for (size_t i = 0; i < lead; i++) x[i] = 0.0f;
+    CHECK(sync_detect_frame(x, n, &sc, &st, &snr) == 1 && st == lead);
+    sc.sf = 3;
+    CHECK(sync_detect_frame(x, n, &sc, &st, &snr) == 0);
+    free(x);
+    free(f.data);
+    printf("PASS: CSS argument, config and input edge cases\n");
+}
+
 // Throughput table (computed from the geometry, printed for the docs).
 static void print_rates(void) {
     const float bws[] = {2000.0f, 4000.0f};
@@ -382,6 +474,7 @@ int main(void) {
     test_no_false_alarm();
     test_ber_per_sf();
     test_frequency_offset();
+    test_edge_cases();
     print_rates();
     printf("All CSS modulation & demodulation tests passed successfully!\n");
     return 0;
