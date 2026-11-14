@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../engine/frame_geometry.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../state/app_state.dart';
 import '../state/ui_preferences.dart';
@@ -102,24 +103,11 @@ class SettingsScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   SwitchListTile(
                     title: const Text('Enable Reed-Solomon Correction'),
-                    subtitle:
-                        const Text('Uses RS(255,223) error correction layer'),
+                    subtitle: const Text(
+                        'RS(255,223): 32 parity bytes, corrects up to 16 '
+                        'byte errors per frame'),
                     value: state.enableRs,
                     onChanged: (v) => state.setEnableRs(v),
-                  ),
-                  const Divider(),
-                  DropdownButtonFormField<double>(
-                    isExpanded: true,
-                    initialValue: state.codingRate,
-                    decoration: const InputDecoration(
-                        labelText: 'Convolutional Coding Rate'),
-                    items: const [
-                      DropdownMenuItem(
-                          value: 0.5, child: Text('Rate 1/2 (More Robust)')),
-                      DropdownMenuItem(
-                          value: 0.75, child: Text('Rate 3/4 (Higher Speed)')),
-                    ],
-                    onChanged: (v) => state.setCodingRate(v ?? 0.5),
                   ),
                 ],
               ),
@@ -299,6 +287,7 @@ class _CssSettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final g = state.cssGeometry;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -313,26 +302,18 @@ class _CssSettingsCard extends StatelessWidget {
               label: 'Spreading factor',
               child: Slider(
                 value: state.sf.toDouble(),
-                min: 7,
-                max: 12,
-                divisions: 5,
+                min: FrameGeometry.minSf.toDouble(),
+                max: FrameGeometry.maxSf.toDouble(),
+                divisions: FrameGeometry.maxSf - FrameGeometry.minSf,
                 label: 'SF ${state.sf}',
                 onChanged: (v) => state.setSf(v.toInt()),
               ),
             ),
-            const SizedBox(height: 12),
             Text(
-                'Chirp/Symbol Duration: ${(state.symbolDuration * 1000).toInt()} ms'),
-            Semantics(
-              label: 'Chirp symbol duration',
-              child: Slider(
-                value: state.symbolDuration,
-                min: 0.01,
-                max: 0.1,
-                divisions: 9,
-                label: '${(state.symbolDuration * 1000).toInt()} ms',
-                onChanged: (v) => state.setSymbolDuration(v),
-              ),
+              'Computed: ${(g.symbolSeconds * 1000).toStringAsFixed(1)} ms '
+              'per chirp, ${g.bitsPerSymbol} bits per chirp, '
+              '${g.rawBitRate.toStringAsFixed(1)} bit/s raw',
+              key: const Key('css_computed_rate'),
             ),
             const SizedBox(height: 12),
             TextFormField(

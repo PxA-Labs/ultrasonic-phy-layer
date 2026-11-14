@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:soundwave/dsp/constellation.dart';
 import 'package:soundwave/engine/arq.dart';
+import 'package:soundwave/engine/frame_geometry.dart';
 import 'package:soundwave/engine/link_receiver.dart';
 import 'package:soundwave/services/received_file_store.dart';
 import 'package:soundwave/engine/tx_engine.dart';
@@ -33,12 +34,10 @@ class AppState extends ChangeNotifier {
   int _numPilots = 8;
   double _carrierFreq = 19000.0;
   double _bandwidth = 2000.0;
-  double _symbolDuration = 0.02; // CSS symbol/chirp duration
   double _amplitude = 0.8;
   int _ofdmModulation = 1; // QPSK
   double _threshold = 3.0;
   int _equalizer = 0; // 0 = ZF, 1 = MMSE
-  double _codingRate = 0.5;
   bool _enableRs = true;
   double _volume = 0.8;
   bool _agcEnabled = true; // RX automatic gain control (#92)
@@ -94,12 +93,10 @@ class AppState extends ChangeNotifier {
     _configMap['num_pilots'] = _numPilots;
     _configMap['carrier_freq'] = _carrierFreq;
     _configMap['bandwidth'] = _bandwidth;
-    _configMap['symbol_duration'] = _symbolDuration;
     _configMap['amplitude'] = _amplitude;
     _configMap['ofdm_modulation'] = _ofdmModulation;
     _configMap['threshold'] = _threshold;
     _configMap['equalizer'] = _equalizer;
-    _configMap['coding_rate'] = _codingRate;
     _configMap['enable_rs'] = _enableRs;
     _configMap['volume'] = _volume;
     _configMap['agc_enabled'] = _agcEnabled;
@@ -283,12 +280,17 @@ class AppState extends ChangeNotifier {
   int get numPilots => _numPilots;
   double get carrierFreq => _carrierFreq;
   double get bandwidth => _bandwidth;
-  double get symbolDuration => _symbolDuration;
+  /// CSS waveform derived from the current SF / bandwidth / sample rate:
+  /// symbol duration 2^SF / B and SF bits per chirp (computed, not a knob).
+  FrameGeometry get cssGeometry =>
+      FrameGeometry.fromConfig({..._configMap, 'modulation': 0});
+
+  /// Duration of one CSS chirp symbol in seconds (computed from SF and B).
+  double get symbolDuration => cssGeometry.symbolSeconds;
   double get amplitude => _amplitude;
   int get ofdmModulation => _ofdmModulation;
   double get threshold => _threshold;
   int get equalizer => _equalizer;
-  double get codingRate => _codingRate;
   bool get enableRs => _enableRs;
   double get volume => _volume;
   bool get agcEnabled => _agcEnabled;
@@ -357,12 +359,10 @@ class AppState extends ChangeNotifier {
     _numPilots = v['num_pilots'] as int? ?? _numPilots;
     _carrierFreq = v['carrier_freq'] as double? ?? _carrierFreq;
     _bandwidth = v['bandwidth'] as double? ?? _bandwidth;
-    _symbolDuration = v['symbol_duration'] as double? ?? _symbolDuration;
     _amplitude = v['amplitude'] as double? ?? _amplitude;
     _ofdmModulation = v['ofdm_modulation'] as int? ?? _ofdmModulation;
     _threshold = v['threshold'] as double? ?? _threshold;
     _equalizer = v['equalizer'] as int? ?? _equalizer;
-    _codingRate = v['coding_rate'] as double? ?? _codingRate;
     _enableRs = v['enable_rs'] as bool? ?? _enableRs;
     _volume = v['volume'] as double? ?? _volume;
     _agcEnabled = v['agc_enabled'] as bool? ?? _agcEnabled;
@@ -432,11 +432,6 @@ class AppState extends ChangeNotifier {
     _updateConfigField('bandwidth', v);
   }
 
-  void setSymbolDuration(double v) {
-    _symbolDuration = v;
-    _updateConfigField('symbol_duration', v);
-  }
-
   void setAmplitude(double v) {
     _amplitude = v;
     _updateConfigField('amplitude', v);
@@ -455,11 +450,6 @@ class AppState extends ChangeNotifier {
   void setEqualizer(int v) {
     _equalizer = v;
     _updateConfigField('equalizer', v);
-  }
-
-  void setCodingRate(double v) {
-    _codingRate = v;
-    _updateConfigField('coding_rate', v);
   }
 
   void setEnableRs(bool v) {
@@ -615,7 +605,7 @@ class AppState extends ChangeNotifier {
     final samples = TestToneGenerator.generateChirp(
       _carrierFreq - _bandwidth / 2,
       _carrierFreq + _bandwidth / 2,
-      _symbolDuration,
+      symbolDuration,
       _sampleRate.toDouble(),
     );
     await _audio.enqueueForPlayback(samples);
@@ -667,14 +657,12 @@ class AppState extends ChangeNotifier {
         _cpLength = 64;
         _carrierFreq = 19000.0;
         _bandwidth = 2000.0;
-        _symbolDuration = 0.02;
         break;
       case 'long_range':
         _mode = 0;
-        _sf = 12;
+        _sf = FrameGeometry.maxSf; // 0.51 s chirps, ~20 bit/s at 2 kHz
         _carrierFreq = 18000.0;
-        _bandwidth = 1000.0;
-        _symbolDuration = 0.05;
+        _bandwidth = 2000.0;
         break;
       case 'high_speed':
         _mode = 1;
