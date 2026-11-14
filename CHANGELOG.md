@@ -60,6 +60,7 @@ All notable changes to this project will be documented in this file.
 - **fec,packet:** Make FEC round-trip and enforce packet length limits (#28)
 - **sync:** Zero-initialise analytic buffers in CFO estimator (#28)
 - **ofdm:** Compute 1/SNR without dividing by zero for silent pilots (#28)
+- **app:** Do not return a Future from setState in the storage card
 
 ### Build
 
@@ -142,6 +143,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -171,6 +173,7 @@ All notable changes to this project will be documented in this file.
 - **settings:** Persist modem settings, add BPSK/QPSK selector, fix CP options (#88)
 - **agc:** Native automatic gain control with FFI API (#92)
 - **app:** Apply AGC in the RX pipeline with settings toggle and gain readout (#92)
+- **app:** WAV recording, signal import/demodulation and message export (#33)
 
 ### Maintenance
 
