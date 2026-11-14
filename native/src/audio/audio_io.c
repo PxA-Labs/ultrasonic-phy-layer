@@ -1,5 +1,15 @@
 // Audio I/O using miniaudio: capture, playback, ring buffer, device enumeration.
 
+#if defined(__ANDROID__)
+// Android (issue #87): only build the AAudio and OpenSL ES backends. miniaudio
+// tries them in that order, so AAudio is used on API 26+ (both are dlopen()ed
+// at runtime) and OpenSL ES is the fallback on older devices or when AAudio
+// fails to open a stream.
+#define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
+#define MA_ENABLE_AAUDIO
+#define MA_ENABLE_OPENSL
+#endif
+
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 
@@ -138,6 +148,19 @@ static ma_result get_device_id_by_index(ma_device_type type, int index, ma_devic
 
 // --- Public Control Functions ---
 
+// Low-latency settings shared by capture and playback. On Android this also
+// selects the "unprocessed" input preset: the default voice presets run AGC,
+// noise suppression and low-pass filtering that remove the ultrasonic band.
+static void sw_apply_low_latency(ma_device_config* config) {
+    config->performanceProfile = ma_performance_profile_low_latency;
+#if defined(__ANDROID__)
+    config->aaudio.usage = ma_aaudio_usage_media;
+    config->aaudio.contentType = ma_aaudio_content_type_sonification;
+    config->aaudio.inputPreset = ma_aaudio_input_preset_unprocessed;
+    config->opensl.recordingPreset = ma_opensl_recording_preset_voice_unprocessed;
+#endif
+}
+
 int audio_capture_start(audio_capture_t** cap, int sample_rate,
                         int device_id, ring_buffer_t* rb) {
     if (!cap || !rb) return SW_ERR_BAD_PARAM;
@@ -154,6 +177,7 @@ int audio_capture_start(audio_capture_t** cap, int sample_rate,
     config.sampleRate = sample_rate;
     config.pUserData = c;
     config.dataCallback = capture_callback;
+    sw_apply_low_latency(&config);
 
     ma_device_id dev_id;
     if (device_id >= 0) {
@@ -221,6 +245,7 @@ int audio_playback_start(audio_playback_t** play, int sample_rate,
     config.sampleRate = sample_rate;
     config.pUserData = p;
     config.dataCallback = playback_callback;
+    sw_apply_low_latency(&config);
 
     ma_device_id dev_id;
     if (device_id >= 0) {
