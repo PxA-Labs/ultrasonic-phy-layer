@@ -64,6 +64,17 @@ All notable changes to this project will be documented in this file.
 - **android:** Import Properties in app build script
 - **ci:** Gate Android signature check on apksigner exit status, not cert wording
 - **ci:** Pin macOS build to Flutter 3.50.0 to avoid 3.47 gen_snapshot crash
+- **ci:** Resolve libunwind conflict on ubuntu-22.04 desktop builds
+- **linux:** Avoid SIGPIPE false failure when checking .deb contents
+- **release:** Checksum and publish a flattened asset set
+- **ci:** Pin Flutter 3.50.0 to avoid macOS AOT snapshotter crash
+- **ci:** Pin Flutter 3.50.0 only for macOS desktop jobs
+- **android:** Import Properties in app build script
+- **ci:** Gate Android signature check on apksigner exit status, not cert wording
+- **ci:** Pin macOS build to Flutter 3.50.0 to avoid 3.47 gen_snapshot crash
+- **android:** Import Properties in app build script
+- **ci:** Gate Android signature check on apksigner exit status, not cert wording
+- **ci:** Pin macOS build to Flutter 3.50.0 to avoid 3.47 gen_snapshot crash
 
 ### Build
 
@@ -82,6 +93,8 @@ All notable changes to this project will be documented in this file.
 - **workflow:** Add auto-formatting and auto-commit step to CI for Dart files
 - Remove redundant auto-format and auto-commit steps in ci.yml
 - Add sanitizer, libFuzzer and static-analysis jobs; document workflow (#28)
+- **build:** Produce debug/split release APKs and AAB with packaged .so checks
+- **build:** Produce debug/split release APKs and AAB with packaged .so checks
 - **build:** Produce debug/split release APKs and AAB with packaged .so checks
 
 ### Documentation
@@ -149,6 +162,9 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
+- **ci:** Document desktop packaging, signing secrets and dry-run releases
+- **ci:** Note the macOS Flutter pin
 
 ### Features
 
@@ -181,6 +197,12 @@ All notable changes to this project will be documented in this file.
 - **app:** WAV recording, signal import/demodulation and message export (#33)
 - **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
 - **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
+- **desktop:** Bundle libsoundwave and package Windows/macOS/Linux builds
+- **release:** Sign, package and checksum desktop builds with dry-run mode
+- **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
+- **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
+- **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
+- **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
 
 ### Maintenance
 
@@ -208,5 +230,9 @@ All notable changes to this project will be documented in this file.
 - **app:** Fix ProviderNotFound, CSV csv contains format, closeTo tolerance, and ServicesBinding in tests
 - **native:** Real TX->audio->RX loopback tests, run in CI against this commit's DSP (#88)
 - **native:** Memory-safety regression suite and ASan canaries (#28)
+
+### Merge
+
+- Android NDK branch into desktop pipeline (stack on #124)
 
 
