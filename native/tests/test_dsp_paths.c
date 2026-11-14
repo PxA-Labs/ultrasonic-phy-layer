@@ -241,8 +241,12 @@ static void test_ofdm_frame_buffer_negotiation(void) {
 // defaults: 18 kHz, 4 kHz sweep, 44.1 kHz, 882-sample (20 ms) symbols. A
 // zeroed sync config must fall back to exactly these values.
 static void test_css_sync_defaults(void) {
+    // The buffer extends well past the preamble, as a live capture with a
+    // frame body does. (sync_detect_frame only computes matched-filter power
+    // for the first len - 10N lags, so a preamble near the end of a short
+    // buffer is scored on fewer than its 10 chirps.)
     const size_t N = 882, offset = 1500;
-    const size_t len = offset + 10 * N + 3000;
+    const size_t len = offset + 20 * N + 3000;
     sw_signal up = css_generate_chirp(18000.0, 4000.0, (double)N / 44100.0, 0.8, 0.0,
                                       44100.0);
     sw_signal down = css_generate_chirp(18000.0, -4000.0, (double)N / 44100.0, 0.8,

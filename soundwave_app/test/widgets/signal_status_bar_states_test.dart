@@ -140,8 +140,7 @@ void main() {
       expect(find.byKey(const Key('agc_gain_readout')), findsNothing);
     });
 
-    testWidgets('reduce motion: the status dot does not pulse',
-        (tester) async {
+    testWidgets('reduce motion: the status dot does not pulse', (tester) async {
       final m = SignalMetrics(connectionState: ModemLinkState.listening);
       await pumpBar(tester, m, reduceMotion: true);
       // With animations disabled nothing is scheduled, so the tree settles.
