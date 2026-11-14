@@ -10,27 +10,25 @@ This page lists what the modulators **actually generate** on the current code, a
 
 ## CSS (chirp) mode
 
-**Implementation (derived from code).** `sw_css_modulate` sends one bit per chirp. Bit `0` is an up-chirp and bit `1` is a down-chirp, MSB first. Every frame starts with a preamble of 8 up-chirps followed by 2 down-chirps. A chirp of duration $T$ and amplitude $A$ is
+**Implementation (derived from code).** `sw_css_modulate` sends LoRa-style chirp symbols: each data symbol is the base up-chirp cyclically shifted by $k$ chips, $k < M = 2^{SF}$, so **one chirp carries SF bits** (Gray mapped, MSB first). The band is `carrier_freq` ± $B/2$, where $B = f_s / D$ and $D = \operatorname{round}(f_s / \text{bandwidth})$ samples per chip. A symbol lasts $T = M/B$ ($N = MD$ samples). Every frame starts with 8 base up-chirps and 2 down-chirps; data are up-chirps only. `symbol_duration` is not used by CSS. Formulas, the receiver and the reasons for the SF range are in [Mathematical model §2.1](../MATHEMATICAL_MODEL.md#21-chirp-spread-spectrum-css).
 
-$$s(t) = A\cos\!\left(2\pi\left(f_0 + \tfrac{B}{2T}t\right)t\right),\qquad 0 \le t < T,$$
+| Configuration | $f_c$ / bandwidth / SF | Occupied band | Samples per chirp (44.1 kHz) | Chirp duration | Raw bit rate |
+|---|---|---|---|---|---|
+| Default (app and CLI) | 19 kHz / 2 kHz / 8 | 18.0–20.0 kHz | 5632 | 127.7 ms | 62.6 bit/s |
+| App preset *Long Range* | 18 kHz / 2 kHz / 10 | 17.0–19.0 kHz | 22528 | 510.8 ms | 19.6 bit/s |
+| 4 kHz band, SF6 (fastest) | 19 kHz / 4 kHz / 6 | 17.0–21.0 kHz | 704 | 16.0 ms | 375.9 bit/s |
+| 4 kHz band, SF7 | 19 kHz / 4 kHz / 7 | 17.0–21.0 kHz | 1408 | 31.9 ms | 219.2 bit/s |
 
-with $B>0$ for an up-chirp ($f_0 \to f_0+B$) and $B<0$ for a down-chirp ($f_0 \to f_0-|B|$). The configured `carrier_freq` is the **start** frequency $f_0$, not the centre. The signal therefore spans $[f_0-B,\ f_0+B]$.
-
-The `sf` (spreading factor) field is validated (6..12) but is **not used** by the `sw_css_modulate` / `sw_css_demodulate` path. Only `symbol_duration`, `carrier_freq`, `bandwidth`, `amplitude` and `sample_rate` affect the waveform.
-
-| Configuration | $f_0$ / $B$ / $T$ | Occupied band | Samples per chirp (44.1 kHz) | Raw bit rate |
-|---|---|---|---|---|
-| Default (app and CLI) | 19 kHz / 2 kHz / 20 ms | 17–21 kHz | 882 | 50 bit/s |
-| App preset *Long Range* | 18 kHz / 1 kHz / 50 ms | 17–19 kHz | 2205 | 20 bit/s |
+All rates are derived from the formulas (raw rate $= SF \cdot B / M$, before preamble and FEC), not measured. Before this change CSS sent one bit per 20 ms chirp (50 bit/s) whatever `sf` was set to; see the [SF table](../MATHEMATICAL_MODEL.md#215-valid-sf-range-computed-441-khz) for every SF at 2 and 4 kHz.
 
 Airtime (derived) for the app frame format (`CRC 4 B + payload + RS 32 B`, plus the 10-chirp preamble):
 
-| Payload | Frame bytes | Default (20 ms) | Long Range (50 ms) |
-|---|---|---|---|
-| 2 B | 38 | 6.3 s | 15.7 s |
-| 219 B (maximum) | 255 | 41.0 s | 102.5 s |
+| Payload | Frame bytes | Default (SF8, 2 kHz) | Long Range (SF10, 2 kHz) | SF6, 4 kHz | SF7, 4 kHz |
+|---|---|---|---|---|---|
+| 2 B | 38 | 6.1 s | 20.9 s | 1.0 s | 1.7 s |
+| 219 B (maximum) | 255 | 33.8 s | 109.3 s | 5.6 s | 9.6 s |
 
-Note that the 17–18 kHz part of the default band is audible to many people.
+Note that the lower part of a 17–21 kHz band is audible to many people.
 
 ## OFDM mode
 
@@ -57,9 +55,9 @@ All values are at $f_s$ = 44.1 kHz. Raw rates are PHY symbol rates before CRC, R
 ## Receiver chain (both modes)
 
 1. **AGC** (optional, app default on): target RMS 0.25, attack 1 ms, release 100 ms, gain range −20 to +32 dB ([math §6](../MATHEMATICAL_MODEL.md#6-automatic-gain-control-agc)).
-2. **Frame detection** (`sw_detect_frame`): CSS uses a matched filter on the 8-up/2-down preamble pattern. OFDM uses the repeated ZC preamble.
+2. **Frame detection** (`sw_detect_frame`): CSS converts to complex baseband and scores every lag on all 10 preamble chirps with normalised up-/down-chirp correlations over the whole buffer; the first preamble wins, and the up/down peak split gives fractional timing and the frequency offset ([math §3.1](../MATHEMATICAL_MODEL.md#31-css-preamble-detection)). OFDM uses the repeated ZC preamble.
 3. **CFO**: Schmidl-Cox on the two repeated preamble symbols (OFDM), computed on the analytic signal.
-4. **OFDM only**: the FFT window backs off $\lfloor N_{cp}/4\rfloor$ samples into the CP. Then a least-squares channel estimate from the preamble, a noise-variance estimate, and ZF or MMSE equalization.
+4. **CSS**: dechirp each symbol at the chip rate and take the $2^{SF}$-point FFT peak (Gray demapping). **OFDM**: the FFT window backs off $\lfloor N_{cp}/4\rfloor$ samples into the CP. Then a least-squares channel estimate from the preamble, a noise-variance estimate, and ZF or MMSE equalization.
 5. **Demapping** to bits, then in the app `FrameCodec.decode`: RS(255,223) decoding (up to 16 byte errors) and CRC-32 verification.
 
 ## What has been verified, and how
@@ -68,6 +66,7 @@ All values are at $f_s$ = 44.1 kHz. Raw rates are PHY symbol rates before CRC, R
 |---|---|---|
 | CSS and OFDM loopback decode correctly | `native/tests/test_e2e.c`, `integration_loopback.c`, Flutter `test/native/loopback_test.dart` | Simulation (digital loopback) |
 | CSS BER < 10⁻³ for SNR ≥ 3 dB; OFDM BER < 10⁻² for SNR ≥ 10 dB | `native/tests/test_ber.c` assertions (8-byte payloads, AWGN over the whole frame) | Simulation |
+| CSS BER ≤ 0.5 % for every SF 6..10 at −7 dB full-band SNR (≈ +3.4 dB in a 2 kHz band); sync after 0 / 37 ms / 1 s of silence, noise or CSS data; preamble-like payloads; ±1 bin frequency offset | `native/tests/test_css.c` | Simulation |
 | Noiseless OFDM loopback EVM < 1 % | `native/tests/test_constellation.c` | Simulation |
 | AGC settles within ±0.11 dB for inputs −30 to +10 dB around target | `native/tests/test_agc.c` | Simulation |
 | BER < 10⁻⁵ at 10 dB SNR, range ≥ 5 m | [PRD](../PRD.md) | **Target, not yet tested** |

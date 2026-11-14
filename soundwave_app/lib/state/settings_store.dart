@@ -7,6 +7,7 @@
 // before it reaches the native DSP layer.
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:soundwave/engine/frame_geometry.dart';
 
 abstract class SettingsStore {
   Future<Map<String, Object>> load();
@@ -135,7 +136,8 @@ class ModemSettingsSchema {
     intIn('sample_rate', (v) => v >= 8000 && v <= 192000);
     final nyquist = ((out['sample_rate'] as int?) ?? 44100) / 2;
     intIn('modulation', (v) => v == 0 || v == 1);
-    intIn('sf', (v) => v >= 6 && v <= 12);
+    // CSS spreading factors the modem supports (native CSS_MIN/MAX_SF).
+    intIn('sf', (v) => v >= FrameGeometry.minSf && v <= FrameGeometry.maxSf);
     intIn('num_subcarriers', subcarrierOptions.contains);
     final n = (out['num_subcarriers'] as int?) ?? 256;
     intIn('cp_length', (v) => v > 0 && v <= n);
@@ -144,10 +146,8 @@ class ModemSettingsSchema {
     intIn('equalizer', (v) => v == 0 || v == 1);
     doubleIn('carrier_freq', (v) => v > 0 && v <= nyquist);
     doubleIn('bandwidth', (v) => v > 0 && v <= nyquist);
-    doubleIn('symbol_duration', (v) => v > 0 && v <= 1.0);
     doubleIn('amplitude', (v) => v >= 0 && v <= 1.0);
     doubleIn('threshold', (v) => v > 0 && v <= 100);
-    doubleIn('coding_rate', (v) => v > 0 && v <= 1.0);
     doubleIn('volume', (v) => v >= 0 && v <= 1.0);
     if (raw['enable_rs'] is bool) out['enable_rs'] = raw['enable_rs']!;
     if (raw['agc_enabled'] is bool) out['agc_enabled'] = raw['agc_enabled']!;

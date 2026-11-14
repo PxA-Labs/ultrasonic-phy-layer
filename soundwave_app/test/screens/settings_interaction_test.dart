@@ -59,16 +59,16 @@ void main() {
     expect(state.carrierFreq, 19000.0);
   });
 
-  testWidgets('FEC switch and coding rate', (tester) async {
+  testWidgets('FEC switch; no coding-rate knob', (tester) async {
     await pumpSettings(tester);
     expect(state.enableRs, isTrue);
     await tester.tap(find.text('Enable Reed-Solomon Correction'));
     await tester.pumpAndSettle();
     expect(state.enableRs, isFalse);
     expect(state.configMap['enable_rs'], isFalse);
-
-    await choose(tester, 'Rate 1/2 (More Robust)', 'Rate 3/4 (Higher Speed)');
-    expect(state.codingRate, 0.75);
+    // The FEC is a fixed RS(255,223); a rate selector would do nothing.
+    expect(find.textContaining('Rate 1/2'), findsNothing);
+    expect(state.configMap.containsKey('coding_rate'), isFalse);
   });
 
   testWidgets('carrier and bandwidth fields parse, or fall back on garbage',
@@ -85,24 +85,26 @@ void main() {
     expect(state.bandwidth, 2000.0);
   });
 
-  testWidgets('CSS sliders set SF and chirp duration', (tester) async {
+  testWidgets('CSS SF slider sets SF; chirp duration is computed',
+      (tester) async {
     await pumpSettings(tester);
     final sf = sliderWhere((s) => s.label?.startsWith('SF ') ?? false);
-    final duration = sliderWhere((s) => s.min == 0.01);
+    // Only the SF slider: the chirp duration follows from SF and bandwidth.
+    expect(sliderWhere((s) => s.min == 0.01), findsNothing);
     await tester.drag(sf, const Offset(2000, 0));
     await tester.pumpAndSettle();
-    expect(state.sf, 12);
-    expect(find.text('Spreading Factor (SF): 12'), findsOneWidget);
+    expect(state.sf, 10);
+    expect(find.text('Spreading Factor (SF): 10'), findsOneWidget);
+    // SF10 @ 2 kHz: 1024 chips x 22 samples = 510.8 ms, 19.6 bit/s.
+    expect(state.symbolDuration, closeTo(1024 * 22 / 44100, 1e-9));
+    expect(find.textContaining('510.8 ms per chirp, 10 bits per chirp'),
+        findsOneWidget);
 
     await tester.drag(sf, const Offset(-2000, 0));
     await tester.pumpAndSettle();
-    expect(state.sf, 7);
-
-    final before = state.symbolDuration;
-    await tester.drag(duration, const Offset(2000, 0));
-    await tester.pumpAndSettle();
-    expect(state.symbolDuration, greaterThan(before));
-    expect(state.configMap['symbol_duration'], state.symbolDuration);
+    expect(state.sf, 6);
+    expect(find.textContaining('6 bits per chirp, 187.9 bit/s raw'),
+        findsOneWidget);
   });
 
   testWidgets('OFDM dropdowns and equaliser', (tester) async {

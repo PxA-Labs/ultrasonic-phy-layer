@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
+#include <string.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -100,6 +101,7 @@ int main(void) {
 
     // Test full CSS modulate API and preamble
     sw_config_t sw_cfg;
+    memset(&sw_cfg, 0, sizeof sw_cfg);
     sw_cfg.sample_rate = 44100;
     sw_cfg.sf = 8;
     sw_cfg.carrier_freq = 18000.0f;
@@ -108,17 +110,29 @@ int main(void) {
     sw_cfg.amplitude = 0.8f;
 
     uint8_t bits[4] = {0x12, 0x34, 0x56, 0x78};
-    // 4 bits modulated -> 10 preamble chirps (10ms each) + 4 data symbols (20ms each)
+    // 4 bits at SF8 -> 10 preamble chirps + ceil(4 / 8) = 1 data symbol of
+    // 2^8 chips x round(44100 / 2000) = 22 samples per chip.
     sw_signal mod_sig = css_modulate(bits, 4, sw_cfg);
     assert(mod_sig.data != NULL);
-    
-    size_t expected_preamble_len = 10 * (size_t)(sw_cfg.symbol_duration * sw_cfg.sample_rate + 0.5f);
-    size_t expected_data_len = 4 * (size_t)(sw_cfg.symbol_duration * sw_cfg.sample_rate + 0.5f);
-    printf("mod_sig.length = %zu, expected = %zu\n", mod_sig.length, expected_preamble_len + expected_data_len);
-    assert(mod_sig.length == expected_preamble_len + expected_data_len);
+    size_t sym_len = 256 * 22;
+    printf("mod_sig.length = %zu, expected = %zu\n", mod_sig.length, 11 * sym_len);
+    assert(mod_sig.length == 11 * sym_len);
+    free(mod_sig.data);
+
+    // Each symbol carries SF bits: 32 bits -> ceil(32 / SF) symbols.
+    for (int sf = 6; sf <= 10; sf++) {
+        sw_cfg.sf = sf;
+        mod_sig = css_modulate(bits, 32, sw_cfg);
+        assert(mod_sig.data != NULL);
+        size_t n_sym = (size_t)((32 + sf - 1) / sf);
+        assert(mod_sig.length == (10 + n_sym) * (size_t)(1 << sf) * 22);
+        free(mod_sig.data);
+    }
+    sw_cfg.sf = 12; // outside the supported 6..10
+    mod_sig = css_modulate(bits, 32, sw_cfg);
+    assert(mod_sig.data == NULL && mod_sig.length == 0);
     printf("PASS: CSS full modulation and preamble length verified.\n");
 
-    free(mod_sig.data);
     printf("All test_modulator tests passed successfully.\n");
     return 0;
 }

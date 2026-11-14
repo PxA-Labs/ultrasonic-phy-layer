@@ -54,7 +54,7 @@ static void test_config_validation_table(void) {
     CHECK(sw_config_validate(c) == SW_OK);
     c = ok; c.sample_rate = 192000;                CHECK(sw_config_validate(c) == SW_OK);
     c = ok; c.sf = 6;                              CHECK(sw_config_validate(c) == SW_OK);
-    c = ok; c.sf = 12;                             CHECK(sw_config_validate(c) == SW_OK);
+    c = ok; c.sf = 10;                             CHECK(sw_config_validate(c) == SW_OK);
     c = ok; c.num_subcarriers = 16; c.cp_length = 16; c.num_pilots = 8;
     CHECK(sw_config_validate(c) == SW_OK);
     c = ok; c.num_subcarriers = 4096;              CHECK(sw_config_validate(c) == SW_OK);
@@ -97,7 +97,13 @@ static void test_config_validation_table(void) {
     REJECT(amplitude, 1.01f);
     REJECT(amplitude, -0.1f);
     REJECT(sf, 5);
+    REJECT(sf, 11); // CSS supports SF 6..10 (MATHEMATICAL_MODEL.md 2.1)
     REJECT(sf, 13);
+    // CSS only: the chirp band must fit below Nyquist and a symbol in 1 s.
+    c = cfg_for(0); c.carrier_freq = 21500.0f;     CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
+    c = cfg_for(0); c.sf = 10; c.bandwidth = 500.0f;
+    CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
+    c.modulation = 1;                              CHECK(sw_config_validate(c) == SW_OK);
     REJECT(num_subcarriers, 100);  // not a power of two
     REJECT(num_subcarriers, 8);    // too small
     REJECT(num_subcarriers, 8192); // too large

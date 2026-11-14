@@ -35,12 +35,12 @@ There are **no field measurements yet**. Every number below is labeled with its 
 - **Simulated**: from CI tests with software AWGN.
 - **Target**: a [PRD](docs/PRD.md) goal that has not been verified.
 
-| Quantity | CSS (default) | OFDM (default N=256, CP=64, QPSK) | Source |
+| Quantity | CSS (default SF8, 2 kHz) | OFDM (default N=256, CP=64, QPSK) | Source |
 |---|---|---|---|
-| Occupied band | 17–21 kHz (start freq 19 kHz, ±2 kHz up/down chirps) | ≈ 5.7–21.9 kHz (**audible**; the band is set by N, not by `carrier_freq`) | Derived |
-| Raw PHY bit rate | 50 bit/s (one bit per 20 ms chirp) | 22.9 kbit/s | Derived |
-| Airtime, largest single frame (219 B payload) | 41 s | 0.11 s | Derived |
-| BER under AWGN | < 10⁻³ at ≥ 3 dB SNR | < 10⁻² at ≥ 10 dB SNR | Simulated (`native/tests/test_ber.c`) |
+| Occupied band | 18–20 kHz (centre 19 kHz ± 1 kHz) | ≈ 5.7–21.9 kHz (**audible**; the band is set by N, not by `carrier_freq`) | Derived |
+| Raw PHY bit rate | 62.6 bit/s (8 bits per 127.7 ms chirp); 19.6–375.9 bit/s over SF 10..6 and 2–4 kHz | 22.9 kbit/s | Derived |
+| Airtime, largest single frame (219 B payload) | 33.8 s (5.6 s at SF6, 4 kHz) | 0.11 s | Derived |
+| BER under AWGN | < 10⁻³ at ≥ 3 dB SNR; ≤ 0.5 % at −7 dB for every SF | < 10⁻² at ≥ 10 dB SNR | Simulated (`native/tests/test_ber.c`, `test_css.c`) |
 | Noiseless loopback EVM | n/a | < 1 % | Simulated (`native/tests/test_constellation.c`) |
 | Error rate in the field | BER < 10⁻⁵ at 10 dB SNR | same | Target, untested |
 | Range | ≥ 5 m at ≤ 80 dB SPL @ 1 m | same | Target, untested |
