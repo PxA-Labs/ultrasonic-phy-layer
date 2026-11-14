@@ -56,9 +56,19 @@ All values are **computed** from the code at $f_s$ = 44.1 kHz (not measured). Ra
 
 **Transmit spectrum (simulated, `native/tests/test_ofdm_spectrum.c`).** Periodogram of a 46-byte frame (CRC + 10-byte payload + RS parity), QPSK. The test requires ≥ 98.5 % of the energy inside the configured band and ≤ −40 dB below 16 kHz. The ~1 % outside the band is the main lobe of the outermost subcarriers, within a few hundred hertz of the band edges.
 
-SPECTRUM_TABLE
+| $N$ / CP, band | Energy in band | Energy below 16 kHz | Energy below 17 kHz | Peak sample |
+|---|---|---|---|---|
+| 256 / 32, 18–20 kHz | 98.69 % | −44.7 dB | −33.8 dB | 1.11 |
+| 256 / 64, 18–20 kHz (default) | 98.99 % | −53.9 dB | −44.4 dB | 1.11 |
+| 512 / 64, 18–20 kHz | 99.17 % | −46.5 dB | −42.1 dB | 1.06 |
+| 1024 / 128, 18–20 kHz | 99.20 % | −42.3 dB | −39.2 dB | 1.10 |
+| 2048 / 128, 18–20 kHz | 99.49 % | −47.8 dB | −44.4 dB | 2.16 |
+| 256 / 64, 18–21 kHz | 99.39 % | −43.0 dB | −39.2 dB | 1.41 |
+| 2048 / 128, 18–21 kHz (*High Speed*) | 99.40 % | −56.2 dB | −49.9 dB | 2.47 |
 
-Before this change the OFDM modulator ignored `carrier_freq` and `bandwidth` and spread energy over 5.7–21.9 kHz (N = 256): only about 11–15 % of the energy fell in 18–20 kHz and about −2 dB (≈ 60 %) was below 16 kHz (pure-Python model of the old modulator, same frame).
+Before this change the OFDM modulator ignored `carrier_freq` and `bandwidth` and spread energy over 5.7–21.9 kHz (N = 256): only about 11–15 % of the energy fell in 18–20 kHz and about −2 dB (≈ 60 %) was below 16 kHz (pure-Python model of the old modulator, same frame; peak samples 7–19).
+
+The modulator output is not normalised: the peak values above exceed full scale for N = 2048, and the app plays the samples unscaled (`soundwave-cli` rescales to 0.8 before writing a WAV).
 
 !!! warning "Not measured over the air"
     The band plan and spectrum are exact properties of the transmitted samples. Whether a given speaker and microphone pass 18–20 kHz, and what SNR they achieve there, has not been measured; see the [field test plan](../testing/FIELD_TEST_PLAN.md). Many devices roll off above 18–20 kHz, which is why the default band stops at 20 kHz.
