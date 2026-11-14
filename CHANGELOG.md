@@ -48,10 +48,23 @@ All notable changes to this project will be documented in this file.
 - **test:** Scroll ListView in dashboard_test to bring message log into view
 - **ui:** Prevent notifyListeners calls after AppState is disposed
 - **test:** Implement updateConfig in MockAudioService
+- **ci:** Add Flutter platform projects and repair Build/Release workflows
+- **ci:** Align CI Flutter with platform templates and upgrade record to v7
+- **ci:** Install GStreamer for Linux and silence STL1011 on Windows builds
+- **sync:** Normalised, energy-gated Schmidl-Cox metric for OFDM frame timing (#88)
+- **ffi:** Send all frame bits and size modulator buffers by the API's overflow protocol (#88)
+- **api,rs:** Validate sw_config_t at the FFI boundary; decode RS with explicit parity (#28)
+- **sync:** Bounds-check CFO estimation, timing metric and matched filter (#28)
+- **css:** Derive symbol length from the chirp template; remove debug print (#28)
+- **ofdm:** Guard short inputs, unchecked allocations and failed frame writes (#28)
+- **fec,packet:** Make FEC round-trip and enforce packet length limits (#28)
+- **sync:** Zero-initialise analytic buffers in CFO estimator (#28)
+- **ofdm:** Compute 1/SNR without dividing by zero for silent pilots (#28)
 
 ### Build
 
 - Ignore AGENTS.md for local agent configuration
+- **native:** ASan/UBSan/libFuzzer options and property-based fuzz harnesses (#28)
 
 ### CI
 
@@ -64,6 +77,7 @@ All notable changes to this project will be documented in this file.
 - Fix invalid GitHub action major versions in workflow files
 - **workflow:** Add auto-formatting and auto-commit step to CI for Dart files
 - Remove redundant auto-format and auto-commit steps in ci.yml
+- Add sanitizer, libFuzzer and static-analysis jobs; document workflow (#28)
 
 ### Documentation
 
@@ -127,6 +141,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -152,11 +167,20 @@ All notable changes to this project will be documented in this file.
 - **ui:** Implement Dashboard, Signal Monitor, and Settings screens (#30)
 - **ui:** Dynamic config settings propagation and OpenSSF secure bounds checks
 - **ui:** Implement throughput meter, SNR display & connection status widget (#90)
+- **engine:** Config-driven RX pipeline with shared frame codec for CSS and OFDM (#88)
+- **settings:** Persist modem settings, add BPSK/QPSK selector, fix CP options (#88)
+- **agc:** Native automatic gain control with FFI API (#92)
+- **app:** Apply AGC in the RX pipeline with settings toggle and gain readout (#92)
 
 ### Maintenance
 
 - Change license from MIT to Apache 2.0
 - Merge main into feat/ci-benchmarking
+- Land stacked PRs #118, #120, #121 and #119 (#122)
+
+### Performance
+
+- **sync:** FFT overlap-save correlation for CSS sync; replay fuzz regressions in CTest (#28)
 
 ### Styling
 
@@ -172,5 +196,7 @@ All notable changes to this project will be documented in this file.
 
 - **qa:** Implement AWGN channel simulator and BER benchmarking harness (#72)
 - **app:** Fix ProviderNotFound, CSV csv contains format, closeTo tolerance, and ServicesBinding in tests
+- **native:** Real TX->audio->RX loopback tests, run in CI against this commit's DSP (#88)
+- **native:** Memory-safety regression suite and ASan canaries (#28)
 
 
