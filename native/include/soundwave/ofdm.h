@@ -18,7 +18,14 @@ typedef struct {
     float sample_rate;    // Hz (default 44100)
     float carrier_freq;   // band centre in Hz (default 19000)
     float bandwidth;      // band width in Hz (default 2000)
+    // Transmit peak level: ofdm_modulate_frame scales every frame so that
+    // max |sample| == amplitude exactly (see OFDM_DEFAULT_AMPLITUDE). Values
+    // <= 0, > 1 or non-finite select the default.
+    float amplitude;
 } ofdm_config_t;
+
+// Default transmit peak (sw_config.amplitude == 0 selects it too).
+#define OFDM_DEFAULT_AMPLITUDE 0.8f
 
 // --- Ultrasonic band plan ----------------------------------------------------
 //
@@ -115,12 +122,24 @@ void ofdm_modulate_symbol(const ofdm_config_t* cfg, const kiss_fft_cpx* X,
 // ceil(bit_len / bits_per_symbol) data symbols, each N + cp samples, plus the
 // OFDM_WOLA_LEN(cp)-sample fade-out of the last symbol:
 //   (2 + num_symbols) * (N + cp) + OFDM_WOLA_LEN(cp) samples.
+// Output level: the whole frame is multiplied by one gain g so that its peak
+// max |sample| equals cfg->amplitude (deterministic per-frame peak
+// normalization; ofdm_peak_normalize). A single real gain per frame is a
+// flat channel for the receiver, which estimates the channel from the
+// preamble, so demodulation is unaffected.
 // Returns SW_OK, SW_ERR_BAD_PARAM (invalid FFT size / CP / band) or
 // SW_ERR_OVERFLOW (*sample_len then holds the required size).
 int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
                          size_t bit_len, float* samples, size_t* sample_len);
 
-// Full frame modulation returning sw_signal
+// Scales samples[0 .. len) by amplitude / max|samples| so that the peak
+// equals amplitude (0 < amplitude <= 1), and clamps the at most one-ulp
+// rounding excess so max |sample| <= amplitude holds exactly. All-zero input
+// is left unchanged. Returns the gain applied (0 for all-zero input).
+float ofdm_peak_normalize(float* samples, size_t len, float amplitude);
+
+// Full frame modulation returning sw_signal (cfg.amplitude: frame peak,
+// 0 selects OFDM_DEFAULT_AMPLITUDE).
 sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg);
 
 // Receiver timing backoff b: the FFT window of every symbol starts b samples

@@ -15,6 +15,8 @@
 
 #include "soundwave/audio.h"
 #include "soundwave_api.h"
+#include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -97,6 +99,7 @@ struct audio_playback_t {
     ma_device device;
     ring_buffer_t* rb;
     int running;
+    size_t clipped; // samples outside [-1, 1] clamped by audio_playback_write
 };
 
 // --- Callback Implementations ---
@@ -285,7 +288,15 @@ int audio_playback_write(audio_playback_t* play, const float* samples,
         int16_t* temp = (int16_t*)malloc(count * sizeof(int16_t));
         if (!temp) return SW_ERR_MEMORY;
 
-        audio_float_to_int16(samples, count, temp);
+        // Safety net only: the modulators keep their output within
+        // +/-sw_config.amplitude <= 1, so nothing should be clamped here.
+        // Clamping is hard clipping (audible splatter), so it is reported.
+        size_t clipped = audio_float_to_int16(samples, count, temp);
+        if (clipped) {
+            play->clipped += clipped;
+            fprintf(stderr, "soundwave: playback clamped %zu of %zu samples outside "
+                            "[-1, 1] (%zu total)\n", clipped, count, play->clipped);
+        }
         ring_buffer_write(play->rb, temp, count);
         free(temp);
     }
@@ -340,14 +351,22 @@ void audio_free_device_list(char** names, int count) {
     }
 }
 
-void audio_float_to_int16(const float* in, size_t count, int16_t* out) {
-    if (!in || !out) return;
+size_t audio_float_to_int16(const float* in, size_t count, int16_t* out) {
+    if (!in || !out) return 0;
+    size_t clipped = 0;
     for (size_t i = 0; i < count; i++) {
+        if (isnan(in[i])) { // (int16_t)NaN is undefined behaviour
+            out[i] = 0;
+            clipped++;
+            continue;
+        }
+        if (in[i] > 1.0f || in[i] < -1.0f) clipped++;
         float s = in[i] * 32767.0f;
         if (s > 32767.0f) s = 32767.0f;
         if (s < -32768.0f) s = -32768.0f;
         out[i] = (int16_t)s;
     }
+    return clipped;
 }
 
 void audio_int16_to_float(const int16_t* in, size_t count, float* out) {

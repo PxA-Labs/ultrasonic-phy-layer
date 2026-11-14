@@ -83,7 +83,8 @@ void test_conversions(void) {
     float float_in[5] = { 0.0f, 0.5f, 1.0f, -0.5f, -1.0f };
     int16_t int_out[5];
 
-    audio_float_to_int16(float_in, 5, int_out);
+    size_t nclip = audio_float_to_int16(float_in, 5, int_out);
+    assert(nclip == 0); // all in range
     assert(int_out[0] == 0);
     assert(int_out[1] == 16383);
     assert(int_out[2] == 32767);
@@ -93,9 +94,23 @@ void test_conversions(void) {
     // Check clipping
     float float_clip[2] = { 1.5f, -2.0f };
     int16_t int_clip[2];
-    audio_float_to_int16(float_clip, 2, int_clip);
+    nclip = audio_float_to_int16(float_clip, 2, int_clip);
+    assert(nclip == 2); // both clamped
     assert(int_clip[0] == 32767);
     assert(int_clip[1] == -32768);
+
+    // NaN is clamped to silence and counted; NULL arguments are a no-op.
+    float float_nan[3] = { NAN, 0.25f, 1.0000001f };
+    int16_t int_nan[3];
+    nclip = audio_float_to_int16(float_nan, 3, int_nan);
+    assert(nclip == 2);
+    assert(int_nan[0] == 0);
+    assert(int_nan[2] == 32767);
+    nclip = audio_float_to_int16(NULL, 3, int_nan);
+    assert(nclip == 0);
+    nclip = audio_float_to_int16(float_nan, 3, NULL);
+    assert(nclip == 0);
+    (void)nclip;
 
     // Int16 to Float
     int16_t int_in[5] = { 0, 16384, 32767, -16384, -32768 };

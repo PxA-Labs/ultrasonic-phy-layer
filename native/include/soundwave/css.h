@@ -43,7 +43,8 @@ typedef struct {
 // Applies the module defaults to zero fields (fs 44100, sf 8, carrier 19 kHz,
 // bandwidth 2 kHz, amplitude 0.8) and derives the geometry. Returns 0, or -1
 // if the configuration cannot be modulated: sf outside CSS_MIN_SF..MAX_SF,
-// non-finite values, band [fc - B/2, fc + B/2] outside (0, fs/2], or a symbol
+// non-finite values, amplitude > 1 (the chirps have a constant envelope, so
+// the frame peak max |sample| is exactly the amplitude), band [fc - B/2, fc + B/2] outside (0, fs/2], or a symbol
 // longer than CSS_MAX_SYMBOL_SEC. cfg.symbol_duration is not used: a CSS
 // symbol always lasts 2^SF / B.
 int    css_geometry(const sw_config* cfg, css_geometry_t* g);

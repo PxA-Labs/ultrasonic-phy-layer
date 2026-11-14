@@ -5,12 +5,60 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ffi';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:ffi/ffi.dart';
 import 'package:soundwave/native/soundwave_native.dart';
 import 'package:soundwave/native/bindings.dart';
 import 'package:soundwave/services/mic_permission.dart';
+
+/// Safety net at the float -> PCM playback boundary.
+///
+/// The native modulators guarantee max |sample| <= `amplitude` <= 1 (OFDM
+/// frames are peak-normalized, CSS chirps have a constant envelope), so
+/// nothing should ever need clamping here. If something does, it is clamped
+/// to [-1, 1] (NaN to 0) instead of wrapping or reaching the device as
+/// undefined values, counted in [clippedSamples] and logged: clipping is
+/// audible splatter, so it must be visible, not silently "handled".
+class PlaybackGuard {
+  PlaybackGuard._();
+
+  /// Samples clamped since start-up (or the last reset).
+  static int clippedSamples = 0;
+
+  /// Clamps [samples] to [-1, 1] in place; returns how many were outside.
+  static int clampInPlace(Float64List samples) {
+    var clipped = 0;
+    for (var i = 0; i < samples.length; i++) {
+      final s = samples[i];
+      if (s.isNaN) {
+        samples[i] = 0.0;
+      } else if (s > 1.0) {
+        samples[i] = 1.0;
+      } else if (s < -1.0) {
+        samples[i] = -1.0;
+      } else {
+        continue;
+      }
+      clipped++;
+    }
+    if (clipped > 0) {
+      clippedSamples += clipped;
+      debugPrint('PlaybackGuard: clamped $clipped of ${samples.length} '
+          'samples outside [-1, 1] ($clippedSamples total)');
+    }
+    return clipped;
+  }
+
+  /// Float32 copy of [samples] for the native playback ring, clamped to
+  /// [-1, 1] (see [clampInPlace]).
+  static Float32List toPlaybackSamples(Float64List samples) {
+    final copy = Float64List.fromList(samples);
+    clampInPlace(copy);
+    return Float32List.fromList(copy);
+  }
+}
 
 class AudioDevice {
   final String name;
@@ -155,10 +203,7 @@ class NativeAudioService implements AudioService {
   Future<void> enqueueForPlayback(Float64List samples) async {
     if (!_isPlaying || _playbackHandle == null) return;
 
-    final floatSamples = Float32List(samples.length);
-    for (int i = 0; i < samples.length; i++) {
-      floatSamples[i] = samples[i].toFloat();
-    }
+    final floatSamples = PlaybackGuard.toPlaybackSamples(samples);
     SoundwaveNative.instance.audioPlaybackWrite(_playbackHandle!, floatSamples);
   }
 
@@ -299,6 +344,7 @@ class RecordAudioService implements AudioService {
     if (_playbackQueue.length >= 8192) {
       final chunk = Float64List.fromList(_playbackQueue);
       _playbackQueue.clear();
+      PlaybackGuard.clampInPlace(chunk);
 
       final wavBytes = WavUtility.createWav(chunk, 44100);
       await _player.play(BytesSource(wavBytes));

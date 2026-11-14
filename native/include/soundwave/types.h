@@ -32,7 +32,7 @@ typedef struct {
     float  carrier_freq;     /**< CSS band centre; OFDM band centre. Hz (default 19000.0). */
     float  bandwidth;        /**< CSS sweep bandwidth, quantised to fs/round(fs/B); OFDM occupied band width. Hz (default 2000.0). */
     float  symbol_duration;  /**< Ignored by CSS (a chirp lasts 2^sf / B); validated <= 1 s. */
-    float  amplitude;        /**< Amplitude A (0.0 to 1.0) (default 0.8). */
+    float  amplitude;        /**< Transmit peak level in (0, 1] (0 = default 0.8): every modulator frame satisfies max |sample| <= amplitude (CSS: constant envelope A; OFDM: per-frame peak normalization to A). */
     int    ofdm_modulation;  /**< OFDM constellation mapping: 0 = BPSK, 1 = QPSK. */
 } sw_config;
 

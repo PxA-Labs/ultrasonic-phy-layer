@@ -37,7 +37,7 @@ typedef struct {
     float carrier_freq;     // Hz; CSS band centre fc, OFDM band centre (0 = 19000)
     float bandwidth;        // Hz; CSS sweep (used as fs / round(fs / bandwidth)), OFDM band width (0 = 2000)
     float symbol_duration;  // s; ignored by CSS (T = 2^sf / B); validated <= 1.0
-    float amplitude;        // [0, 1] (0 = 0.8)
+    float amplitude;        // transmit peak, (0, 1] (0 = 0.8): max |sample| <= amplitude
     int   ofdm_modulation;  // 0 = BPSK, 1 = QPSK
 } sw_config_t;
 ```
@@ -47,6 +47,7 @@ Field notes (from the implementation):
 - **Zero means default** for most fields. Each module fills in its own default.
 - `sf` sets the CSS symbol: one chirp of $2^{SF}$ chips carries SF bits (cyclically shifted up-chirps, Gray mapped). The chirp lasts $2^{SF}/B$, so `symbol_duration` is not used by CSS.
 - `coding_rate` is reserved and ignored: the only FEC is the fixed RS(255,223) code applied by the caller (app/CLI). `num_pilots` is validated but does not change the waveform: OFDM puts a pilot on every 8th active subcarrier regardless of `num_pilots`.
+- `amplitude` is the **transmit peak level**. Every frame from `sw_css_modulate` and `sw_ofdm_modulate` satisfies max |sample| ≤ `amplitude` ≤ 1, so it can be played or written as 16-bit PCM without clipping (clipping would splatter energy into the audible band). CSS chirps have a constant envelope of exactly `amplitude`. OFDM frames are multiplied by one gain per frame so that their peak equals `amplitude` (deterministic peak normalization); the RMS level is therefore lower by the frame's crest factor and varies slightly from frame to frame. A single gain is a flat channel to the receiver (preamble channel estimate, AGC), so demodulation is unaffected.
 - `carrier_freq` and `bandwidth` also set the **OFDM band** $[f_c - B/2, f_c + B/2]$ (default 18–20 kHz). Only subcarriers inside it (with one guard bin per edge) carry data or pilots. `sw_config_validate` (for `modulation == 1`) and every `sw_ofdm_*` function reject a band that reaches DC, lies within one subcarrier spacing of Nyquist, or holds fewer than 4 subcarriers (see [Signal chain](architecture/signal-chain.md#ofdm-mode)).
 
 ### `sw_config_validate`
@@ -63,7 +64,7 @@ Returns `SW_OK` or `SW_ERR_BAD_PARAM`. Every `sw_*` function that takes a config
 - `threshold`, `carrier_freq`, `bandwidth` and `symbol_duration` are ≥ 0.
 - `carrier_freq` and `bandwidth` are ≤ Nyquist.
 - `symbol_duration` ≤ 1 s.
-- `amplitude` is in [0, 1].
+- `amplitude` is in [0, 1] (0 selects 0.8).
 - `sf` is 0 or 6..10.
 - CSS (`modulation` 0) only: the band `carrier_freq` ± B/2 lies in (0, Nyquist] and a symbol $2^{SF}/B$ is at most 1 s, with B = fs / round(fs / `bandwidth`).
 - `num_subcarriers` is 0 or a power of two in 16..4096.

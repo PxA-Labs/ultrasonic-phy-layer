@@ -6,6 +6,7 @@
 
 #include "soundwave_api.h"
 #include "soundwave/ofdm.h"
+#include "ofdm_gain_util.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -215,7 +216,11 @@ typedef struct {
 //   lead  samples of leading silence (detector must find the frame),
 //   drop  first samples of the frame removed: the earliest possible FFT
 //         window is then `drop` samples late (a known timing offset),
-//   noise uniform noise amplitude added to every sample (0 = noiseless).
+//   noise uniform noise amplitude added to every sample (0 = noiseless),
+//         relative to the unit-energy subcarriers: the modulator scales each
+//         frame by a gain g (peak normalization to cfg.amplitude), so the
+//         noise is scaled by the same g to keep the per-subcarrier SNR -- and
+//         the EVM prediction below -- independent of the output level.
 // EVM and decisions cover the frame's own data symbols only (a trailing
 // silent symbol the detector may admit carries no data).
 static loopback_t loopback(int ofdm_modulation, int cp, int equalizer,
@@ -241,7 +246,9 @@ static loopback_t loopback(int ofdm_modulation, int cp, int equalizer,
     if (n > MAX_SAMPLES) goto done;
     memcpy(rx + lead, tx + drop, (tx_len - drop) * sizeof(float));
     if (noise > 0.0) {
-        for (size_t k = 0; k < n; k++) rx[k] += (float)(noise * lcg_uniform());
+        double g = ofdm_frame_gain(tx, tx_len, cfg);
+        if (!(g > 0.0)) goto done;
+        for (size_t k = 0; k < n; k++) rx[k] += (float)(g * noise * lcg_uniform());
     }
 
     size_t count = MAX_POINTS;
@@ -323,7 +330,8 @@ static void test_timing_offset_within_cp(void) {
 }
 
 // Noise must show up in the EVM at the predicted level. Uniform noise of
-// amplitude A has variance A^2/3 per sample, and the unitary DFT keeps that
+// amplitude A (relative to the unit-energy subcarriers, see loopback()) has
+// variance A^2/3 per sample, and the unitary DFT keeps that
 // per subcarrier. The ZF error is W - X (W1 + W2) / 2 (data noise plus the
 // two-copy channel-estimate noise), so EVM = sqrt(1.5 A^2 / 3) = 1.41 % for
 // A = 0.02. The per-symbol common-phase correction from the two pilots adds

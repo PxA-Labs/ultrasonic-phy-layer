@@ -21,6 +21,8 @@ void ofdm_init(ofdm_config_t* cfg) {
     if (cfg->cp_length <= 0) cfg->cp_length = cfg->num_subcarriers / 8;
     if (cfg->pilot_spacing <= 0) cfg->pilot_spacing = OFDM_PILOT_SPACING;
     if (cfg->pilot_boost <= 0.0f) cfg->pilot_boost = 1.0f;
+    if (!(cfg->amplitude > 0.0f && cfg->amplitude <= 1.0f))
+        cfg->amplitude = OFDM_DEFAULT_AMPLITUDE;
 }
 
 void bpsk_map(int bit, kiss_fft_cpx* out) {
@@ -296,6 +298,25 @@ static void ofdm_wola_add(float* out, const float* sym, int N, int cp, int W,
     }
 }
 
+float ofdm_peak_normalize(float* samples, size_t len, float amplitude) {
+    if (!samples || len == 0 || !(amplitude > 0.0f)) return 0.0f;
+    float peak = 0.0f;
+    for (size_t i = 0; i < len; i++) {
+        float a = fabsf(samples[i]);
+        if (a > peak) peak = a;
+    }
+    if (!(peak > 0.0f)) return 0.0f;
+    double g = (double)amplitude / (double)peak;
+    for (size_t i = 0; i < len; i++) {
+        float v = (float)((double)samples[i] * g);
+        // Rounding can land one ulp above the target; the contract is exact.
+        if (v > amplitude) v = amplitude;
+        else if (v < -amplitude) v = -amplitude;
+        samples[i] = v;
+    }
+    return (float)g;
+}
+
 int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
                          size_t bit_len, float* samples, size_t* sample_len) {
     if (!cfg || !bits || !samples || !sample_len) return SW_ERR_BAD_PARAM;
@@ -386,6 +407,14 @@ int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
     free(ramp);
     free(wbits);
 
+    // Peak normalization (MATHEMATICAL_MODEL.md 2.2.3): the IDFT output's
+    // peak depends on N, the band and the payload (crest factor ~3-5), so the
+    // raw frame can exceed full scale. One gain per frame keeps the spectrum
+    // shape (and the ultrasonic confinement) intact, unlike clipping.
+    float amp = (cfg->amplitude > 0.0f && cfg->amplitude <= 1.0f)
+                    ? cfg->amplitude : OFDM_DEFAULT_AMPLITUDE;
+    ofdm_peak_normalize(samples, total_samples, amp);
+
     *sample_len = total_samples;
     return SW_OK;
 }
@@ -407,6 +436,7 @@ sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg) {
     ofdm_cfg.sample_rate = cfg.sample_rate > 0 ? (float)cfg.sample_rate : 0.0f;
     ofdm_cfg.carrier_freq = cfg.carrier_freq;
     ofdm_cfg.bandwidth = cfg.bandwidth;
+    ofdm_cfg.amplitude = cfg.amplitude; // 0 -> OFDM_DEFAULT_AMPLITUDE
 
     ofdm_init(&ofdm_cfg);
 

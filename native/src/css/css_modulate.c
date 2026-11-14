@@ -26,6 +26,8 @@ int css_geometry(const sw_config* cfg, css_geometry_t* g) {
     if (fc <= 0.0) fc = 19000.0;
     if (bw <= 0.0) bw = 2000.0;
     if (amp <= 0.0) amp = 0.8;
+    // Constant-envelope chirps: the frame peak is exactly amp (<= full scale).
+    if (amp > 1.0) return -1;
     if (sf < CSS_MIN_SF || sf > CSS_MAX_SF) return -1;
     if (fs < 1000.0 || fs > 1.0e6) return -1;
 

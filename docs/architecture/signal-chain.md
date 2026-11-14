@@ -54,7 +54,7 @@ All values are **computed** from the code at $f_s$ = 44.1 kHz (not measured). Ra
 
 **Transmit spectrum (simulated, `native/tests/test_ofdm_spectrum.c`).** Periodogram of a 46-byte frame (CRC + 10-byte payload + RS parity), QPSK. The test requires ≥ 98.5 % of the energy inside the configured band and ≤ −40 dB below 16 kHz. The ~1 % outside the band is the main lobe of the outermost subcarriers, within a few hundred hertz of the band edges.
 
-| $N$ / CP, band | Energy in band | Energy below 16 kHz | Energy below 17 kHz | Peak sample |
+| $N$ / CP, band | Energy in band | Energy below 16 kHz | Energy below 17 kHz | Raw peak (before normalization) |
 |---|---|---|---|---|
 | 256 / 32, 18–20 kHz | 98.69 % | −44.7 dB | −33.8 dB | 1.11 |
 | 256 / 64, 18–20 kHz (default) | 98.99 % | −53.9 dB | −44.4 dB | 1.11 |
@@ -66,7 +66,7 @@ All values are **computed** from the code at $f_s$ = 44.1 kHz (not measured). Ra
 
 Before this change the OFDM modulator ignored `carrier_freq` and `bandwidth` and spread energy over 5.7–21.9 kHz (N = 256): only about 11–15 % of the energy fell in 18–20 kHz and about −2 dB (≈ 60 %) was below 16 kHz (pure-Python model of the old modulator, same frame; peak samples 7–19).
 
-The modulator output is not normalised: the peak values above exceed full scale for N = 2048, and the app plays the samples unscaled (`soundwave-cli` rescales to 0.8 before writing a WAV).
+The raw IDFT peaks above exceed full scale for N = 2048 and for the 18–21 kHz band. The modulator therefore normalises every frame to a peak of exactly `amplitude` (default 0.8) with one gain per frame (see *Transmit level* in the [mathematical model](../MATHEMATICAL_MODEL.md#223-ultrasonic-band-plan)); the energy fractions above do not depend on the level. The app and `soundwave-cli` play or write the samples unscaled, and `native/tests/test_tx_peak.c` checks max |sample| ≤ `amplitude` across FFT sizes, CP lengths, BPSK/QPSK, bands and worst-case payloads.
 
 !!! warning "Not measured over the air"
     The band plan and spectrum are exact properties of the transmitted samples. Whether a given speaker and microphone pass 18–20 kHz, and what SNR they achieve there, has not been measured; see the [field test plan](../testing/FIELD_TEST_PLAN.md). Many devices roll off above 18–20 kHz, which is why the default band stops at 20 kHz.

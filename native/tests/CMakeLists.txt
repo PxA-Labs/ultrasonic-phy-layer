@@ -42,6 +42,7 @@ sw_add_test(test_packet_fec          test_packet_fec.c)
 sw_add_test(test_api_errors          test_api_errors.c)
 sw_add_test(test_dsp_paths           test_dsp_paths.c)
 sw_add_test(test_ofdm_spectrum      test_ofdm_spectrum.c)
+sw_add_test(test_tx_peak            test_tx_peak.c)
 
 # soundwave-cli frame format (same bytes as the app's FrameCodec)
 sw_add_test(test_cli_frame          test_cli_frame.c)

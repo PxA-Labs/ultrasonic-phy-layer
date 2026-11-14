@@ -90,7 +90,7 @@ Symbol value $k \in \{0, \dots, M-1\}$ is the base up-chirp started $k$ chips in
 
 $$f_k(t) = f_c - \frac{B}{2} + B \left( \frac{k}{M} + \frac{t}{T} \bmod 1 \right), \qquad 0 \le t < T,$$
 
-that is, it starts at $f_c - B/2 + kB/M$, rises at $B/T$ Hz/s and wraps from $f_c + B/2$ back to $f_c - B/2$ at $t_w = T(1 - k/M)$, which is sample $(M - k) D$. The transmitted sample is $s[n] = A \cos(2\pi \varphi(n / f_s))$ with $\varphi$ the integral of $f_k$; phase is carried across symbols so the signal is continuous. The down-chirp used in the preamble sweeps $f_c + B/2 \to f_c - B/2$.
+that is, it starts at $f_c - B/2 + kB/M$, rises at $B/T$ Hz/s and wraps from $f_c + B/2$ back to $f_c - B/2$ at $t_w = T(1 - k/M)$, which is sample $(M - k) D$. The transmitted sample is $s[n] = A \cos(2\pi \varphi(n / f_s))$ with $\varphi$ the integral of $f_k$ and $A$ = `amplitude` $\in (0, 1]$, so $\max_n |s[n]| \le A$ (constant envelope); phase is carried across symbols so the signal is continuous. The down-chirp used in the preamble sweeps $f_c + B/2 \to f_c - B/2$.
 
 #### 2.1.3 Bits to symbols (Gray mapping) and frame
 Bits are taken MSB first, $SF$ at a time (the last group is zero padded). A group with value $v$ is sent as the symbol $k$ whose Gray code equals $v$, i.e. $v = k \oplus (k \gg 1)$. The most likely demodulation error is a neighbouring bin ($k \pm 1$, also across the wrap $M-1 \leftrightarrow 0$), and neighbours differ in exactly one bit. A frame is
@@ -172,6 +172,12 @@ $$\text{samples} = (2 + N_{sym}) (N + N_{cp}) + \lfloor N_{cp}/2 \rfloor$$
 The two preamble copies are joined without a cross-fade so that they stay sample-identical (section 3). To keep that one junction continuous anyway, the preamble's ZC sequence is multiplied by the common phase $e^{j\varphi}$ for which $\text{Re}\{e^{j\varphi}(z[N - N_{cp}] - z[0])\} = 0$, with $z[n] = \sum_{k \in K_a} X_k e^{j 2\pi k n / N}$: the first sample of the second copy's prefix then equals the natural continuation of the first copy.
 
 **Data whitening.** With only a few data bins (8 at $N = 256$ in the default band, i.e. 16 bits per QPSK symbol), repeated payload bytes would produce identical consecutive OFDM symbols, which a repetition detector cannot tell from the preamble. Data bits are therefore XORed with the PRBS15 sequence $x^{15} + x^{14} + 1$ (seed all ones, restarted every frame, `ofdm_scramble`) before mapping and after demapping.
+
+**Transmit level.** A sum of $2|K_a|$ unit-magnitude subcarriers has RMS $\sqrt{2|K_a|/N}$ per sample (about 0.28–0.30 in the default band) but a peak that depends on $N$, the band and the data, so the raw IDFT output can exceed full scale (raw peaks up to about 2.5 for $N = 2048$; `native/tests/test_tx_peak.c` prints them). Clipping at the DAC would spread energy over the whole spectrum, including the audible band. The modulator therefore scales the whole frame by one gain
+
+$$g = \frac{A}{\max_n |x[n]|}, \qquad A = \texttt{amplitude} \in (0, 1]$$
+
+(`ofdm_peak_normalize`), so the transmitted peak is exactly $A$ and the spectrum shape is unchanged. A real gain common to the whole frame is a flat channel: the receiver's preamble channel estimate absorbs it, so the equalized points are still unit-energy constellation points. The price is that the RMS level is $A$ divided by the frame's crest factor, which also varies a little from frame to frame. Peak-to-average power reduction (e.g. tone reservation on unused in-band bins) could raise the RMS level for the same peak; it is not implemented.
 
 `native/tests/test_ofdm_spectrum.c` computes the transmit spectrum of a typical frame and requires at least 98.5 % of the energy in $[f_c - B/2, f_c + B/2]$ and at most $-40$ dB below 16 kHz for every tested FFT size. The values it prints are listed in [Signal chain & parameters](architecture/signal-chain.md#ofdm-mode).
 

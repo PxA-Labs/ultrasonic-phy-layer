@@ -38,7 +38,11 @@ int  audio_enumerate_devices(int type, char*** names, int* count);
 void audio_free_device_list(char** names, int count);
 
 // Sample format conversion.
-void audio_float_to_int16(const float* in, size_t count, int16_t* out);
+// audio_float_to_int16 maps [-1, 1] to +/-32767, clamps anything outside
+// (NaN -> 0) and returns the number of samples that were outside [-1, 1] or
+// NaN. Clamping is a safety net, not a level control: modulator output stays
+// within +/-sw_config.amplitude.
+size_t audio_float_to_int16(const float* in, size_t count, int16_t* out);
 void audio_int16_to_float(const int16_t* in, size_t count, float* out);
 
 #endif // SOUNDWAVE_AUDIO_H

@@ -50,7 +50,7 @@ soundwave-cli modulate --mode <css|ofdm> --input "<text>" --output <filename.wav
 - `--bw <bw_hz>`: Bandwidth in Hz (default `2000.0`; OFDM band = `freq ± bw/2`).
 - `--ofdm-mod <bpsk|qpsk>`: OFDM subcarrier mapping (default `qpsk`).
 - `--no-rs`: frames without Reed-Solomon parity (the app's `enable_rs` off).
-- `--amp <amplitude>`: Waveform amplitude scaling (0.0 to 1.0, default `0.8`).
+- `--amp <amplitude>`: Transmit peak level (0.0 to 1.0, default `0.8`). Every frame peaks at exactly this value (OFDM is peak-normalized per frame, CSS has a constant envelope), so the 16-bit WAV never clips and the CLI does not rescale the samples. The `DEBUG: Modulated signal peak amplitude` line on stderr reports the peak.
 
 ### Examples
 #### CSS Modulation

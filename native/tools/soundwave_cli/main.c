@@ -170,19 +170,19 @@ int main(int argc, char** argv) {
             return 1;
         }
 
-        // Check peak amplitude and scale if necessary to avoid WAV clipping
+        // The modulators guarantee max |sample| <= --amp (<= 1), so the
+        // samples go to 16-bit PCM unscaled; no rescaling here. Report the
+        // peak and treat a violation as the bug it would be.
         float peak = 0.0f;
         for (size_t i = 0; i < sample_len; i++) {
             float abs_val = fabsf(samples[i]);
             if (abs_val > peak) peak = abs_val;
         }
         fprintf(stderr, "DEBUG: Modulated signal peak amplitude = %.4f\n", peak);
-        if (peak > 1.0f) {
-            float scale = 0.8f / peak;
-            for (size_t i = 0; i < sample_len; i++) {
-                samples[i] *= scale;
-            }
-            fprintf(stderr, "DEBUG: Scaled signal by %.4f to avoid WAV clipping\n", scale);
+        if (!(peak <= 1.0f)) {
+            fprintf(stderr, "Error: Modulator output peak %.4f exceeds full scale.\n", peak);
+            free(samples);
+            return 1;
         }
 
         // Pad the signal with 64 zero samples at the end to prevent timing truncation
