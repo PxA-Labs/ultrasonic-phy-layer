@@ -14,6 +14,7 @@ import 'screens/settings.dart';
 import 'services/mic_permission.dart';
 import 'theme/soundwave_theme.dart';
 import 'widgets/mic_permission_gate.dart';
+import 'widgets/transfer_notice_listener.dart';
 
 void main() {
   runApp(const SoundwaveApp());
@@ -136,7 +137,9 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: TransferNoticeListener(
+        child: IndexedStack(index: _currentIndex, children: _screens),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),

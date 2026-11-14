@@ -15,6 +15,7 @@ import 'package:soundwave/engine/rx_engine.dart';
 import 'package:soundwave/engine/tx_queue.dart';
 import 'package:soundwave/engine/signal_metrics.dart';
 import 'package:soundwave/engine/throughput_calculator.dart';
+import 'package:soundwave/engine/transfer_notice.dart';
 import 'package:soundwave/services/audio_service.dart';
 import 'package:soundwave/state/settings_store.dart';
 import 'package:soundwave/export/message_exporter.dart';
@@ -76,6 +77,19 @@ class AppState extends ChangeNotifier {
   RxTransferProgress? _rxTransfer;
   String? _transferError;
   final List<ReceivedFileRecord> _receivedFiles = [];
+  final StreamController<TransferNotice> _transferNotices =
+      StreamController<TransferNotice>.broadcast();
+
+  /// One event per finished file transfer, sent or received (#89).
+  Stream<TransferNotice> get transferNotices => _transferNotices.stream;
+  TransferNotice? _lastTransferNotice;
+  TransferNotice? get lastTransferNotice => _lastTransferNotice;
+
+  void _notifyTransfer(TransferNotice n) {
+    _lastTransferNotice = n;
+    if (!_transferNotices.isClosed) _transferNotices.add(n);
+  }
+
   Timer? _throughputTimer;
   bool _isDisposed = false;
 
@@ -160,9 +174,29 @@ class AppState extends ChangeNotifier {
       }),
       _txEngine.transfers.listen((p) {
         _txTransfer = p;
+        _onTxTransferProgress(p);
         notifyListeners();
       }),
     ]);
+  }
+
+  /// File transfers that ended (not text, not a user cancel) get a notice.
+  void _onTxTransferProgress(TxTransferProgress p) {
+    final name = p.fileName;
+    if (name == null) return;
+    if (p.state != TxTransferState.completed &&
+        p.state != TxTransferState.failed) {
+      return;
+    }
+    _notifyTransfer(TransferNotice(
+      direction: TransferDirection.sent,
+      fileName: name,
+      bytes: p.contentBytes,
+      duration: p.elapsed,
+      ok: p.state == TxTransferState.completed,
+      error: p.error,
+      retransmissions: p.retransmissions,
+    ));
   }
 
   Future<void> _onFileReceived(ReceivedFile file) async {
@@ -184,9 +218,18 @@ class AppState extends ChangeNotifier {
         timestamp: file.timestamp,
         savedPath: path,
         error: error,
+        transferTime: file.transferTime,
       ),
     );
     if (_receivedFiles.length > 50) _receivedFiles.removeLast();
+    _notifyTransfer(TransferNotice(
+      direction: TransferDirection.received,
+      fileName: file.fileName,
+      bytes: file.data.length,
+      duration: file.transferTime,
+      ok: path != null,
+      error: error,
+    ));
     addMessage('File "${file.fileName}" (${file.data.length} B)', file.snr);
   }
 
@@ -862,6 +905,7 @@ class AppState extends ChangeNotifier {
       s.cancel();
     }
     _txEngine.cancelTransfer();
+    _transferNotices.close();
     _captureTap?.cancel();
     _finishRecordingQuietly();
     _rxEngine.stopListening();

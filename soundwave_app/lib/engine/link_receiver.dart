@@ -41,7 +41,16 @@ class LinkRxOutcome {
 
   final RxTransferProgress? progress;
 
-  const LinkRxOutcome({this.message, this.control, this.reply, this.progress});
+  /// With [message]: when its first fragment began arriving.
+  final DateTime? startedAt;
+
+  const LinkRxOutcome({
+    this.message,
+    this.control,
+    this.reply,
+    this.progress,
+    this.startedAt,
+  });
 
   static const LinkRxOutcome none = LinkRxOutcome();
 }
@@ -65,13 +74,15 @@ class LinkReceiver {
 
   /// Handles one decoded link frame. [arqEnabled] is the local setting: when
   /// off this node never transmits (pure listener / one-way broadcast).
-  LinkRxOutcome handle(LinkFrame f, DateTime now, {required bool arqEnabled}) {
+  /// [frameStart] is when [f]'s frame began, used to time transfers.
+  LinkRxOutcome handle(LinkFrame f, DateTime now,
+      {required bool arqEnabled, DateTime? frameStart}) {
     if (f.src == nodeId) return LinkRxOutcome.none; // our own echo
     if (f.isControl) {
       return f.dst == nodeId ? LinkRxOutcome(control: f) : LinkRxOutcome.none;
     }
 
-    final r = reassembler.add(f, now);
+    final r = reassembler.add(f, now, startedAt: frameStart);
     final ack =
         arqEnabled && f.ackRequested && r.status != FragmentStatus.rejected
             ? _debounced(
@@ -86,6 +97,7 @@ class LinkReceiver {
     };
     return LinkRxOutcome(
       message: r.message,
+      startedAt: r.startedAt,
       reply: ack,
       progress: r.status == FragmentStatus.duplicate && r.received == r.count
           ? null // already delivered; nothing new to report

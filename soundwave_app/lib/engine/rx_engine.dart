@@ -41,6 +41,9 @@ class ReceivedFile {
   final double snr;
   final DateTime timestamp;
 
+  /// From the start of the first fragment's frame to reassembly.
+  final Duration transferTime;
+
   const ReceivedFile({
     required this.fileName,
     required this.mimeType,
@@ -48,6 +51,7 @@ class ReceivedFile {
     required this.src,
     required this.snr,
     required this.timestamp,
+    this.transferTime = Duration.zero,
   });
 }
 
@@ -82,6 +86,10 @@ class RxEngine {
   /// Link-layer address of this device (shared with its TxEngine).
   final int nodeId;
   late final LinkReceiver _link = LinkReceiver(nodeId: nodeId);
+
+  /// Clock for link-layer timing: reassembly timeouts, debouncing and
+  /// transfer times (injectable for tests).
+  final DateTime Function() _now;
   Timer? _reassemblyTimer;
 
   int _framesDetected = 0;
@@ -96,7 +104,9 @@ class RxEngine {
     required Map<String, dynamic> configMap,
     bool useIsolates = true,
     int? nodeId,
+    DateTime Function()? clock,
   })  : _native = native,
+        _now = clock ?? DateTime.now,
         _audio = audio,
         _configMap = configMap,
         _useIsolates = useIsolates,
@@ -384,7 +394,7 @@ class RxEngine {
   void _onFrameDecoded(DecodedFrame frame) {
     _framesReceived++;
     _totalBytesReceived += frame.payload.length;
-    final now = DateTime.now();
+    final now = _now();
     if (LinkFrame.isLinkPayload(frame.payload)) {
       handleLinkPayload(frame.payload, snr: _pendingSnr, now: now);
     } else {
@@ -416,7 +426,7 @@ class RxEngine {
       errorMessage: 'CRC / RS decoding check failed',
     ));
     _emitCurrentMetrics(ModemLinkState.error);
-    final nack = _link.onFrameError(DateTime.now(), arqEnabled: _arqEnabled);
+    final nack = _link.onFrameError(_now(), arqEnabled: _arqEnabled);
     if (nack != null) _controlOutController.add(nack);
   }
 
@@ -439,6 +449,20 @@ class RxEngine {
     return const Duration(seconds: 30) + perAttempt * (arq.maxRetries + 2);
   }
 
+  /// Airtime of the PHY frame that carried a [payloadBytes]-byte payload at
+  /// the current settings (the frame is decoded only once it has ended).
+  Duration frameAirtime(int payloadBytes) {
+    final g = FrameGeometry.fromConfig(_configMap);
+    final frameBytes = FrameCodec.crcLength +
+        payloadBytes +
+        (g.enableRs ? FrameCodec.parityLength : 0);
+    final sr = (_configMap['sample_rate'] as num?)?.toInt() ?? 44100;
+    return Duration(
+        microseconds: g.samplesForFrameBytes(frameBytes) *
+            1000000 ~/
+            (sr > 0 ? sr : 44100));
+  }
+
   /// Routes one decoded link-layer payload (public for tests and imports).
   void handleLinkPayload(Uint8List payload, {double snr = 0.0, DateTime? now}) {
     final f = LinkFrame.decode(payload);
@@ -446,9 +470,11 @@ class RxEngine {
       debugPrint('RX: malformed link frame (${payload.length} bytes)');
       return;
     }
-    final t = now ?? DateTime.now();
+    final t = now ?? _now();
     _link.reassembler.timeout = reassemblyTimeout;
-    final out = _link.handle(f, t, arqEnabled: _arqEnabled);
+    final out = _link.handle(f, t,
+        arqEnabled: _arqEnabled,
+        frameStart: t.subtract(frameAirtime(payload.length)));
     if (out.control != null) _controlInController.add(out.control!);
     if (out.reply != null) _controlOutController.add(out.reply!);
     if (out.progress != null) _transfersController.add(out.progress!);
@@ -469,6 +495,7 @@ class RxEngine {
           src: f.src,
           snr: snr,
           timestamp: t,
+          transferTime: t.difference(out.startedAt ?? t),
         ));
       }
     }
@@ -494,11 +521,11 @@ class RxEngine {
     _reassemblyTimer = null;
     final deadline = _link.reassembler.nextDeadline;
     if (deadline == null) return;
-    var delay = deadline.difference(DateTime.now());
+    var delay = deadline.difference(_now());
     if (delay.isNegative) delay = Duration.zero;
     _reassemblyTimer = Timer(delay + const Duration(milliseconds: 10), () {
       _reassemblyTimer = null;
-      _reportReassemblyFailures(DateTime.now());
+      _reportReassemblyFailures(_now());
       _scheduleReassemblyCheck();
     });
   }

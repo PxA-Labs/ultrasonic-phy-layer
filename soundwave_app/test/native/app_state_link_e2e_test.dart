@@ -12,6 +12,7 @@ import 'package:soundwave/engine/arq.dart';
 import 'package:soundwave/engine/frame_geometry.dart';
 import 'package:soundwave/engine/link_receiver.dart';
 import 'package:soundwave/engine/rx_engine.dart';
+import 'package:soundwave/engine/transfer_notice.dart';
 import 'package:soundwave/native/soundwave_native.dart';
 import 'package:soundwave/services/received_file_store.dart';
 import 'package:soundwave/state/app_state.dart';
@@ -99,6 +100,10 @@ void main() {
       final data =
           Uint8List.fromList(List.generate(600, (i) => (i * 17 + 3) % 256));
       expect(a.state.isListening, isFalse);
+      final aNotices = <TransferNotice>[];
+      final bNotices = <TransferNotice>[];
+      a.state.transferNotices.listen(aNotices.add);
+      b.state.transferNotices.listen(bNotices.add);
 
       await a.state
           .sendFileBytes(data, fileName: 'report.bin')
@@ -128,6 +133,26 @@ void main() {
       // A must not have "received" its own echo.
       expect(a.state.receivedFiles, isEmpty);
 
+      // End-of-transfer notices (#89): one per side, with real timing.
+      await waitUntil(() => aNotices.isNotEmpty && bNotices.isNotEmpty);
+      final sent = aNotices.single;
+      expect(sent.direction, TransferDirection.sent);
+      expect(sent.ok, isTrue);
+      expect(sent.fileName, 'report.bin');
+      expect(sent.bytes, 600);
+      expect(sent.retransmissions, a.state.txTransfer!.retransmissions);
+      expect(sent.duration, a.state.txTransfer!.elapsed);
+      expect(sent.duration, greaterThan(Duration.zero));
+      expect(sent.message, startsWith('Sent "report.bin" (600 B) in '));
+      final received = bNotices.single;
+      expect(received.direction, TransferDirection.received);
+      expect(received.ok, isTrue);
+      expect(received.bytes, 600);
+      expect(received.duration, rec.transferTime);
+      // At least one OFDM frame of airtime, which the estimate includes.
+      expect(received.duration, greaterThan(const Duration(milliseconds: 100)));
+      expect(a.state.lastTransferNotice, same(sent));
+
       // Live metrics on both sides.
       expect(a.state.metrics.totalBytesTransferred, greaterThan(0));
       expect(b.state.metrics.framesReceived, greaterThanOrEqualTo(3));
@@ -136,6 +161,8 @@ void main() {
 
     test('a failing file store is reported, not swallowed', () async {
       await connect(arq: false, bSink: MemoryFileSink(failWith: 'disk full'));
+      final bNotices = <TransferNotice>[];
+      b.state.transferNotices.listen(bNotices.add);
       final data = Uint8List.fromList(List.generate(40, (i) => i));
       await a.state.sendFileBytes(data, fileName: 'x.txt');
       await waitUntil(
@@ -146,6 +173,10 @@ void main() {
       final rec = b.state.receivedFiles.single;
       expect(rec.savedPath, isNull);
       expect(rec.error, contains('disk full'));
+      await waitUntil(() => bNotices.isNotEmpty);
+      expect(bNotices.single.ok, isFalse);
+      expect(bNotices.single.message,
+          'Received "x.txt" but could not save it: disk full');
       expect(rec.mimeType, 'text/plain');
       expect(b.state.messages.first, contains('File "x.txt" (40 B)'));
     }, timeout: const Timeout(Duration(minutes: 3)));

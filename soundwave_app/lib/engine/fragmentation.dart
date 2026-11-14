@@ -77,8 +77,12 @@ class FragmentResult {
   final LinkMessage? message;
   final String? error;
 
+  /// For [FragmentStatus.completed]: when the message's first fragment
+  /// began arriving (see [PayloadReassembler.add]'s `startedAt`).
+  final DateTime? startedAt;
+
   const FragmentResult(this.status, this.received, this.count,
-      {this.message, this.error});
+      {this.message, this.error, this.startedAt});
 }
 
 class ReassemblyFailure {
@@ -107,8 +111,11 @@ class ReassemblySession {
   int _bytes = 0;
   DateTime lastUpdate;
 
-  ReassemblySession._(
-      this.src, this.msgId, this.count, this.ackRequested, this.lastUpdate);
+  /// When the first fragment began arriving (start of its frame if known).
+  final DateTime startedAt;
+
+  ReassemblySession._(this.src, this.msgId, this.count, this.ackRequested,
+      this.lastUpdate, this.startedAt);
 
   int get received => _chunks.length;
 
@@ -163,7 +170,10 @@ class PayloadReassembler {
     return t;
   }
 
-  FragmentResult add(LinkFrame f, DateTime now) {
+  /// Adds one fragment received at [now]. [startedAt] is when that
+  /// fragment's frame began (decode time minus airtime); it dates a new
+  /// session, so transfer times include the first frame. Defaults to [now].
+  FragmentResult add(LinkFrame f, DateTime now, {DateTime? startedAt}) {
     if (f.type != LinkFrameType.data) {
       return const FragmentResult(FragmentStatus.rejected, 0, 0,
           error: 'not a DATA frame');
@@ -186,7 +196,8 @@ class PayloadReassembler {
             .reduce((a, b) => a.lastUpdate.isBefore(b.lastUpdate) ? a : b);
         _fail(oldest, 'evicted: too many concurrent transfers');
       }
-      s = ReassemblySession._(f.src, f.msgId, f.count, f.ackRequested, now);
+      s = ReassemblySession._(
+          f.src, f.msgId, f.count, f.ackRequested, now, startedAt ?? now);
       _sessions[key] = s;
     }
     s.lastUpdate = now;
@@ -217,7 +228,7 @@ class PayloadReassembler {
         _completed.remove(_completed.keys.first);
       }
       return FragmentResult(FragmentStatus.completed, s.count, s.count,
-          message: message);
+          message: message, startedAt: s.startedAt);
     } on FormatException catch (e) {
       _failures.add(ReassemblyFailure(
           s.src, s.msgId, s.received, s.count, 'corrupt: ${e.message}'));

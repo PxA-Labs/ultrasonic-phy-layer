@@ -55,6 +55,7 @@ class TxEngine {
     bool useIsolates = true,
     int? nodeId,
     math.Random? random,
+    DateTime Function()? clock,
   })  : _native = native,
         _audio = audio,
         _configMap = configMap,
@@ -65,6 +66,7 @@ class TxEngine {
       transmit: transmitPayload,
       responseAllowance: _responseAllowance,
       random: random,
+      now: clock,
     );
   }
 
