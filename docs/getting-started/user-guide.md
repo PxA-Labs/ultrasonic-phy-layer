@@ -5,13 +5,13 @@ The Soundwave app has three tabs: **Dashboard**, **Monitor** and **Settings**. T
 ## First message (two devices)
 
 1. Install and open the app on two devices (see [Build from source](build.md)). On first launch, a five-page tutorial explains the modes and asks for microphone access. You can replay it from **Settings → Show tutorial**.
-2. Keep the default settings on **both** devices: CSS mode, 19 kHz start frequency, 2 kHz sweep, 20 ms chirps. Both devices must use the same modem settings.
+2. Keep the default settings on **both** devices: CSS mode, 19 kHz centre frequency, 2 kHz sweep, spreading factor 8. Both devices must use the same modem settings.
 3. On the receiver, open **Dashboard → Receiver Control → Start Listening**.
 4. On the transmitter, type a short message under **Transmission Control** and tap **Send / Modulate & Play**. Set the media volume to a moderate level.
 5. Received messages appear under **Received Messages Log**, together with an estimated SNR.
 
 !!! tip "Expect slow CSS frames"
-    In the default CSS configuration one chirp carries one bit, so the raw rate is 50 bit/s and even a two-byte message takes about 6 s on air (values computed from the code, see [Signal chain](../architecture/signal-chain.md)). OFDM is much faster, but it currently occupies roughly 5.7–21.9 kHz, which is clearly audible.
+    In the default CSS configuration (SF 8, 2 kHz) one 128 ms chirp carries 8 bits, so the raw rate is 62.6 bit/s and a two-byte message takes about 6 s on air. A lower SF or a 4 kHz sweep is faster (SF 6 at 4 kHz: 376 bit/s, about 1 s) but less robust (values computed from the code, see [Signal chain](../architecture/signal-chain.md)). OFDM is much faster, but it currently occupies roughly 5.7–21.9 kHz, which is clearly audible.
 
 Start with the devices close together (tens of centimetres) and increase the distance from there. Range has **not** been measured yet.
 
@@ -38,11 +38,11 @@ Start with the devices close together (tens of centimetres) and increase the dis
 
 | Group | Settings | Notes |
 |---|---|---|
-| Presets | *Defaults*, *Long Range (Robust)* (CSS, 18 kHz, 1 kHz sweep, 50 ms chirps), *High Speed (OFDM)* (2048-point FFT, CP 128) | Apply on both devices |
+| Presets | *Defaults*, *Long Range (Robust)* (CSS, 18 kHz, 2 kHz sweep, SF 10), *High Speed (OFDM)* (2048-point FFT, CP 128) | Apply on both devices |
 | Modulation | CSS or OFDM | |
-| FEC | Reed-Solomon on/off, coding rate 1/2 or 3/4 | The coding-rate value is passed to the native config but **has no effect** in the current DSP code. RS(255,223) is either on or off |
+| FEC | Reed-Solomon on/off | RS(255,223): 32 parity bytes, corrects up to 16 byte errors per frame. There is no adjustable code rate |
 | Audio I/O | Input/output device, playback volume, AGC on/off | AGC is on by default |
-| CSS | Spreading factor, chirp duration | The SF value is validated but **does not change the CSS waveform** in the current core. The chirp duration sets the bit rate (1 bit per chirp) |
+| CSS | Spreading factor (6–10), carrier, sweep bandwidth | Each chirp carries SF bits and lasts 2^SF / bandwidth. The card shows the computed chirp duration and raw bit rate. Higher SF is slower and more robust |
 | OFDM | FFT size, BPSK/QPSK, cyclic prefix, pilots, ZF/MMSE equalizer | |
 | Link layer | ARQ on/off, max retries (1/3/5), ACK timeout (200–2000 ms) | With ARQ on, **both** devices must enable it |
 | Appearance | System / light / dark theme, replay tutorial | |

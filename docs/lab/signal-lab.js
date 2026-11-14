@@ -166,41 +166,59 @@
   }
 
   // ---------- CSS (css_modulate.c) ----------
-  function cssChirp(f0, B, T, fs) {
-    var n = Math.floor(T * fs + 0.5), s = new Float64Array(n);
-    for (var i = 0; i < n; i++) {
-      var t = i / fs;
-      s[i] = 0.8 * Math.cos(2 * Math.PI * (f0 + (B / (2 * T)) * t) * t);
+  // One symbol: the base up-chirp cyclically shifted by k chips (down: the
+  // f_hi -> f_lo down-chirp). Phase is carried across symbols via ph[0].
+  function cssSymbol(out, off, k, down, g, ph) {
+    var B = g.B, T = g.M / B, rate = B / T, flo = g.fc - B / 2, fhi = g.fc + B / 2;
+    var nw = (g.M - k) * g.D, tw = nw / g.fs, fst = flo + k * B / g.M;
+    var phw = fst * tw + 0.5 * rate * tw * tw, p0 = ph[0], p = 0;
+    for (var n = 0; n <= g.N; n++) {
+      var t = n / g.fs;
+      if (down) p = fhi * t - 0.5 * rate * t * t;
+      else if (n < nw) p = fst * t + 0.5 * rate * t * t;
+      else { var u = t - tw; p = phw + flo * u + 0.5 * rate * u * u; }
+      if (n === g.N) break;
+      out[off + n] = 0.8 * Math.cos(2 * Math.PI * ((p0 + p) % 1));
     }
-    return s;
+    ph[0] = (p0 + p) % 1;
   }
   function renderCss() {
-    var fs = +$("css-fs").value, f0 = +$("css-f0").value, B = +$("css-bw").value;
-    var T = +$("css-t").value / 1000, snr = +$("css-snr").value;
+    var fs = +$("css-fs").value, fc = +$("css-f0").value, Bcfg = +$("css-bw").value;
+    var sf = +$("css-sf").value, snr = +$("css-snr").value;
     var bits = ($("css-bits").value || "").replace(/[^01]/g, "").slice(0, 32);
-    $("css-f0-o").value = (f0 / 1000).toFixed(1) + " kHz";
-    $("css-bw-o").value = (B / 1000).toFixed(1) + " kHz";
-    $("css-t-o").value = (T * 1000).toFixed(0) + " ms";
+    $("css-f0-o").value = (fc / 1000).toFixed(1) + " kHz";
+    $("css-bw-o").value = (Bcfg / 1000).toFixed(1) + " kHz";
     $("css-snr-o").value = snr + " dB";
-    if (f0 + B > fs / 2) {
-      $("css-stats").textContent = "f0 + B exceeds Nyquist (" + fs / 2 + " Hz); the native validator would reject this.";
+    var D = Math.max(1, Math.round(fs / Bcfg)), M = 1 << sf;
+    var g = { fs: fs, fc: fc, B: fs / D, D: D, M: M, N: M * D };
+    if (fc + g.B / 2 > fs / 2 || fc - g.B / 2 <= 0) {
+      $("css-stats").textContent = "The band fc ± B/2 leaves (0, " + fs / 2 + " Hz]; the native validator would reject this.";
       return;
     }
-    var up = cssChirp(f0, B, T, fs), down = cssChirp(f0, -B, T, fs), seq = [];
-    for (var i = 0; i < 8; i++) seq.push(up);
-    seq.push(down, down);
-    for (i = 0; i < bits.length; i++) seq.push(bits[i] === "1" ? down : up);
-    var x = new Float64Array(seq.length * up.length);
-    for (i = 0; i < seq.length; i++) x.set(seq[i], i * up.length);
+    if (g.N > fs) {
+      $("css-stats").textContent = "A chirp would last " + (g.N / fs).toFixed(2) + " s (> 1 s); the native validator would reject this.";
+      return;
+    }
+    var nsym = Math.ceil(bits.length / sf), x = new Float64Array((10 + nsym) * g.N), ph = [0], i;
+    for (i = 0; i < 8; i++) cssSymbol(x, i * g.N, 0, false, g, ph);
+    for (i = 8; i < 10; i++) cssSymbol(x, i * g.N, 0, true, g, ph);
+    for (var s = 0; s < nsym; s++) {
+      var v = 0;
+      for (var b = 0; b < sf; b++) { var j = s * sf + b; v = (v << 1) | (j < bits.length && bits[j] === "1" ? 1 : 0); }
+      var k = v;                         // symbol whose Gray code is v
+      for (var sh = 1; sh < 16; sh <<= 1) k ^= k >> sh;
+      cssSymbol(x, (10 + s) * g.N, k, false, g, ph);
+    }
     var y = addNoise(x, snr, rng(7));
     var zoom = y.subarray(0, Math.min(y.length, Math.round(fs * 0.002)));
     linePlot($("css-wave"), zoom, "First 2 ms of the frame (up-chirp start, with noise)", "t", "amplitude");
-    spectrogram($("css-spec"), y, fs, 256, fs / 2, "Spectrogram: 8 up + 2 down preamble, then one chirp per bit");
-    var air = (10 + bits.length) * up.length / fs;
+    spectrogram($("css-spec"), y, fs, 256, fs / 2, "Spectrogram: 8 up + 2 down preamble, then one shifted up-chirp per " + sf + " bits");
+    var air = x.length / fs;
     $("css-stats").textContent =
-      "Band " + ((f0 - B) / 1000).toFixed(1) + "–" + ((f0 + B) / 1000).toFixed(1) + " kHz · " +
-      up.length + " samples/chirp · raw rate " + (1 / T).toFixed(1) + " bit/s · this frame " +
-      air.toFixed(2) + " s (" + bits.length + " bits + preamble)";
+      "Band " + ((fc - g.B / 2) / 1000).toFixed(2) + "–" + ((fc + g.B / 2) / 1000).toFixed(2) + " kHz (B = fs/" + D + " = " +
+      g.B.toFixed(1) + " Hz) · " + g.N + " samples/chirp (" + (1000 * g.N / fs).toFixed(1) + " ms) · raw rate " +
+      (sf * g.B / M).toFixed(1) + " bit/s · this frame " + air.toFixed(2) + " s (" + bits.length + " bits in " + nsym +
+      " chirps + preamble)";
   }
 
   // ---------- OFDM (ofdm_modulate.c) ----------
@@ -262,7 +280,7 @@
     var root = $("sw-lab");
     if (!root || root.dataset.ready) return;
     root.dataset.ready = "1";
-    ["css-fs", "css-f0", "css-bw", "css-t", "css-snr", "css-bits"].forEach(function (id) {
+    ["css-fs", "css-f0", "css-bw", "css-sf", "css-snr", "css-bits"].forEach(function (id) {
       $(id).addEventListener("input", renderCss);
     });
     ["ofdm-n", "ofdm-cp", "ofdm-mod", "ofdm-snr"].forEach(function (id) {
