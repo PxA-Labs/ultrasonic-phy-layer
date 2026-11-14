@@ -666,11 +666,13 @@ class AppState extends ChangeNotifier {
         _bandwidth = 2000.0;
         break;
       case 'high_speed':
+        // OFDM occupies carrier +- bandwidth/2: 18-21 kHz (inaudible band,
+        // one subcarrier of guard below Nyquist at 44.1 kHz).
         _mode = 1;
         _numSubcarriers = 2048;
         _cpLength = 128;
-        _carrierFreq = 19000.0;
-        _bandwidth = 4000.0;
+        _carrierFreq = 19500.0;
+        _bandwidth = 3000.0;
         break;
     }
     _syncConfigMap();

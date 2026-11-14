@@ -5,6 +5,7 @@
 // Release builds (NDEBUG).
 
 #include "soundwave_api.h"
+#include "soundwave/ofdm.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -31,8 +32,9 @@ static int failures = 0;
 // (positive bins only half doubled) cost 28-45 %.
 #define EVM_NOISELESS_MAX 0.01
 
-// Data subcarriers per OFDM symbol for N = 256 (95 active, 12 pilots).
-#define DATA_PER_SYMBOL 83
+// Data subcarriers per OFDM symbol for N = 256 in the default 18-20 kHz band:
+// bins 106..115 (one guard bin inside each band edge), pilots on 106 and 114.
+#define DATA_PER_SYMBOL 8
 
 static sw_config_t ofdm_config(int ofdm_modulation) {
     sw_config_t cfg;
@@ -58,6 +60,13 @@ static int bit_at(const uint8_t* bytes, size_t i) {
     return (bytes[i / 8] >> (7 - (i % 8))) & 1;
 }
 
+// The modulator whitens the data bits (ofdm_scramble), so the constellation
+// points carry payload XOR PRBS15. Returns that on-air bit sequence.
+static void on_air_bits(const uint8_t* payload, size_t nbytes, uint8_t* out) {
+    memcpy(out, payload, nbytes);
+    ofdm_scramble(out, nbytes * 8);
+}
+
 // Modulates payload; returns a malloc'd sample buffer (caller frees).
 static float* modulate(const uint8_t* payload, size_t nbytes, sw_config_t cfg,
                        size_t* out_len) {
@@ -70,13 +79,8 @@ static float* modulate(const uint8_t* payload, size_t nbytes, sw_config_t cfg,
         free(samples);
         return NULL;
     }
-    // Trailing silence shorter than one symbol: the detector may place the
-    // frame start a few samples late, and only whole symbols are demodulated.
-    size_t pad = (size_t)(cfg.num_subcarriers + cfg.cp_length - 1);
-    if (len + pad <= MAX_SAMPLES) {
-        memset(samples + len, 0, pad * sizeof(float));
-        len += pad;
-    }
+    // No trailing padding: a buffer that ends at the frame's last sample
+    // yields every data symbol (and nothing after it).
     *out_len = len;
     return samples;
 }
@@ -102,8 +106,9 @@ static double evm_rms(const float* iq, size_t n, int ofdm_modulation) {
 }
 
 static void test_qpsk_points_match_payload(void) {
-    uint8_t payload[32];
+    uint8_t payload[32], air[32];
     for (int i = 0; i < 32; i++) payload[i] = (uint8_t)(i * 37 + 11);
+    on_air_bits(payload, sizeof payload, air);
     sw_config_t cfg = ofdm_config(1);
     size_t n = 0;
     float* s = modulate(payload, sizeof payload, cfg, &n);
@@ -128,7 +133,7 @@ static void test_qpsk_points_match_payload(void) {
     for (size_t k = 0; k < sizeof payload * 8 / 2; k++) {
         int b1 = iq[2 * k + 1] < 0.0f;
         int b2 = iq[2 * k] < 0.0f;
-        if (b1 != bit_at(payload, 2 * k) || b2 != bit_at(payload, 2 * k + 1))
+        if (b1 != bit_at(air, 2 * k) || b2 != bit_at(air, 2 * k + 1))
             mismatches++;
     }
     CHECK(mismatches == 0);
@@ -161,7 +166,8 @@ static void test_qpsk_points_match_payload(void) {
 }
 
 static void test_bpsk_points_on_real_axis(void) {
-    uint8_t payload[8] = {0xA5, 0x3C, 0xFF, 0x00, 0x12, 0x34, 0x56, 0x78};
+    uint8_t payload[8] = {0xA5, 0x3C, 0xFF, 0x00, 0x12, 0x34, 0x56, 0x78}, air[8];
+    on_air_bits(payload, sizeof payload, air);
     sw_config_t cfg = ofdm_config(0);
     size_t n = 0;
     float* s = modulate(payload, sizeof payload, cfg, &n);
@@ -175,7 +181,7 @@ static void test_bpsk_points_on_real_axis(void) {
     int mismatches = 0;
     for (size_t k = 0; k < sizeof payload * 8; k++) {
         int bit = iq[2 * k] > 0.0f; // bpsk_map: 0 -> -1, 1 -> +1
-        if (bit != bit_at(payload, k)) mismatches++;
+        if (bit != bit_at(air, k)) mismatches++;
     }
     CHECK(mismatches == 0);
 
@@ -215,8 +221,9 @@ typedef struct {
 static loopback_t loopback(int ofdm_modulation, int cp, int equalizer,
                            size_t lead, size_t drop, double noise) {
     loopback_t res = {INFINITY, -1, 0};
-    uint8_t payload[64];
+    uint8_t payload[64], air[64];
     for (int i = 0; i < 64; i++) payload[i] = (uint8_t)(i * 151 + 29);
+    on_air_bits(payload, sizeof payload, air);
     sw_config_t cfg = ofdm_config(ofdm_modulation);
     cfg.cp_length = cp;
     cfg.equalizer = equalizer;
@@ -230,7 +237,7 @@ static loopback_t loopback(int ofdm_modulation, int cp, int equalizer,
 
     size_t sym = (size_t)(cfg.num_subcarriers + cp);
     size_t frame_syms = tx_len / sym - 2;
-    size_t n = lead + (tx_len - drop) + sym - 1; // + trailing silence < 1 symbol
+    size_t n = lead + (tx_len - drop); // ends at the frame's last sample
     if (n > MAX_SAMPLES) goto done;
     memcpy(rx + lead, tx + drop, (tx_len - drop) * sizeof(float));
     if (noise > 0.0) {
@@ -247,11 +254,11 @@ static loopback_t loopback(int ofdm_modulation, int cp, int equalizer,
     for (size_t k = 0; k < want; k++) {
         float re = iq[2 * k], im = iq[2 * k + 1];
         if (ofdm_modulation == 0) {
-            int bit = k < nbits ? bit_at(payload, k) : 0; // bpsk_map: 0 -> -1
+            int bit = k < nbits ? bit_at(air, k) : 0; // bpsk_map: 0 -> -1
             errors += (re > 0.0f) != bit;
         } else {
-            int b1 = 2 * k < nbits ? bit_at(payload, 2 * k) : 0;
-            int b2 = 2 * k + 1 < nbits ? bit_at(payload, 2 * k + 1) : 0;
+            int b1 = 2 * k < nbits ? bit_at(air, 2 * k) : 0;
+            int b2 = 2 * k + 1 < nbits ? bit_at(air, 2 * k + 1) : 0;
             errors += (im < 0.0f) != b1;
             errors += (re < 0.0f) != b2;
         }
@@ -319,7 +326,9 @@ static void test_timing_offset_within_cp(void) {
 // amplitude A has variance A^2/3 per sample, and the unitary DFT keeps that
 // per subcarrier. The ZF error is W - X (W1 + W2) / 2 (data noise plus the
 // two-copy channel-estimate noise), so EVM = sqrt(1.5 A^2 / 3) = 1.41 % for
-// A = 0.02. The window allows for the finite sample of points.
+// A = 0.02. The per-symbol common-phase correction from the two pilots adds
+// a phase error of variance (A^2/3) / 4, i.e. sqrt(1.5 + 0.25) A / sqrt(3) =
+// 1.53 %. The window allows for the finite sample of points.
 static void test_noise_evm_matches_theory(void) {
     for (int eq = 0; eq <= 1; eq++) {
         check_case("noise A=0.02", 1, 32, eq, 0, 0, 0.02, 0.010, 0.020);
@@ -359,7 +368,15 @@ static void test_bad_params(void) {
     CHECK(count == 0);
 }
 
+static void test_layout_matches_constant(void) {
+    ofdm_layout_t lay;
+    CHECK(ofdm_layout_compute(256, 44100.0f, 19000.0f, 2000.0f, &lay) == SW_OK);
+    CHECK(lay.first_bin == 106 && lay.last_bin == 115);
+    CHECK(lay.num_data == DATA_PER_SYMBOL);
+}
+
 int main(void) {
+    test_layout_matches_constant();
     test_qpsk_points_match_payload();
     test_bpsk_points_on_real_axis();
     test_noiseless_loopback_evm();

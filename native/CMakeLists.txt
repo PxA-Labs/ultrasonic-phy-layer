@@ -234,6 +234,7 @@ if(NOT ANDROID)
     add_executable(soundwave_cli
         tools/soundwave_cli/main.c
         tools/soundwave_cli/wav_util.c
+        tools/soundwave_cli/frame_format.c
     )
     target_link_libraries(soundwave_cli PRIVATE soundwave_static)
     target_include_directories(soundwave_cli PRIVATE tools/soundwave_cli)

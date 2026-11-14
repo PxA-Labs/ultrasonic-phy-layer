@@ -3,7 +3,7 @@
  * @brief Shared data structures, status codes, and configuration types for Soundwave PHY.
  * 
  * @copyright Copyright (c) 2026 PxA Labs (Archit Mittal, Purvansh Joshi)
- * @license MIT License
+ * @license Apache License 2.0 (SPDX-License-Identifier: Apache-2.0); see LICENSE.
  */
 
 #ifndef SOUNDWAVE_TYPES_H
@@ -29,8 +29,8 @@ typedef struct {
     float  coding_rate;      /**< Reserved, ignored (must be finite). FEC is fixed RS(255,223). */
     float  threshold;        /**< Preamble detection threshold multiplier theta. */
     int    equalizer;        /**< Equalizer algorithm: 0 = Zero-Forcing (ZF), 1 = MMSE. */
-    float  carrier_freq;     /**< CSS band centre in Hz (default 19000.0). */
-    float  bandwidth;        /**< CSS sweep bandwidth in Hz, quantised to fs/round(fs/B) (default 2000.0). */
+    float  carrier_freq;     /**< CSS band centre; OFDM band centre. Hz (default 19000.0). */
+    float  bandwidth;        /**< CSS sweep bandwidth, quantised to fs/round(fs/B); OFDM occupied band width. Hz (default 2000.0). */
     float  symbol_duration;  /**< Ignored by CSS (a chirp lasts 2^sf / B); validated <= 1 s. */
     float  amplitude;        /**< Amplitude A (0.0 to 1.0) (default 0.8). */
     int    ofdm_modulation;  /**< OFDM constellation mapping: 0 = BPSK, 1 = QPSK. */

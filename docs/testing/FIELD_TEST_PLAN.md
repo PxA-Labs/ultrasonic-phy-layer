@@ -30,7 +30,7 @@ Covers issue #96. **No field results exist yet.** This document is the procedure
 
 ## 3. Two test pipelines
 
-The app and `soundwave-cli` use **different frame formats** (the app has no length field; see [Architecture](../architecture/overview.md#frame-formats)). They share the modulation, so each pipeline must be decoded with its own tool.
+The app and `soundwave-cli` use the **same frame format** and modem defaults (see [Architecture](../architecture/overview.md#frame-formats)), so a recording from either pipeline can be decoded by either tool as long as the settings match.
 
 | | **Pipeline A: CLI playback, offline decode** (primary) | **Pipeline B: app to app** (end-to-end check) |
 |---|---|---|
@@ -103,11 +103,11 @@ The repo has no impulse-response tool. As a proxy, measure RT60 (any room-acoust
 |---|---|---|---|
 | C1 | CSS | f_c 19 kHz, B 2 kHz, SF 8 (default) | 62.6 bit/s |
 | C2 | CSS | f_c 18 kHz, B 2 kHz, SF 10 (*Long Range* preset) | 19.6 bit/s |
-| O1 | OFDM | N 256, CP 64, QPSK, ZF (default) | 22.9 kbit/s |
-| O2 | OFDM | N 256, CP 64, QPSK, MMSE | 22.9 kbit/s |
-| O3 | OFDM | N 256, CP 64, BPSK, MMSE | 11.4 kbit/s |
+| O1 | OFDM | N 256, CP 64, QPSK, ZF, 18–20 kHz (default) | 2.2 kbit/s |
+| O2 | OFDM | N 256, CP 64, QPSK, MMSE, 18–20 kHz | 2.2 kbit/s |
+| O3 | OFDM | N 256, CP 64, BPSK, MMSE, 18–20 kHz | 1.1 kbit/s |
 
-`soundwave-cli` exposes `--sf`, `--freq`, `--bw`, `--fft`, `--cp`, `--amp` and `--equalizer` (`ber_sweep.py generate --sf`), so C1 and C2 run through either pipeline. It has **no option** for BPSK, so O3 can only be run through pipeline B (app to app) until the CLI gains it.
+`soundwave-cli` exposes `--sf`, `--freq`, `--bw`, `--fft`, `--cp`, `--ofdm-mod`, `--amp` and `--equalizer` (`ber_sweep.py generate --sf`), so every configuration runs through either pipeline (`ber_sweep.py` itself does not pass `--ofdm-mod` yet).
 
 ### 6.2 Distance (line of sight, 0°, devices at 1.0 m height)
 

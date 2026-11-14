@@ -11,7 +11,7 @@ The Soundwave app has three tabs: **Dashboard**, **Monitor** and **Settings**. T
 5. Received messages appear under **Received Messages Log**, together with an estimated SNR.
 
 !!! tip "Expect slow CSS frames"
-    In the default CSS configuration (SF 8, 2 kHz) one 128 ms chirp carries 8 bits, so the raw rate is 62.6 bit/s and a two-byte message takes about 6 s on air. A lower SF or a 4 kHz sweep is faster (SF 6 at 4 kHz: 376 bit/s, about 1 s) but less robust (values computed from the code, see [Signal chain](../architecture/signal-chain.md)). OFDM is much faster, but it currently occupies roughly 5.7–21.9 kHz, which is clearly audible.
+    In the default CSS configuration (SF 8, 2 kHz) one 128 ms chirp carries 8 bits, so the raw rate is 62.6 bit/s and a two-byte message takes about 6 s on air. A lower SF or a 4 kHz sweep is faster (SF 6 at 4 kHz: 376 bit/s, about 1 s) but less robust (values computed from the code, see [Signal chain](../architecture/signal-chain.md)). OFDM is much faster (about 2.2 kbit/s raw with the defaults, 4.9 kbit/s with *High Speed*) and stays in the configured band, 18–20 kHz by default; the OFDM card in Settings shows the computed band and rate.
 
 Start with the devices close together (tens of centimetres) and increase the distance from there. Range has **not** been measured yet.
 
@@ -38,7 +38,7 @@ Start with the devices close together (tens of centimetres) and increase the dis
 
 | Group | Settings | Notes |
 |---|---|---|
-| Presets | *Defaults*, *Long Range (Robust)* (CSS, 18 kHz, 2 kHz sweep, SF 10), *High Speed (OFDM)* (2048-point FFT, CP 128) | Apply on both devices |
+| Presets | *Defaults*, *Long Range (Robust)* (CSS, 18 kHz, 2 kHz sweep, SF 10), *High Speed (OFDM)* (2048-point FFT, CP 128, 18–21 kHz) | Apply on both devices |
 | Modulation | CSS or OFDM | |
 | FEC | Reed-Solomon on/off | RS(255,223): 32 parity bytes, corrects up to 16 byte errors per frame. There is no adjustable code rate |
 | Audio I/O | Input/output device, playback volume, AGC on/off | AGC is on by default |

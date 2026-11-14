@@ -1,4 +1,5 @@
-// OFDM modulator: constellation mapping, pilot insertion, IDFT, cyclic prefix.
+// OFDM modulator: band plan, constellation mapping, pilot insertion, IDFT,
+// cyclic prefix and transmit windowing (WOLA).
 // References: MATHEMATICAL_MODEL.md section 2.2.2.
 
 #include "soundwave/ofdm.h"
@@ -18,7 +19,7 @@ void ofdm_init(ofdm_config_t* cfg) {
     if (!cfg) return;
     if (cfg->num_subcarriers <= 0) cfg->num_subcarriers = 256;
     if (cfg->cp_length <= 0) cfg->cp_length = cfg->num_subcarriers / 8;
-    if (cfg->pilot_spacing <= 0) cfg->pilot_spacing = 8;
+    if (cfg->pilot_spacing <= 0) cfg->pilot_spacing = OFDM_PILOT_SPACING;
     if (cfg->pilot_boost <= 0.0f) cfg->pilot_boost = 1.0f;
 }
 
@@ -69,28 +70,63 @@ uint8_t qpsk_demap_hard(kiss_fft_cpx symbol) {
     return 0;
 }
 
-void ofdm_allocate_subcarriers(int N, int* data_indices, int* pilot_indices, int* null_indices,
-                               int* num_data, int* num_pilots, int* num_nulls) {
-    int N_guard = N / 8;
-    int n_data = 0;
-    int n_pilots = 0;
-    int n_nulls = 0;
+static int ofdm_fft_size_ok(int N) {
+    return N >= 16 && N <= 4096 && (N & (N - 1)) == 0;
+}
 
-    // DC Null
-    if (null_indices) null_indices[n_nulls] = 0;
-    n_nulls++;
+int ofdm_layout_compute(int N, float sample_rate, float carrier_freq,
+                        float bandwidth, ofdm_layout_t* out) {
+    if (!out) return SW_ERR_BAD_PARAM;
+    memset(out, 0, sizeof *out);
+    if (!ofdm_fft_size_ok(N)) return SW_ERR_BAD_PARAM;
+    if (!isfinite(sample_rate) || !isfinite(carrier_freq) || !isfinite(bandwidth) ||
+        sample_rate < 0.0f || carrier_freq < 0.0f || bandwidth < 0.0f)
+        return SW_ERR_BAD_PARAM;
+    // Defaults are applied in float, then everything is computed in double
+    // with the same operation order as FrameGeometry (soundwave_app), so both
+    // sides agree on the bin indices exactly.
+    if (sample_rate == 0.0f) sample_rate = OFDM_DEFAULT_SAMPLE_RATE;
+    if (carrier_freq == 0.0f) carrier_freq = OFDM_DEFAULT_CARRIER_HZ;
+    if (bandwidth == 0.0f) bandwidth = OFDM_DEFAULT_BANDWIDTH_HZ;
 
-    // Guard left
-    for (int k = 1; k <= N_guard; k++) {
-        if (null_indices) null_indices[n_nulls] = k;
-        n_nulls++;
+    double fs = (double)sample_rate;
+    double f_lo = (double)carrier_freq - 0.5 * (double)bandwidth;
+    double f_hi = (double)carrier_freq + 0.5 * (double)bandwidth;
+    double df = fs / (double)N;
+    // The band must sit strictly above DC and leave one subcarrier spacing of
+    // guard below Nyquist (anti-aliasing filters roll off there).
+    if (!(f_lo > 0.0) || !(f_hi <= 0.5 * fs - df)) return SW_ERR_BAD_PARAM;
+
+    double k_lo = ceil(f_lo * (double)N / fs) + OFDM_EDGE_GUARD_BINS;
+    double k_hi = floor(f_hi * (double)N / fs) - OFDM_EDGE_GUARD_BINS;
+    if (k_lo < 1.0 || k_hi > 0.5 * (double)N - 1.0 ||
+        k_hi - k_lo + 1.0 < (double)OFDM_MIN_ACTIVE_BINS)
+        return SW_ERR_BAD_PARAM;
+
+    out->first_bin = (int)k_lo;
+    out->last_bin = (int)k_hi;
+    out->num_active = out->last_bin - out->first_bin + 1;
+    out->num_pilots = (out->num_active + OFDM_PILOT_SPACING - 1) / OFDM_PILOT_SPACING;
+    out->num_data = out->num_active - out->num_pilots;
+    return SW_OK;
+}
+
+int ofdm_layout_from_config(const ofdm_config_t* cfg, ofdm_layout_t* out) {
+    if (!cfg) {
+        if (out) memset(out, 0, sizeof *out);
+        return SW_ERR_BAD_PARAM;
     }
+    int N = cfg->num_subcarriers > 0 ? cfg->num_subcarriers : 256;
+    return ofdm_layout_compute(N, cfg->sample_rate, cfg->carrier_freq,
+                               cfg->bandwidth, out);
+}
 
-    // Active subcarriers in the independent first half [N_guard + 1 .. N/2 - 1]
-    int active_start = N_guard + 1;
-    int active_end = N / 2 - 1;
-    for (int k = active_start; k <= active_end; k++) {
-        if ((k - active_start) % 8 == 0) {
+void ofdm_allocate_subcarriers(const ofdm_layout_t* lay, int* data_indices,
+                               int* pilot_indices) {
+    if (!lay) return;
+    int n_data = 0, n_pilots = 0;
+    for (int k = lay->first_bin; k <= lay->last_bin; k++) {
+        if ((k - lay->first_bin) % OFDM_PILOT_SPACING == 0) {
             if (pilot_indices) pilot_indices[n_pilots] = k;
             n_pilots++;
         } else {
@@ -98,94 +134,101 @@ void ofdm_allocate_subcarriers(int N, int* data_indices, int* pilot_indices, int
             n_data++;
         }
     }
+}
 
-    // Middle Null (N/2)
-    if (null_indices) null_indices[n_nulls] = N / 2;
-    n_nulls++;
+int ofdm_preamble_spectrum(const ofdm_layout_t* lay, int N, int cp, kiss_fft_cpx* X) {
+    if (!lay || !X || N <= 0 || cp < 0 || cp > N || lay->num_active <= 0 ||
+        lay->first_bin < 1 || lay->last_bin >= N / 2)
+        return SW_ERR_BAD_PARAM;
+    float* zr = (float*)malloc((size_t)lay->num_active * sizeof(float));
+    float* zi = (float*)malloc((size_t)lay->num_active * sizeof(float));
+    if (!zr || !zi) {
+        free(zr);
+        free(zi);
+        return SW_ERR_MEMORY;
+    }
+    sync_zc_generate(1, lay->num_active, zr, zi);
 
-    // Dependent / Conjugate symmetric subcarriers [N/2 + 1 .. N - N_guard - 1]
-    for (int k = N / 2 + 1; k <= N - N_guard - 1; k++) {
-        if (null_indices) null_indices[n_nulls] = k;
-        n_nulls++;
+    // The two preamble copies are joined without a cross-fade, so the
+    // waveform jumps from body[N-1] to the second copy's CP sample
+    // body[N-cp] instead of continuing with body[0]. A common phase
+    // rotation e^{j phi} of the whole sequence (still a ZC sequence, so the
+    // receiver's template, which comes from this function too, is identical)
+    // makes Re{e^{j phi} (z[N-cp] - z[0])} = 0, z[n] = sum_k X_k e^{j2pi kn/N}:
+    // the junction is then continuous in value and its spectral splatter
+    // falls off as 1/f^4 instead of 1/f^2.
+    double dr = 0.0, di = 0.0;
+    for (int i = 0; i < lay->num_active; i++) {
+        int k = lay->first_bin + i;
+        double a = 2.0 * (double)SW_PI * (double)k * (double)(N - cp) / (double)N;
+        double ca = cos(a), sa = sin(a);
+        dr += (double)zr[i] * ca - (double)zi[i] * sa - (double)zr[i];
+        di += (double)zr[i] * sa + (double)zi[i] * ca - (double)zi[i];
+    }
+    double rot_r = 1.0, rot_i = 0.0;
+    double dmag = sqrt(dr * dr + di * di);
+    if (dmag > 1e-9 * (double)lay->num_active) {
+        // e^{j phi} = j * conj(dz) / |dz|  =>  e^{j phi} dz = j |dz|
+        rot_r = di / dmag;
+        rot_i = dr / dmag;
     }
 
-    // Guard right
-    for (int k = N - N_guard; k < N; k++) {
-        if (null_indices) null_indices[n_nulls] = k;
-        n_nulls++;
+    memset(X, 0, (size_t)N * sizeof(kiss_fft_cpx));
+    for (int i = 0; i < lay->num_active; i++) {
+        X[lay->first_bin + i].r = (float)((double)zr[i] * rot_r - (double)zi[i] * rot_i);
+        X[lay->first_bin + i].i = (float)((double)zr[i] * rot_i + (double)zi[i] * rot_r);
     }
+    free(zr);
+    free(zi);
+    return SW_OK;
+}
 
-    if (num_data) *num_data = n_data;
-    if (num_pilots) *num_pilots = n_pilots;
-    if (num_nulls) *num_nulls = n_nulls;
+void ofdm_scramble(uint8_t* bits, size_t nbits) {
+    if (!bits) return;
+    unsigned state = 0x7FFFu;
+    for (size_t i = 0; i < nbits; i++) {
+        unsigned pn = ((state >> 14) ^ (state >> 13)) & 1u;
+        state = ((state << 1) | pn) & 0x7FFFu;
+        if (pn) bits[i / 8] ^= (uint8_t)(0x80u >> (i % 8));
+    }
 }
 
 void ofdm_map_constellation(const ofdm_config_t* cfg, const uint8_t* bits,
                             size_t bit_len, kiss_fft_cpx* X) {
     if (!cfg || !bits || !X) return;
+    ofdm_layout_t lay;
+    if (ofdm_layout_from_config(cfg, &lay) != SW_OK) return;
+    int N = cfg->num_subcarriers > 0 ? cfg->num_subcarriers : 256;
+    int* data_indices = (int*)calloc((size_t)lay.num_data, sizeof(int));
+    if (!data_indices) return;
+    ofdm_allocate_subcarriers(&lay, data_indices, NULL);
 
-    int N = cfg->num_subcarriers;
-    int* data_indices = (int*)malloc(N * sizeof(int));
-    int* pilot_indices = (int*)malloc(N * sizeof(int));
-    int* null_indices = (int*)malloc(N * sizeof(int));
-    if (!data_indices || !pilot_indices || !null_indices) {
-        free(data_indices); free(pilot_indices); free(null_indices);
-        return;
-    }
-
-    int num_data, num_pilots, num_nulls;
-
-    ofdm_allocate_subcarriers(N, data_indices, pilot_indices, null_indices,
-                               &num_data, &num_pilots, &num_nulls);
-
-    memset(X, 0, N * sizeof(kiss_fft_cpx));
-
-    for (int i = 0; i < num_data; i++) {
+    memset(X, 0, (size_t)N * sizeof(kiss_fft_cpx));
+    for (int i = 0; i < lay.num_data; i++) {
         int idx = data_indices[i];
         if (cfg->modulation == 0) {
-            // BPSK
-            int bit = (i < (int)bit_len) ? get_bit(bits, i) : 0;
+            int bit = ((size_t)i < bit_len) ? get_bit(bits, (size_t)i) : 0;
             bpsk_map(bit, &X[idx]);
         } else {
-            // QPSK
-            int bit1 = (2 * i < (int)bit_len) ? get_bit(bits, 2 * i) : 0;
-            int bit2 = (2 * i + 1 < (int)bit_len) ? get_bit(bits, 2 * i + 1) : 0;
-            uint8_t dibit = (bit1 << 1) | bit2;
-            qpsk_map(dibit, &X[idx]);
+            size_t b = 2 * (size_t)i;
+            int bit1 = (b < bit_len) ? get_bit(bits, b) : 0;
+            int bit2 = (b + 1 < bit_len) ? get_bit(bits, b + 1) : 0;
+            qpsk_map((uint8_t)((bit1 << 1) | bit2), &X[idx]);
         }
     }
-
     free(data_indices);
-    free(pilot_indices);
-    free(null_indices);
 }
 
 void ofdm_insert_pilots(const ofdm_config_t* cfg, kiss_fft_cpx* X) {
     if (!cfg || !X) return;
-
-    int N = cfg->num_subcarriers;
-    int* data_indices = (int*)malloc(N * sizeof(int));
-    int* pilot_indices = (int*)malloc(N * sizeof(int));
-    int* null_indices = (int*)malloc(N * sizeof(int));
-    if (!data_indices || !pilot_indices || !null_indices) {
-        free(data_indices); free(pilot_indices); free(null_indices);
-        return;
-    }
-    int num_data, num_pilots, num_nulls;
-
-    ofdm_allocate_subcarriers(N, data_indices, pilot_indices, null_indices,
-                               &num_data, &num_pilots, &num_nulls);
-
+    ofdm_layout_t lay;
+    if (ofdm_layout_from_config(cfg, &lay) != SW_OK) return;
     float boost = (cfg->pilot_boost > 0.0f) ? cfg->pilot_boost : 1.0f;
-    for (int p = 0; p < num_pilots; p++) {
-        int idx = pilot_indices[p];
+    for (int p = 0; p < lay.num_pilots; p++) {
+        int idx = lay.first_bin + p * OFDM_PILOT_SPACING;
         X[idx].r = (p % 2 == 0) ? boost : -boost;
         X[idx].i = 0.0f;
     }
-
-    free(data_indices);
-    free(pilot_indices);
-    free(null_indices);
 }
 
 void ofdm_modulate_symbol(const ofdm_config_t* cfg, const kiss_fft_cpx* X,
@@ -237,107 +280,111 @@ void ofdm_modulate_symbol(const ofdm_config_t* cfg, const kiss_fft_cpx* X,
     free(fft_cfg);
 }
 
+// Overlap-adds one symbol (CP + body: L = N + cp samples in sym) at out with
+// a raised-cosine rise over its first W samples (if rise) and, if suffix, its
+// cyclic suffix sym[cp .. cp + W) fading out over the W samples after it.
+// The destination must be zeroed beforehand.
+static void ofdm_wola_add(float* out, const float* sym, int N, int cp, int W,
+                          const float* ramp, int rise, int suffix) {
+    int L = N + cp;
+    for (int n = 0; n < L; n++) {
+        float g = (rise && n < W) ? ramp[n] : 1.0f;
+        out[n] += g * sym[n];
+    }
+    if (suffix) {
+        for (int n = 0; n < W; n++) out[L + n] += ramp[W - 1 - n] * sym[cp + n];
+    }
+}
+
 int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
                          size_t bit_len, float* samples, size_t* sample_len) {
     if (!cfg || !bits || !samples || !sample_len) return SW_ERR_BAD_PARAM;
 
     int N = cfg->num_subcarriers;
     int cp = cfg->cp_length;
-    if (N < 16 || N > 4096 || (N & (N - 1)) != 0 || cp < 0 || cp > N)
-        return SW_ERR_BAD_PARAM;
+    if (!ofdm_fft_size_ok(N) || cp < 0 || cp > N) return SW_ERR_BAD_PARAM;
 
-    // Check if the capacity can hold at least the 2 preamble symbols
-    if (*sample_len < (size_t)(2 * (N + cp))) {
+    ofdm_layout_t lay;
+    if (ofdm_layout_from_config(cfg, &lay) != SW_OK) return SW_ERR_BAD_PARAM;
+
+    int bits_per_symbol = lay.num_data * (cfg->modulation == 0 ? 1 : 2);
+    size_t num_symbols =
+        bit_len ? (bit_len + (size_t)bits_per_symbol - 1) / (size_t)bits_per_symbol : 0;
+    size_t L = (size_t)N + (size_t)cp;
+    int W = OFDM_WOLA_LEN(cp);
+    if (num_symbols > (size_t)INT_MAX || num_symbols + 3 > SIZE_MAX / sizeof(float) / L)
+        return SW_ERR_BAD_PARAM; // would overflow the size computation below
+    size_t total_samples = (2 + num_symbols) * L + (size_t)W;
+    if (*sample_len < 2 * L + (size_t)W) {
+        // Not even room for the preamble and its fade-out.
         *sample_len = 0;
         return SW_ERR_OVERFLOW;
     }
-
-    int* data_indices = (int*)malloc(N * sizeof(int));
-    int* pilot_indices = (int*)malloc(N * sizeof(int));
-    int* null_indices = (int*)malloc(N * sizeof(int));
-    if (!data_indices || !pilot_indices || !null_indices) {
-        free(data_indices); free(pilot_indices); free(null_indices);
-        return SW_ERR_MEMORY;
-    }
-
-    int num_data, num_pilots, num_nulls;
-    ofdm_allocate_subcarriers(N, data_indices, pilot_indices, null_indices,
-                               &num_data, &num_pilots, &num_nulls);
-
-    int bits_per_symbol = num_data * (cfg->modulation == 0 ? 1 : 2);
-    if (bits_per_symbol <= 0) {
-        free(data_indices); free(pilot_indices); free(null_indices);
-        return SW_ERR_BAD_PARAM;
-    }
-    int num_symbols = (int)((bit_len + bits_per_symbol - 1) / bits_per_symbol);
-    if (bit_len == 0) num_symbols = 0;
-
-    size_t total_samples = ((size_t)2 + (size_t)num_symbols) * ((size_t)N + (size_t)cp);
     if (total_samples > *sample_len) {
-        *sample_len = total_samples;
-        free(data_indices); free(pilot_indices); free(null_indices);
+        *sample_len = total_samples; // required size
         return SW_ERR_OVERFLOW;
     }
 
-    // 1. Generate preamble ZC-OFDM symbol
-    int N_guard = N / 8;
-    int N_active = N / 2 - N_guard - 1;
-    int active_start = N_guard + 1;
-    float* zc_real = (float*)malloc(N_active * sizeof(float));
-    float* zc_imag = (float*)malloc(N_active * sizeof(float));
-    if (!zc_real || !zc_imag) {
-        free(zc_real); free(zc_imag);
-        free(data_indices); free(pilot_indices); free(null_indices);
+    int* data_indices = (int*)calloc((size_t)lay.num_data, sizeof(int));
+    kiss_fft_cpx* X = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
+    float* sym = (float*)calloc(L, sizeof(float));
+    float* ramp = (float*)malloc(((size_t)W + 1) * sizeof(float));
+    uint8_t* wbits = (uint8_t*)malloc(bit_len / 8 + 1);
+    if (!data_indices || !X || !sym || !ramp || !wbits) {
+        free(data_indices); free(X); free(sym); free(ramp); free(wbits);
         return SW_ERR_MEMORY;
     }
-    sync_zc_generate(1, N_active, zc_real, zc_imag);
+    // Whitened copy of the data bits (see ofdm_scramble).
+    memcpy(wbits, bits, (bit_len + 7) / 8);
+    ofdm_scramble(wbits, bit_len);
+    bits = wbits;
+    ofdm_allocate_subcarriers(&lay, data_indices, NULL);
+    // Raised-cosine rise r[n]; the matching fall is r[W - 1 - n], and
+    // r[n] + r[W - 1 - n] = 1, so overlapping symbols cross-fade at unit gain.
+    for (int n = 0; n < W; n++)
+        ramp[n] = 0.5f * (1.0f - cosf(SW_PI * ((float)n + 0.5f) / (float)W));
 
-    kiss_fft_cpx* X = (kiss_fft_cpx*)calloc(N, sizeof(kiss_fft_cpx));
-    if (!X) {
-        free(zc_real); free(zc_imag);
-        free(data_indices); free(pilot_indices); free(null_indices);
-        return SW_ERR_MEMORY;
+    memset(samples, 0, total_samples * sizeof(float));
+
+    // 1. Preamble: the same ZC-OFDM symbol twice. The two copies are joined
+    // without a cross-fade so they stay sample-identical (Schmidl-Cox timing
+    // and CFO); only the frame start and the junction to the first data
+    // symbol are windowed.
+    int rc = ofdm_preamble_spectrum(&lay, N, cp, X);
+    if (rc != SW_OK) {
+        free(data_indices); free(X); free(sym); free(ramp); free(wbits);
+        return rc;
     }
-    for (int i = 0; i < N_active; i++) {
-        int idx = active_start + i;
-        X[idx].r = zc_real[i];
-        X[idx].i = zc_imag[i];
-    }
+    ofdm_modulate_symbol(cfg, X, sym);
+    ofdm_wola_add(samples, sym, N, cp, W, ramp, 1, 0);
+    ofdm_wola_add(samples + L, sym, N, cp, W, ramp, 0, 1);
 
-    // Modulate preamble symbol 1
-    ofdm_modulate_symbol(cfg, X, samples);
-    // Copy to preamble symbol 2
-    memcpy(samples + (N + cp), samples, (N + cp) * sizeof(float));
-
-    free(zc_real);
-    free(zc_imag);
-
-    // 2. Generate data symbols
-    for (int s = 0; s < num_symbols; s++) {
-        memset(X, 0, N * sizeof(kiss_fft_cpx));
-        for (int i = 0; i < num_data; i++) {
+    // 2. Data symbols
+    int bits_per_sub = (cfg->modulation == 0 ? 1 : 2);
+    for (size_t s = 0; s < num_symbols; s++) {
+        memset(X, 0, (size_t)N * sizeof(kiss_fft_cpx));
+        for (int i = 0; i < lay.num_data; i++) {
             int idx = data_indices[i];
-            size_t bit_pos = s * bits_per_symbol + i * (cfg->modulation == 0 ? 1 : 2);
+            size_t bit_pos = s * (size_t)bits_per_symbol + (size_t)i * (size_t)bits_per_sub;
             if (cfg->modulation == 0) {
                 int bit = (bit_pos < bit_len) ? get_bit(bits, bit_pos) : 0;
                 bpsk_map(bit, &X[idx]);
             } else {
                 int bit1 = (bit_pos < bit_len) ? get_bit(bits, bit_pos) : 0;
                 int bit2 = ((bit_pos + 1) < bit_len) ? get_bit(bits, bit_pos + 1) : 0;
-                uint8_t dibit = (bit1 << 1) | bit2;
-                qpsk_map(dibit, &X[idx]);
+                qpsk_map((uint8_t)((bit1 << 1) | bit2), &X[idx]);
             }
         }
         ofdm_insert_pilots(cfg, X);
-
-        float* sym_dest = samples + (2 + s) * (N + cp);
-        ofdm_modulate_symbol(cfg, X, sym_dest);
+        ofdm_modulate_symbol(cfg, X, sym);
+        ofdm_wola_add(samples + (2 + s) * L, sym, N, cp, W, ramp, 1, 1);
     }
 
-    free(X);
     free(data_indices);
-    free(pilot_indices);
-    free(null_indices);
+    free(X);
+    free(sym);
+    free(ramp);
+    free(wbits);
 
     *sample_len = total_samples;
     return SW_OK;
@@ -347,33 +394,35 @@ sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg) {
     sw_signal sig;
     sig.data = NULL;
     sig.length = 0;
-    sig.sample_rate = (float)cfg.sample_rate;
+    sig.sample_rate = (float)(cfg.sample_rate > 0 ? cfg.sample_rate : 44100);
 
     ofdm_config_t ofdm_cfg;
+    memset(&ofdm_cfg, 0, sizeof ofdm_cfg);
     ofdm_cfg.num_subcarriers = cfg.num_subcarriers;
     ofdm_cfg.cp_length = cfg.cp_length;
     ofdm_cfg.num_pilots = cfg.num_pilots;
-    ofdm_cfg.pilot_spacing = 8;
+    ofdm_cfg.pilot_spacing = OFDM_PILOT_SPACING;
     ofdm_cfg.pilot_boost = 1.0f;
     ofdm_cfg.modulation = cfg.ofdm_modulation; // 0 = BPSK, 1 = QPSK
+    ofdm_cfg.sample_rate = cfg.sample_rate > 0 ? (float)cfg.sample_rate : 0.0f;
+    ofdm_cfg.carrier_freq = cfg.carrier_freq;
+    ofdm_cfg.bandwidth = cfg.bandwidth;
 
     ofdm_init(&ofdm_cfg);
 
+    ofdm_layout_t lay;
+    if (!bits || num_bits == 0 || ofdm_layout_from_config(&ofdm_cfg, &lay) != SW_OK)
+        return sig;
+
     int N = ofdm_cfg.num_subcarriers;
     int cp = ofdm_cfg.cp_length;
-    int N_guard = N / 8;
-    int num_data = N / 2 - N_guard - 1;
-    int num_pilots = (num_data + 7) / 8;
-    num_data -= num_pilots;
-
-    int bits_per_symbol = num_data * (ofdm_cfg.modulation == 0 ? 1 : 2);
-    if (!bits || num_bits == 0 || bits_per_symbol <= 0) return sig;
+    int bits_per_symbol = lay.num_data * (ofdm_cfg.modulation == 0 ? 1 : 2);
     size_t num_symbols = (num_bits + (size_t)bits_per_symbol - 1) / (size_t)bits_per_symbol;
     size_t sym_len = (size_t)N + (size_t)cp;
-    if (num_symbols > (size_t)INT_MAX || num_symbols + 2 > SIZE_MAX / sizeof(float) / sym_len)
+    if (num_symbols > (size_t)INT_MAX || num_symbols + 3 > SIZE_MAX / sizeof(float) / sym_len)
         return sig; // would overflow the size computation below
 
-    size_t total_samples = (2 + num_symbols) * sym_len;
+    size_t total_samples = (2 + num_symbols) * sym_len + (size_t)OFDM_WOLA_LEN(cp);
     sig.data = (float*)malloc(total_samples * sizeof(float));
     if (!sig.data) return sig;
 

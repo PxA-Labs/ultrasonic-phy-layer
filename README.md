@@ -37,9 +37,9 @@ There are **no field measurements yet**. Every number below is labeled with its 
 
 | Quantity | CSS (default SF8, 2 kHz) | OFDM (default N=256, CP=64, QPSK) | Source |
 |---|---|---|---|
-| Occupied band | 18–20 kHz (centre 19 kHz ± 1 kHz) | ≈ 5.7–21.9 kHz (**audible**; the band is set by N, not by `carrier_freq`) | Derived |
-| Raw PHY bit rate | 62.6 bit/s (8 bits per 127.7 ms chirp); 19.6–375.9 bit/s over SF 10..6 and 2–4 kHz | 22.9 kbit/s | Derived |
-| Airtime, largest single frame (219 B payload) | 33.8 s (5.6 s at SF6, 4 kHz) | 0.11 s | Derived |
+| Occupied band | 18–20 kHz (centre 19 kHz ± 1 kHz) | 18–20 kHz (`carrier_freq` ± `bandwidth`/2; subcarriers at 18.26–19.81 kHz; ≤ −40 dB of the energy below 16 kHz) | Derived (OFDM spectrum: simulated, `test_ofdm_spectrum.c`) |
+| Raw PHY bit rate | 62.6 bit/s (8 bits per 127.7 ms chirp); 19.6–375.9 bit/s over SF 10..6 and 2–4 kHz | 2.2 kbit/s (8 data subcarriers × 2 bits per 7.26 ms symbol); 4.9 kbit/s with the *High Speed* preset (N=2048, 18–21 kHz) | Derived |
+| Airtime, largest single frame (219 B payload) | 33.8 s (5.6 s at SF6, 4 kHz) | 0.94 s (0.54 s *High Speed*) | Derived |
 | BER under AWGN | < 10⁻³ at ≥ 3 dB SNR; ≤ 0.5 % at −7 dB for every SF | < 10⁻² at ≥ 10 dB SNR | Simulated (`native/tests/test_ber.c`, `test_css.c`) |
 | Noiseless loopback EVM | n/a | < 1 % | Simulated (`native/tests/test_constellation.c`) |
 | Error rate in the field | BER < 10⁻⁵ at 10 dB SNR | same | Target, untested |

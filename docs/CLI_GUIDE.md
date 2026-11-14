@@ -18,10 +18,10 @@ This will produce the `soundwave-cli` executable inside the build folder (with M
 
 ### Notes on the current implementation
 
-- **Frame format.** `modulate` wraps the text as `[CRC-32][length u16][payload][RS parity 32 B]`. This is **not** the app's frame format (the app has no length field), so CLI WAVs cannot be decoded by the app's *Import Signal*, and app recordings cannot be decoded by `demodulate`. See [Architecture](architecture/overview.md#frame-formats).
-- **`--sf` sets the CSS symbol:** each chirp carries SF bits and lasts 2^SF / B (SF 6..10; 127.7 ms and 62.6 bit/s raw at the default SF 8, 2 kHz). The chirp duration follows from `--sf` and `--bw`; there is no separate option. Pass the same `--sf` and `--bw` to `modulate` and `demodulate`. The CLI has no option for BPSK (OFDM is always QPSK here).
-- **`--freq` / `--bw` affect CSS only.** The OFDM band is set by `--fft` and the sample rate.
-- `demodulate --mode css` searches the **whole file** for the first complete preamble, so any amount of silence, noise or other audio may precede the frame (fixed Nov 2026; before, a frame more than a few milliseconds into the file was usually missed). The `DEBUG: sw_detect_frame ... frame_start = N` line reports the same start.
+- **Frame format.** `modulate` wraps the text in the app's PHY frame, `[CRC-32 LE][payload 1..219 B][RS parity 32 B]` ([specification](DEVELOPER_GUIDE.md#phy-frame-format)). CLI WAVs decode in the app's *Import Signal* and app recordings decode with `demodulate`, given the same modem settings (the defaults match the app's).
+- **`--sf` sets the CSS symbol:** each chirp carries SF bits and lasts 2^SF / B (SF 6..10; 127.7 ms and 62.6 bit/s raw at the default SF 8, 2 kHz). The chirp duration follows from `--sf` and `--bw`; there is no separate option. Pass the same `--sf` and `--bw` to `modulate` and `demodulate`. Use `--ofdm-mod bpsk` for BPSK OFDM.
+- **`--freq` / `--bw`** set the CSS chirp and the **OFDM band** `freq ± bw/2` (default 18–20 kHz). An OFDM band that reaches DC, comes within one subcarrier of Nyquist or holds fewer than 4 subcarriers is rejected.
+- `demodulate --mode css` searches the **whole file** for the first complete preamble, so any amount of silence, noise or other audio may precede the frame (fixed Nov 2026; before, a frame more than a few milliseconds into the file was usually missed). The `DEBUG: sw_detect_frame ... frame_start = N` line reports the same start. The CLI demodulates from that start, as the app does.
 - `demodulate` decodes the **first** frame found in the file. It prints the payload on stdout and diagnostics on stderr, including a `DEBUG: sw_detect_frame ... snr = X dB` line with an uncalibrated SNR estimate. The exit code is 0 only if RS decoding and the CRC succeed.
 - `simulate` sets the noise power from the average power of the **whole file**, including any silence. It uses an unseeded C `rand()`, so every run adds the same noise sequence.
 - For repeated measurements over many frames (field recordings or AWGN sweeps), use [`docs/testing/ber_sweep.py`](testing/ber_sweep.py), described in the [field test plan](testing/FIELD_TEST_PLAN.md).
@@ -39,15 +39,17 @@ soundwave-cli modulate --mode <css|ofdm> --input "<text>" --output <filename.wav
 
 ### Required Arguments
 - `--mode <css|ofdm>`: The modulation technique.
-- `--input "<text>"`: The ASCII string to encode (up to 217 bytes).
+- `--input "<text>"`: The ASCII string to encode (up to 219 bytes).
 - `--output <filename.wav>`: Destination path for the generated audio file.
 
 ### Options
 - `--sf <sf>`: CSS spreading factor, SF bits per chirp (6..10, default `8`).
 - `--fft <size>`: OFDM FFT size (256, 512, 1024, 2048, default `256`).
 - `--cp <length>`: OFDM cyclic prefix length (default `64`).
-- `--freq <freq_hz>`: Carrier frequency in Hz (default `19000.0`).
-- `--bw <bw_hz>`: Bandwidth in Hz (default `2000.0`).
+- `--freq <freq_hz>`: Carrier frequency in Hz (default `19000.0`; OFDM band centre).
+- `--bw <bw_hz>`: Bandwidth in Hz (default `2000.0`; OFDM band = `freq ± bw/2`).
+- `--ofdm-mod <bpsk|qpsk>`: OFDM subcarrier mapping (default `qpsk`).
+- `--no-rs`: frames without Reed-Solomon parity (the app's `enable_rs` off).
 - `--amp <amplitude>`: Waveform amplitude scaling (0.0 to 1.0, default `0.8`).
 
 ### Examples
@@ -80,8 +82,10 @@ soundwave-cli demodulate --mode <css|ofdm> --input <filename.wav> [options]
 - `--sf <sf>`: CSS spreading factor, SF bits per chirp (6..10, default `8`).
 - `--fft <size>`: OFDM FFT size (default `256`).
 - `--cp <length>`: OFDM cyclic prefix length (default `64`).
-- `--freq <freq_hz>`: Carrier frequency in Hz (default `19000.0`).
-- `--bw <bw_hz>`: Bandwidth in Hz (default `2000.0`).
+- `--freq <freq_hz>`: Carrier frequency in Hz (default `19000.0`; OFDM band centre).
+- `--bw <bw_hz>`: Bandwidth in Hz (default `2000.0`; OFDM band = `freq ± bw/2`).
+- `--ofdm-mod <bpsk|qpsk>`: OFDM subcarrier mapping (default `qpsk`).
+- `--no-rs`: frames without Reed-Solomon parity (the app's `enable_rs` off).
 - `--equalizer <zf|mmse>`: Channel equalization method for OFDM (default `zf`).
 
 ### Examples

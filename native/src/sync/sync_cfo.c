@@ -101,26 +101,3 @@ void sync_apply_cfo_correction(const float* y_real, const float* y_imag,
     }
     free(cr); free(ci);
 }
-
-void sync_schmidl_cox_timing(const float* y, size_t len, int N, float* M) {
-    // len - 2N would wrap for short inputs and run far past the buffer.
-    if (!y || !M || N <= 0 || len < 2 * (size_t)N) return;
-    for (size_t d = 0; d <= len - 2 * (size_t)N; d++) {
-        double P_real = 0.0, P_imag = 0.0, R = 0.0;
-        for (int n = 0; n < N; n++) {
-            P_real += (double)y[d + n] * (double)y[d + n + N];
-            P_imag += (double)y[d + n] * (double)y[d + n + N]; // simplified
-            R += (double)y[d + n + N] * (double)y[d + n + N];
-        }
-        M[d] = (float)((P_real * P_real + P_imag * P_imag) / (R * R + 1e-10));
-    }
-}
-
-int sync_find_timing_peak(const float* M, size_t len, size_t* timing_idx) {
-    if (!M || !timing_idx || len == 0) return -1;
-    size_t peak = 0;
-    for (size_t i = 1; i < len; i++)
-        if (M[i] > M[peak]) peak = i;
-    *timing_idx = peak;
-    return 0;
-}

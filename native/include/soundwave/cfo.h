@@ -25,9 +25,7 @@ void sync_apply_cfo_correction(const float* y_real, const float* y_imag,
                                size_t len, float cfo, float fs,
                                float* out_real);
 
-// Timing metric: M(d) = |P(d)|^2 / R(d)^2 (Schmidl-Cox timing).
-void sync_schmidl_cox_timing(const float* y, size_t len, int N, float* M);
-// Returns 0 on success, -1 on bad arguments.
-int  sync_find_timing_peak(const float* M, size_t len, size_t* timing_idx);
+// Schmidl-Cox timing is computed on the analytic signal in
+// sync_detect_frame() (sync_frame.c); fine timing in ofdm_refine_timing().
 
 #endif // SOUNDWAVE_CFO_H

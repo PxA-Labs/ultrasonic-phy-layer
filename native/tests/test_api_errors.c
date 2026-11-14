@@ -48,24 +48,42 @@ static void test_config_validation_table(void) {
     memset(&zero, 0, sizeof zero);
     CHECK(sw_config_validate(zero) == SW_OK); // all-defaults config is valid
 
-    // Boundary values that must be accepted.
-    sw_config_t c = ok;
-    c.sample_rate = 8000; c.carrier_freq = 4000.0f; c.bandwidth = 4000.0f;
+    // Boundary values of each field that must be accepted. They are checked
+    // on a CSS config: with modulation == 1 the OFDM band plan adds its own
+    // constraints (checked below), e.g. no ultrasonic band fits at 8 kHz or
+    // in a 16-point FFT. Both modems require their whole band below Nyquist.
+    const sw_config_t css_ok = cfg_for(0);
+    sw_config_t c = css_ok;
+    c.sample_rate = 8000; c.carrier_freq = 2000.0f; c.bandwidth = 2000.0f;
     CHECK(sw_config_validate(c) == SW_OK);
-    c = ok; c.sample_rate = 192000;                CHECK(sw_config_validate(c) == SW_OK);
-    c = ok; c.sf = 6;                              CHECK(sw_config_validate(c) == SW_OK);
-    c = ok; c.sf = 10;                             CHECK(sw_config_validate(c) == SW_OK);
-    c = ok; c.num_subcarriers = 16; c.cp_length = 16; c.num_pilots = 8;
+    c = css_ok; c.sample_rate = 192000;                CHECK(sw_config_validate(c) == SW_OK);
+    c = css_ok; c.sf = 6;                              CHECK(sw_config_validate(c) == SW_OK);
+    c = css_ok; c.sf = 10;                             CHECK(sw_config_validate(c) == SW_OK);
+    c = css_ok; c.num_subcarriers = 16; c.cp_length = 16; c.num_pilots = 8;
     CHECK(sw_config_validate(c) == SW_OK);
-    c = ok; c.num_subcarriers = 4096;              CHECK(sw_config_validate(c) == SW_OK);
-    c = ok; c.amplitude = 1.0f;                    CHECK(sw_config_validate(c) == SW_OK);
-    c = ok; c.symbol_duration = 1.0f;              CHECK(sw_config_validate(c) == SW_OK);
-    c = ok; c.cp_length = 256; c.num_pilots = 128; CHECK(sw_config_validate(c) == SW_OK);
-    // sample_rate 0 means the 44.1 kHz default: Nyquist is 22050 Hz.
-    c = ok; c.sample_rate = 0; c.carrier_freq = 22050.0f;
+    c = css_ok; c.num_subcarriers = 4096;              CHECK(sw_config_validate(c) == SW_OK);
+    c = css_ok; c.amplitude = 1.0f;                    CHECK(sw_config_validate(c) == SW_OK);
+    c = css_ok; c.symbol_duration = 1.0f;              CHECK(sw_config_validate(c) == SW_OK);
+    c = css_ok; c.cp_length = 256; c.num_pilots = 128; CHECK(sw_config_validate(c) == SW_OK);
+    // sample_rate 0 means the 44.1 kHz default: Nyquist is 22050 Hz, and the
+    // OFDM band may reach fs/2 - fs/N = 21877.734375 Hz (N = 256) exactly.
+    c = ok; c.sample_rate = 0; c.carrier_freq = 20877.734375f;
     CHECK(sw_config_validate(c) == SW_OK);
+    c.carrier_freq = 20877.75f; // 1/64 Hz further
+    CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
     c.carrier_freq = 22100.0f;
     CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
+
+    // OFDM band plan (carrier_freq +- bandwidth/2, see test_ofdm_spectrum.c).
+    c = ok; c.num_subcarriers = 4096;              CHECK(sw_config_validate(c) == SW_OK);
+    c = ok; c.carrier_freq = 19500.0f; c.bandwidth = 3000.0f;
+    CHECK(sw_config_validate(c) == SW_OK);         // 18-21 kHz
+    c = ok; c.num_subcarriers = 16; c.cp_length = 16;
+    CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM); // < 4 subcarriers in band
+    c = ok; c.sample_rate = 8000;
+    CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM); // 18-20 kHz above Nyquist
+    c = ok; c.carrier_freq = 21500.0f;
+    CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM); // band edge past Nyquist
 
     // Every rejection rule.
 #define REJECT(field, value)                                                   \
@@ -101,7 +119,9 @@ static void test_config_validation_table(void) {
     REJECT(sf, 13);
     // CSS only: the chirp band must fit below Nyquist and a symbol in 1 s.
     c = cfg_for(0); c.carrier_freq = 21500.0f;     CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
-    c = cfg_for(0); c.sf = 10; c.bandwidth = 500.0f;
+    // SF 10 at 1 kHz: a 1.02 s chirp (CSS rejects it). The same 18.5-19.5 kHz
+    // band still holds the 4 OFDM subcarriers the OFDM band plan needs.
+    c = cfg_for(0); c.sf = 10; c.bandwidth = 1000.0f;
     CHECK(sw_config_validate(c) == SW_ERR_BAD_PARAM);
     c.modulation = 1;                              CHECK(sw_config_validate(c) == SW_OK);
     REJECT(num_subcarriers, 100);  // not a power of two
@@ -221,16 +241,9 @@ static void test_ofdm_buffer_negotiation(void) {
     for (int i = 0; i < 24; i++) msg[i] = (uint8_t)(i * 37 + 5);
     size_t n = 0;
     float* tx = negotiate_modulate(sw_ofdm_modulate, msg, 24 * 8, cfg, &n);
-    // A receive buffer keeps going after the frame: append two symbols of
-    // silence. (Demodulating a buffer that ends exactly at the last sample of
-    // the frame currently yields one data symbol fewer; that is a receiver
-    // timing detail outside this API-contract test.)
-    const size_t pad = 2 * (256 + 64);
-    float* s = (float*)calloc(n + pad, sizeof(float));
-    CHECK(s != NULL);
-    memcpy(s, tx, n * sizeof(float));
-    free(tx);
-    n += pad;
+    // The buffer ends exactly at the frame's last sample: every data symbol
+    // must still be demodulated (no trailing padding needed).
+    float* s = tx;
 
     uint8_t out[4096];
     size_t bits = 8;
