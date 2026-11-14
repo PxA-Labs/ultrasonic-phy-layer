@@ -151,6 +151,29 @@ SW_API int sw_ofdm_modulate(const uint8_t* bits, size_t bit_len,
 SW_API int sw_ofdm_demodulate(const float* samples, size_t sample_len,
                               sw_config_t cfg, uint8_t* bits, size_t* bit_len);
 
+/**
+ * @brief Demodulates an OFDM frame and returns the equalized data-subcarrier
+ *        constellation points (for constellation diagrams and EVM).
+ *
+ * Runs the same detection, CFO correction, channel estimation and ZF/MMSE
+ * equalization as sw_ofdm_demodulate(), but outputs the complex points that
+ * feed the hard demapper instead of bits. Points are unit-energy for the
+ * configured mapping: BPSK at +/-1, QPSK at (+/-1 +/-j)/sqrt(2).
+ *
+ * @param samples Pointer to input float PCM audio samples (frame-aligned).
+ * @param sample_len Number of input audio samples.
+ * @param cfg PHY configuration struct; cfg.modulation must be 1 (OFDM).
+ * @param iq Pre-allocated output buffer of 2 * (*num_points) floats,
+ *           interleaved I0, Q0, I1, Q1, ...
+ * @param num_points Input: capacity in complex points (> 0).
+ *                   Output: number of points written. Points are in symbol
+ *                   order, then data-subcarrier order; a frame with more
+ *                   points than the capacity is truncated (not an error).
+ * @return SW_OK (0) on success, or negative sw_error_t code.
+ */
+SW_API int sw_ofdm_equalized_symbols(const float* samples, size_t sample_len,
+                                     sw_config_t cfg, float* iq, size_t* num_points);
+
 // --- Synchronization & CFO ---
 
 /**

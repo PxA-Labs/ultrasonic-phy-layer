@@ -78,6 +78,18 @@ static void demodulate(fz_reader* r, sw_config_t cfg, const float* s, size_t n) 
     }
     free(out);
 
+    // Equalized constellation points, at a fuzz-chosen capacity.
+    size_t cap_pts = 1 + fz_u16(r) % 4096;
+    float* iq = (float*)malloc(2 * cap_pts * sizeof(float));
+    if (iq) {
+        size_t pts = cap_pts;
+        if (sw_ofdm_equalized_symbols(s, n, cfg, iq, &pts) == SW_OK) {
+            FZ_CHECK(pts <= cap_pts);
+            touch(iq, 2 * pts * sizeof(float));
+        }
+        free(iq);
+    }
+
     size_t start = 0;
     float snr = 0.0f, cfo = 0.0f;
     if (sw_detect_frame(s, n, cfg, &start, &snr) == SW_OK) FZ_CHECK(start < n);
@@ -124,6 +136,7 @@ static void op_null_and_degenerate(fz_reader* r) {
     FZ_CHECK(sw_ofdm_modulate(&b, 8, cfg, NULL, &len) == SW_ERR_BAD_PARAM);
     FZ_CHECK(sw_css_demodulate(&f, 1, cfg, NULL, &len) == SW_ERR_BAD_PARAM);
     FZ_CHECK(sw_ofdm_demodulate(NULL, 1, cfg, &b, &len) == SW_ERR_BAD_PARAM);
+    FZ_CHECK(sw_ofdm_equalized_symbols(NULL, 1, cfg, &f, &len) == SW_ERR_BAD_PARAM);
     FZ_CHECK(sw_detect_frame(&f, 1, cfg, NULL, &snr) == SW_ERR_BAD_PARAM);
     FZ_CHECK(sw_estimate_cfo(&f, 1, cfg, NULL) == SW_ERR_BAD_PARAM);
     FZ_CHECK(sw_audio_capture_stop(NULL) == SW_ERR_BAD_PARAM);

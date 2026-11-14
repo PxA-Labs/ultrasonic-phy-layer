@@ -1,177 +1,133 @@
-// Signal Monitor screen — real-time waveform, FFT waterfall spectrogram, and level meter.
+// Signal Monitor screen — spectrum analyzer, waterfall spectrogram, OFDM
+// constellation and waveform (#71, #91).
+//
+// One SpectrumAnalyzer (Hann-windowed FFT) feeds both the spectrum and the
+// waterfall; the constellation comes from the receiver's equalizer output.
 
 import 'dart:async';
-import 'dart:math' as math;
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../dsp/constellation.dart';
+import '../dsp/spectrum_analyzer.dart';
 import '../state/app_state.dart';
-
-// Pure Dart Complex Number Implementation for FFT
-class Complex {
-  final double r;
-  final double i;
-  const Complex(this.r, this.i);
-
-  Complex operator +(Complex o) => Complex(r + o.r, i + o.i);
-  Complex operator -(Complex o) => Complex(r - o.r, i - o.i);
-  Complex operator *(Complex o) =>
-      Complex(r * o.r - i * o.i, r * o.i + i * o.r);
-}
-
-// Cooley-Tukey Radix-2 FFT
-List<Complex> fft(List<Complex> x) {
-  final int n = x.length;
-  if (n <= 1) return x;
-
-  final List<Complex> even = List.generate(n ~/ 2, (i) => x[2 * i]);
-  final List<Complex> odd = List.generate(n ~/ 2, (i) => x[2 * i + 1]);
-
-  final List<Complex> evenFft = fft(even);
-  final List<Complex> oddFft = fft(odd);
-
-  final List<Complex> result = List.filled(n, const Complex(0, 0));
-  for (int k = 0; k < n ~/ 2; k++) {
-    final double p = -2.0 * math.pi * k / n;
-    final Complex t = Complex(math.cos(p), math.sin(p)) * oddFft[k];
-    result[k] = evenFft[k] + t;
-    result[k + n ~/ 2] = evenFft[k] - t;
-  }
-  return result;
-}
+import '../widgets/viz/constellation_widget.dart';
+import '../widgets/viz/spectrum_analyzer_widget.dart';
+import '../widgets/viz/waterfall_widget.dart';
+import '../widgets/viz/waveform_widget.dart';
 
 class MonitorScreen extends StatefulWidget {
   const MonitorScreen({super.key});
+
+  /// FFT length shared by the spectrum and waterfall.
+  static const int fftSize = 1024;
+
+  /// Every n-th spectrum frame becomes a waterfall row (43 rows/s at
+  /// 44.1 kHz with a 512-sample hop).
+  static const int waterfallDecimation = 2;
+
+  /// Rows of waterfall history (~6 s at 44.1 kHz).
+  static const int waterfallRows = 256;
+
+  /// Width at which all four plots are shown at once instead of tabs.
+  static const double wideLayoutWidth = 1000;
 
   @override
   State<MonitorScreen> createState() => _MonitorScreenState();
 }
 
 class _MonitorScreenState extends State<MonitorScreen> {
-  StreamSubscription<List<double>>? _audioSubscription;
-  final List<double> _waveformSamples = List.filled(256, 0.0);
-  final List<double> _fftSlidingBuffer = [];
-  final List<List<double>> _waterfallHistory = [];
-  bool _paused = false;
-  double _peakFreqHz = 0.0;
-  double _dbfs = -60.0;
   late AppState _state;
+  StreamSubscription<Float64List>? _audioSubscription;
+  StreamSubscription<ConstellationFrame>? _constellationSubscription;
+
+  late SpectrumAnalyzer _analyzer;
+  late SpectrumController _spectrum;
+  late WaterfallController _waterfall;
+  final WaveformController _waveform = WaveformController();
+  final ConstellationController _constellation = ConstellationController();
+  int _sampleRate = 0;
+  int _frameCount = 0;
+  bool _paused = false;
+  bool _initialized = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _state = Provider.of<AppState>(context, listen: false);
+    if (!_initialized) {
+      _initialized = true;
+      _configure(_state.sampleRate);
+    }
   }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       if (!_state.isAudioCapturing) {
         _state.startAudioCapture();
       }
-      _subscribeToAudio(_state);
+      _audioSubscription = _state.audioStream.listen(_onAudio);
+      _constellationSubscription =
+          _state.constellationStream.listen(_constellation.addFrame);
     });
   }
 
-  void _subscribeToAudio(AppState state) {
-    _audioSubscription = state.audioStream.listen((chunk) {
-      if (_paused || !mounted) return;
+  /// (Re)creates the analysis chain for [sampleRate].
+  void _configure(int sampleRate) {
+    final rate = sampleRate > 0 ? sampleRate : 44100;
+    if (_sampleRate != 0) {
+      _spectrum.dispose();
+      _waterfall.dispose();
+    }
+    _sampleRate = rate;
+    _frameCount = 0;
+    _analyzer = SpectrumAnalyzer(
+      fftSize: MonitorScreen.fftSize,
+      sampleRate: rate.toDouble(),
+    );
+    _spectrum = SpectrumController(binWidthHz: _analyzer.binWidthHz);
+    _waterfall = WaterfallController(
+      rows: MonitorScreen.waterfallRows,
+      binCount: _analyzer.binCount,
+      binWidthHz: _analyzer.binWidthHz,
+      secondsPerRow:
+          _analyzer.secondsPerFrame * MonitorScreen.waterfallDecimation,
+    );
+  }
 
-      setState(() {
-        // Update waveform samples (keep last 256 samples)
-        if (chunk.length >= 256) {
-          for (int i = 0; i < 256; i++) {
-            _waveformSamples[i] = chunk[chunk.length - 256 + i];
-          }
-        } else {
-          _waveformSamples.removeRange(0, chunk.length);
-          _waveformSamples.addAll(chunk);
-        }
+  void _onAudio(Float64List chunk) {
+    if (_paused || !mounted) return;
+    if (_state.sampleRate != _sampleRate && _state.sampleRate > 0) {
+      setState(() => _configure(_state.sampleRate));
+    }
+    _waveform.addSamples(chunk);
+    final dt = _analyzer.secondsPerFrame;
+    for (final frame in _analyzer.addSamples(chunk)) {
+      _spectrum.update(frame, dt);
+      if (_frameCount++ % MonitorScreen.waterfallDecimation == 0) {
+        _waterfall.addRow(frame);
+      }
+    }
+  }
 
-        // Add to FFT sliding buffer
-        _fftSlidingBuffer.addAll(chunk);
-
-        // Process 512-point FFT if enough samples
-        while (_fftSlidingBuffer.length >= 512) {
-          final List<double> fftInput = _fftSlidingBuffer.sublist(0, 512);
-          _fftSlidingBuffer.removeRange(
-              0, 256); // 50% overlap for smooth waterfall
-
-          // Calculate dBFS Level Meter
-          double sumSq = 0.0;
-          for (final s in fftInput) {
-            sumSq += s * s;
-          }
-          final rms = math.sqrt(sumSq / 512);
-          _dbfs = rms > 0.0 ? 20 * math.log(rms) / math.ln10 : -60.0;
-          if (_dbfs < -60.0) _dbfs = -60.0;
-          if (_dbfs > 0.0) _dbfs = 0.0;
-
-          // Apply Hann Window
-          final List<Complex> complexInput = List.generate(512, (i) {
-            final w = 0.5 * (1.0 - math.cos(2.0 * math.pi * i / 511));
-            return Complex(fftInput[i] * w, 0.0);
-          });
-
-          // Run FFT
-          final complexOutput = fft(complexInput);
-
-          // Compute Magnitudes (keep first 256 bins)
-          final List<double> magnitudes = List.generate(256, (i) {
-            final double mag = math.sqrt(
-              complexOutput[i].r * complexOutput[i].r +
-                  complexOutput[i].i * complexOutput[i].i,
-            );
-            return mag;
-          });
-
-          // Find Peak Frequency in 15 kHz - 21 kHz range
-          // Bin width = 44100 / 512 = 86.13 Hz
-          const binWidth = 44100 / 512;
-          final int startBin = (15000 / binWidth).round();
-          final int endBin = (21000 / binWidth).round();
-          double maxMag = -1.0;
-          int peakBin = 0;
-
-          for (int i = startBin; i <= endBin; i++) {
-            if (magnitudes[i] > maxMag) {
-              maxMag = magnitudes[i];
-              peakBin = i;
-            }
-          }
-
-          if (maxMag > 0.01) {
-            _peakFreqHz = peakBin * binWidth;
-          } else {
-            _peakFreqHz = 0.0;
-          }
-
-          // Normalize magnitudes for heatmap display (0.0 to 1.0)
-          final List<double> normalized = List.generate(256, (i) {
-            final magDb = magnitudes[i] > 0.0
-                ? 20 * math.log(magnitudes[i]) / math.ln10
-                : -100.0;
-            // Map -80dB..0dB to 0.0..1.0
-            double norm = (magDb + 80.0) / 80.0;
-            if (norm < 0.0) norm = 0.0;
-            if (norm > 1.0) norm = 1.0;
-            return norm;
-          });
-
-          // Insert into waterfall history
-          _waterfallHistory.insert(0, normalized);
-          if (_waterfallHistory.length > 80) {
-            _waterfallHistory.removeLast();
-          }
-        }
-      });
-    });
+  void _togglePause() {
+    setState(() => _paused = !_paused);
+    if (!_paused) _analyzer.reset();
   }
 
   @override
   void dispose() {
     _audioSubscription?.cancel();
+    _constellationSubscription?.cancel();
+    _spectrum.dispose();
+    _waterfall.dispose();
+    _waveform.dispose();
+    _constellation.dispose();
     if (!_state.isListening && _state.isAudioCapturing) {
       _state.stopAudioCapture();
     }
@@ -180,112 +136,109 @@ class _MonitorScreenState extends State<MonitorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Map dbfs (-60..0) to level indicator progress (0..1)
-    final double levelProgress = (_dbfs + 60.0) / 60.0;
-
+    final carrierHz = context.select<AppState, double>((s) => s.carrierFreq);
     return Scaffold(
-      appBar: AppBar(title: const Text('Real-Time Signal Monitor')),
+      appBar: AppBar(
+        title: const Text('Real-Time Signal Monitor'),
+        actions: [
+          IconButton(
+            key: const ValueKey('monitor-pause'),
+            tooltip: _paused ? 'Resume monitor' : 'Pause monitor',
+            icon: Icon(_paused ? Icons.play_arrow : Icons.pause),
+            onPressed: _togglePause,
+          ),
+        ],
+      ),
       body: Column(
         children: [
-          // Waveform Card
+          _LevelBar(waveform: _waveform, spectrum: _spectrum),
           Expanded(
-            flex: 2,
-            child: Card(
-              margin: const EdgeInsets.all(8),
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Waveform (Time Domain)',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: Colors.grey),
-                    ),
-                    Expanded(
-                      child: CustomPaint(
-                        painter: _WaveformPainter(samples: _waveformSamples),
-                        size: Size.infinite,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final wide =
+                    constraints.maxWidth >= MonitorScreen.wideLayoutWidth;
+                return wide ? _grid(carrierHz) : _tabs(carrierHz);
+              },
             ),
           ),
-          // Spectrogram Card
-          Expanded(
-            flex: 3,
-            child: Card(
-              margin: const EdgeInsets.all(8),
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Waterfall Spectrogram (FFT Heatmap)',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: Colors.grey),
-                    ),
-                    Expanded(
-                      child: ClipRect(
-                        child: CustomPaint(
-                          painter:
-                              _WaterfallPainter(history: _waterfallHistory),
-                          size: Size.infinite,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _spectrumPanel() => _Panel(
+        title: 'Spectrum (dBFS)',
+        child: SpectrumAnalyzerWidget(controller: _spectrum),
+      );
+
+  Widget _waterfallPanel(double carrierHz) => _Panel(
+        title: 'Waterfall Spectrogram',
+        child: WaterfallView(controller: _waterfall, carrierHz: carrierHz),
+      );
+
+  Widget _constellationPanel() => _Panel(
+        title: 'OFDM Constellation (equalized)',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _ConstellationHint(),
+            Expanded(child: ConstellationDiagram(controller: _constellation)),
+          ],
+        ),
+      );
+
+  Widget _waveformPanel() => _Panel(
+        title: 'Waveform (Time Domain)',
+        child: WaveformWidget(controller: _waveform),
+      );
+
+  Widget _grid(double carrierHz) {
+    return Column(
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(child: _spectrumPanel()),
+              Expanded(child: _waterfallPanel(carrierHz)),
+            ],
           ),
-          // Control Bar / Level Meter
-          Card(
-            margin: const EdgeInsets.all(8),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  const Text('Level (dBFS):'),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: LinearProgressIndicator(
-                      value: levelProgress,
-                      backgroundColor: Colors.grey.shade800,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        levelProgress > 0.9
-                            ? Colors.red
-                            : (levelProgress > 0.7
-                                ? Colors.yellow
-                                : Colors.green),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    _peakFreqHz > 0
-                        ? 'Peak: ${(_peakFreqHz / 1000).toStringAsFixed(2)} kHz'
-                        : 'Peak: -- kHz',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 16),
-                  IconButton(
-                    icon: Icon(_paused ? Icons.play_arrow : Icons.pause),
-                    onPressed: () {
-                      setState(() {
-                        _paused = !_paused;
-                      });
-                    },
-                  ),
-                ],
-              ),
+        ),
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(child: _constellationPanel()),
+              Expanded(child: _waveformPanel()),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _tabs(double carrierHz) {
+    return DefaultTabController(
+      length: 4,
+      child: Column(
+        children: [
+          const TabBar(
+            isScrollable: true,
+            tabs: [
+              Tab(text: 'Spectrum'),
+              Tab(text: 'Waterfall'),
+              Tab(text: 'Constellation'),
+              Tab(text: 'Waveform'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              // Horizontal drags belong to the plots (waterfall readout).
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _spectrumPanel(),
+                _waterfallPanel(carrierHz),
+                _constellationPanel(),
+                _waveformPanel(),
+              ],
             ),
           ),
         ],
@@ -294,77 +247,119 @@ class _MonitorScreenState extends State<MonitorScreen> {
   }
 }
 
-class _WaveformPainter extends CustomPainter {
-  final List<double> samples;
-  _WaveformPainter({required this.samples});
+class _Panel extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _Panel({required this.title, required this.child});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.cyan
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-    final double midY = size.height / 2;
-    final double stepX = size.width / (samples.length - 1);
-
-    path.moveTo(0, midY);
-    for (int i = 0; i < samples.length; i++) {
-      final double x = i * stepX;
-      // Multiply amplitude by height/2 for drawing scaling
-      final double y = midY - samples[i] * midY * 0.9;
-      path.lineTo(x, y);
-    }
-
-    canvas.drawPath(path, paint);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    final titleStyle = theme.textTheme.bodySmall?.copyWith(color: muted);
+    return Card(
+      margin: const EdgeInsets.all(8),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: titleStyle),
+            const SizedBox(height: 4),
+            Expanded(child: child),
+          ],
+        ),
+      ),
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant _WaveformPainter oldDelegate) => true;
 }
 
-class _WaterfallPainter extends CustomPainter {
-  final List<List<double>> history;
-  _WaterfallPainter({required this.history});
+/// Input level meter and the strongest ultrasonic tone.
+class _LevelBar extends StatelessWidget {
+  final WaveformController waveform;
+  final SpectrumController spectrum;
 
-  Color _getWaterfallColor(double val) {
-    if (val < 0.25) {
-      return Color.lerp(Colors.blue.shade900, Colors.cyan, val / 0.25)!;
-    } else if (val < 0.5) {
-      return Color.lerp(Colors.cyan, Colors.green, (val - 0.25) / 0.25)!;
-    } else if (val < 0.75) {
-      return Color.lerp(Colors.green, Colors.yellow, (val - 0.5) / 0.25)!;
-    } else {
-      return Color.lerp(Colors.yellow, Colors.red, (val - 0.75) / 0.25)!;
-    }
-  }
+  const _LevelBar({required this.waveform, required this.spectrum});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    if (history.isEmpty) return;
-
-    final double rowHeight = size.height / 80; // Show up to 80 rows
-    final double colWidth = size.width / 128; // Group 256 bins into 128 cols
-
-    for (int r = 0; r < history.length; r++) {
-      final rowData = history[r];
-      final double y = r * rowHeight;
-
-      for (int c = 0; c < 128; c++) {
-        // Average two adjacent FFT bins for compression
-        final double val = (rowData[2 * c] + rowData[2 * c + 1]) / 2;
-        final double x = c * colWidth;
-
-        final paint = Paint()..color = _getWaterfallColor(val);
-        canvas.drawRect(
-          Rect.fromLTWH(x, y, colWidth + 0.5, rowHeight + 0.5),
-          paint,
-        );
-      }
-    }
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: ListenableBuilder(
+          listenable: Listenable.merge([waveform, spectrum]),
+          builder: (context, _) {
+            final db = waveform.levelDbfs.clamp(-60.0, 0.0);
+            final progress = (db + 60) / 60;
+            final Color meter;
+            if (progress > 0.9) {
+              meter = colors.error;
+            } else if (progress > 0.7) {
+              meter = colors.tertiary;
+            } else {
+              meter = colors.primary;
+            }
+            final peak = spectrum.peakBin(18000, 22000);
+            final s = spectrum.spectrum;
+            var peakText = '-- kHz';
+            if (peak != null && s != null && s[peak] > -80) {
+              final khz = peak * spectrum.binWidthHz / 1000;
+              peakText = '${khz.toStringAsFixed(2)} kHz';
+            }
+            return Row(
+              children: [
+                Text('Level ${db.toStringAsFixed(0)} dBFS'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: colors.surfaceContainerHighest,
+                    valueColor: AlwaysStoppedAnimation<Color>(meter),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  'Peak: $peakText',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
+}
+
+/// Explains what the constellation needs (OFDM mode, receiver running).
+class _ConstellationHint extends StatelessWidget {
+  const _ConstellationHint();
 
   @override
-  bool shouldRepaint(covariant _WaterfallPainter oldDelegate) => true;
+  Widget build(BuildContext context) {
+    final mode = context.select<AppState, int>((s) => s.mode);
+    final listening = context.select<AppState, bool>((s) => s.isListening);
+    final style = Theme.of(context).textTheme.bodySmall;
+    if (mode != 1) {
+      return Text(
+        'Constellation is shown for OFDM mode (select it in Settings).',
+        style: style,
+      );
+    }
+    if (listening) return const SizedBox.shrink();
+    return Row(
+      children: [
+        Expanded(
+          child: Text('Start the receiver to see frames.', style: style),
+        ),
+        TextButton(
+          onPressed: () => context.read<AppState>().toggleListening(),
+          child: const Text('Start receiver'),
+        ),
+      ],
+    );
+  }
 }
