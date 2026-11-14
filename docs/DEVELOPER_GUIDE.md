@@ -52,7 +52,23 @@ graph LR
     D --> R[RS parity<br/>32 bytes, optional]
 ```
 
-There is no length field. The receiver tries candidate lengths until RS decoding and the CRC-32 both verify. `soundwave-cli` uses a different layout with a 16-bit length field, so the two are not interchangeable. The TX/RX sequence diagrams, threading and persistence are described in the [architecture overview](architecture/overview.md). Band, rate and airtime per configuration are in [Signal chain & parameters](architecture/signal-chain.md).
+### PHY frame format
+
+This is the single frame format of the project. The app (`soundwave_app/lib/engine/frame_codec.dart`) and `soundwave-cli` (`native/tools/soundwave_cli/frame_format.c`) implement it byte for byte:
+
+| Field | Size | Content |
+|---|---|---|
+| CRC | 4 bytes | CRC-32 (IEEE 802.3, `sw_crc32`) over the payload, little-endian |
+| Payload | 1..219 bytes | Application bytes (UTF-8 text, or a link-layer frame) |
+| RS parity | 32 bytes, unless RS is off (`enable_rs` / `--no-rs`) | `sw_rs_encode` over CRC + payload: a shortened RS(255,223) codeword of at most 255 bytes |
+
+Example: payload `hello` gives `86 A6 10 36 68 65 6C 6C 6F` followed by 32 parity bytes (`native/tests/test_cli_frame.c`, `soundwave_app/test/native/cli_compat_test.dart`).
+
+There is no length field. The demodulator returns every symbol in its input, including noise after the frame, so the receiver tries lengths from the shortest upwards and takes the first one whose RS decode (if enabled) and CRC-32 both verify. This keeps the on-air format of the deployed app and its link layer unchanged. A false accept needs a wrong length to pass both RS decoding and a 32-bit CRC; without RS it needs a CRC-32 collision at one of at most 219 candidate lengths, about $219 \cdot 2^{-32} \approx 5 \times 10^{-8}$ per frame. A length field would not remove the search for the end of the frame in a stream; it would add two bytes that themselves need protection.
+
+The OFDM modulator additionally whitens the frame bits (PRBS15) on air. That is part of the modem, not of the byte format.
+
+The TX/RX sequence diagrams, threading and persistence are described in the [architecture overview](architecture/overview.md). Band, rate and airtime per configuration are in [Signal chain & parameters](architecture/signal-chain.md).
 
 ### Link Layer: Fragmentation, File Transfer & ARQ (#89, #100)
 
@@ -130,7 +146,7 @@ When calling C code from Dart via `dart:ffi`, managing memory safely across the 
 3. **Buffer Length Estimation Formulas**:
    - **RS Parity Allocation**: $N_{\text{parity}} = 2t = N_{\text{block}} - K_{\text{data}}$ bytes (default 32 bytes for $RS(255, 223)$).
    - **CSS Audio Samples**: $N_{\text{samples}} = (10 + N_{\text{bits}}) \times \text{round}(T_{\text{symbol}} f_s)$ floats (10-chirp preamble, one chirp per bit).
-   - **OFDM Audio Samples**: $N_{\text{samples}} = (2 + \lceil N_{\text{bits}} / B_{\text{sym}} \rceil) \times (N_{\text{fft}} + N_{\text{cp}})$, where $B_{\text{sym}}$ is data subcarriers times bits per subcarrier.
+   - **OFDM Audio Samples**: $N_{\text{samples}} = (2 + \lceil N_{\text{bits}} / B_{\text{sym}} \rceil) \times (N_{\text{fft}} + N_{\text{cp}}) + \lfloor N_{\text{cp}}/2 \rfloor$, where $B_{\text{sym}}$ is the number of data subcarriers in the configured band times bits per subcarrier (see [Signal chain](architecture/signal-chain.md#ofdm-mode)).
    - In practice, call once with a too-small capacity: the API returns `SW_ERR_OVERFLOW` and writes the required length.
 
 ### Memory Ownership Pattern Example (Dart FFI)

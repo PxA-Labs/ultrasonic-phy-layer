@@ -30,7 +30,7 @@ Covers issue #96. **No field results exist yet.** This document is the procedure
 
 ## 3. Two test pipelines
 
-The app and `soundwave-cli` use **different frame formats** (the app has no length field; see [Architecture](../architecture/overview.md#frame-formats)). They share the modulation, so each pipeline must be decoded with its own tool.
+The app and `soundwave-cli` use the **same frame format** and modem defaults (see [Architecture](../architecture/overview.md#frame-formats)), so a recording from either pipeline can be decoded by either tool as long as the settings match.
 
 | | **Pipeline A: CLI playback, offline decode** (primary) | **Pipeline B: app to app** (end-to-end check) |
 |---|---|---|

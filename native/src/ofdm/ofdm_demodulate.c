@@ -369,8 +369,8 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     analytic_real = (float*)malloc(payload_len * sizeof(float));
     analytic_imag = (float*)malloc(payload_len * sizeof(float));
     corrected = (float*)malloc(payload_len * sizeof(float));
-    Y_pre1 = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
-    Y_pre2 = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    Y_pre1 = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
+    Y_pre2 = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
     Y_pre = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
     active_indices = (int*)malloc(N_active * sizeof(int));
     X_active = (kiss_fft_cpx*)malloc(N_active * sizeof(kiss_fft_cpx));
@@ -462,7 +462,7 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     size_t total_allocated_bytes = ((size_t)num_symbols * (size_t)bits_per_symbol + 7) / 8;
     decoded_buf = (uint8_t*)calloc(total_allocated_bytes, sizeof(uint8_t));
 
-    Y_sym = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    Y_sym = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
     X_hat = (kiss_fft_cpx*)malloc(num_data * sizeof(kiss_fft_cpx));
     temp_bits = (uint8_t*)malloc(((bits_per_symbol + 7) / 8) * sizeof(uint8_t));
 

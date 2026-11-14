@@ -20,8 +20,6 @@ This page is maintained by hand and checked against `native/include/soundwave_ap
 | `SW_ERR_NOT_IMPLEMENTED` | −6 | Feature not implemented |
 | `SW_ERR_OVERFLOW` | −7 | Output buffer too small. The length out-parameter then holds the **required** size |
 
-!!! note "Header comments that name non-existent codes"
-    Some comments in `soundwave_api.h` mention `SW_ERR_DECODE_FAILED`, `SW_ERR_NOT_FOUND` and `SW_ERR_AUDIO_IO`. These codes do not exist. The functions return `SW_ERR_DECODE`, `SW_ERR_SYNC` and `SW_ERR_AUDIO` (or the backend's code) respectively.
 
 ## Configuration (`sw_config_t`)
 
@@ -36,8 +34,8 @@ typedef struct {
     float coding_rate;      // must be finite; currently unused by the DSP
     float threshold;        // detection threshold multiplier (>= 0)
     int   equalizer;        // 0 = ZF, 1 = MMSE
-    float carrier_freq;     // Hz; CSS chirp start frequency f0 (0 = 19000)
-    float bandwidth;        // Hz; CSS sweep B (0 = 2000)
+    float carrier_freq;     // Hz; CSS chirp start f0, OFDM band centre (0 = 19000)
+    float bandwidth;        // Hz; CSS sweep B, OFDM band width (0 = 2000)
     float symbol_duration;  // s; CSS chirp length T (0 = 0.02, max 1.0)
     float amplitude;        // [0, 1] (0 = 0.8)
     int   ofdm_modulation;  // 0 = BPSK, 1 = QPSK
@@ -48,7 +46,7 @@ Field notes (from the implementation):
 
 - **Zero means default** for most fields. Each module fills in its own default.
 - `sf`, `coding_rate` and `num_pilots` are validated but **do not change the waveform**. CSS sends one bit per chirp (up-chirp = 0, down-chirp = 1). OFDM puts a pilot on every 8th active subcarrier regardless of `num_pilots`.
-- `carrier_freq` and `bandwidth` affect **CSS only**. The OFDM band is fixed by `num_subcarriers` and `sample_rate` (see [Signal chain](architecture/signal-chain.md)).
+- `carrier_freq` and `bandwidth` also set the **OFDM band** $[f_c - B/2, f_c + B/2]$ (default 18–20 kHz). Only subcarriers inside it (with one guard bin per edge) carry data or pilots. `sw_config_validate` (for `modulation == 1`) and every `sw_ofdm_*` function reject a band that reaches DC, lies within one subcarrier spacing of Nyquist, or holds fewer than 4 subcarriers (see [Signal chain](architecture/signal-chain.md#ofdm-mode)).
 
 ### `sw_config_validate`
 
@@ -134,7 +132,7 @@ int sw_estimate_cfo(const float* samples, size_t len, sw_config_t cfg,
                     float* cfo_hz);
 ```
 
-- **`sw_detect_frame`:** finds the preamble (CSS: matched filter on the 8-up/2-down pattern; OFDM: Zadoff-Chu correlation). It writes the start offset and an SNR estimate in dB, and returns `SW_ERR_SYNC` if nothing is above threshold. For CSS mode the buffer must hold at least 10 chirps.
+- **`sw_detect_frame`:** finds the preamble (CSS: matched filter on the 8-up/2-down pattern; OFDM: Schmidl-Cox repetition metric as presence gate, then the earliest strong peak of a normalised matched filter on the known preamble, refined from the preamble's phase slope). It writes the start offset and an SNR estimate in dB, and returns `SW_ERR_SYNC` if nothing is above threshold. For CSS mode the buffer must hold at least 10 chirps.
 - **`sw_estimate_cfo`:** Schmidl-Cox estimate over two repeated periods of `N + cp` samples. It needs `len ≥ 2(N + cp)`, otherwise it returns `SW_ERR_SYNC`.
 
 ## Real-time audio I/O

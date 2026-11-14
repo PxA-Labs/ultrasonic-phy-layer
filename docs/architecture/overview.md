@@ -105,14 +105,13 @@ sequenceDiagram
 
 ## Frame formats
 
-There are **two different byte-level frame formats**, and they do not interoperate:
+The app and `soundwave-cli` share **one** byte-level PHY frame, specified in the [developer guide](../DEVELOPER_GUIDE.md#phy-frame-format):
 
 | Producer | Layout | Length field |
 |---|---|---|
-| App (`engine/frame_codec.dart`) | `[CRC-32 LE over payload][payload 1..219 B][RS parity 32 B]` | None. The receiver tries candidate lengths until RS + CRC verify |
-| `soundwave-cli` (`tools/soundwave_cli/main.c`) | `[CRC-32 LE over payload][length u16 LE][payload 1..217 B][RS parity 32 B]` | Yes |
+| App (`engine/frame_codec.dart`) and `soundwave-cli` (`tools/soundwave_cli/frame_format.c`) | `[CRC-32 LE over payload][payload 1..219 B][RS parity 32 B]` | None. The receiver takes the shortest length whose RS decode and CRC-32 verify |
 
-So a WAV made by `soundwave-cli modulate` cannot be decoded by the app's *Import Signal*, and an app recording cannot be decoded by `soundwave-cli demodulate`. Both use the same modulation and sync, so only the framing differs. The [field test plan](../testing/FIELD_TEST_PLAN.md) takes this into account.
+A WAV made by `soundwave-cli modulate` decodes in the app's *Import Signal*, and an app recording decodes with `soundwave-cli demodulate` (with the same modem settings). CI checks both directions (`soundwave_app/test/native/cli_compat_test.dart`).
 
 The link layer (DATA/ACK/NACK frames, message envelope, reassembly and ARQ timing) runs inside the app frame's payload. It is specified in the [developer guide](../DEVELOPER_GUIDE.md#link-layer-fragmentation-file-transfer--arq-89-100).
 

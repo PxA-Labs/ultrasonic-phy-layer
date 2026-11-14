@@ -11,7 +11,7 @@ The Soundwave app has three tabs: **Dashboard**, **Monitor** and **Settings**. T
 5. Received messages appear under **Received Messages Log**, together with an estimated SNR.
 
 !!! tip "Expect slow CSS frames"
-    In the default CSS configuration one chirp carries one bit, so the raw rate is 50 bit/s and even a two-byte message takes about 6 s on air (values computed from the code, see [Signal chain](../architecture/signal-chain.md)). OFDM is much faster, but it currently occupies roughly 5.7–21.9 kHz, which is clearly audible.
+    In the default CSS configuration one chirp carries one bit, so the raw rate is 50 bit/s and even a two-byte message takes about 6 s on air (values computed from the code, see [Signal chain](../architecture/signal-chain.md)). OFDM is much faster (about 2.2 kbit/s raw with the defaults, 4.9 kbit/s with *High Speed*) and stays in the configured band, 18–20 kHz by default; the OFDM card in Settings shows the computed band and rate.
 
 Start with the devices close together (tens of centimetres) and increase the distance from there. Range has **not** been measured yet.
 
@@ -38,7 +38,7 @@ Start with the devices close together (tens of centimetres) and increase the dis
 
 | Group | Settings | Notes |
 |---|---|---|
-| Presets | *Defaults*, *Long Range (Robust)* (CSS, 18 kHz, 1 kHz sweep, 50 ms chirps), *High Speed (OFDM)* (2048-point FFT, CP 128) | Apply on both devices |
+| Presets | *Defaults*, *Long Range (Robust)* (CSS, 18 kHz, 1 kHz sweep, 50 ms chirps), *High Speed (OFDM)* (2048-point FFT, CP 128, 18–21 kHz) | Apply on both devices |
 | Modulation | CSS or OFDM | |
 | FEC | Reed-Solomon on/off, coding rate 1/2 or 3/4 | The coding-rate value is passed to the native config but **has no effect** in the current DSP code. RS(255,223) is either on or off |
 | Audio I/O | Input/output device, playback volume, AGC on/off | AGC is on by default |

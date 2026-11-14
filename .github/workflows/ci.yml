@@ -228,6 +228,13 @@ jobs:
           ctest --output-on-failure --build-config Release
         shell: bash
 
+      - name: OFDM transmit spectrum report
+        # Prints the in-band / audible-band energy figures quoted in
+        # docs/architecture/signal-chain.md (simulation, not a measurement).
+        if: steps.check.outputs.exists == 'true' && matrix.os == 'ubuntu-latest'
+        run: ctest --test-dir native/build -R test_ofdm_spectrum -V --build-config Release
+        shell: bash
+
       - name: Show ccache stats
         if: steps.check.outputs.exists == 'true'
         run: ccache --show-stats
