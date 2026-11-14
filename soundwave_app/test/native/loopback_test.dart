@@ -14,6 +14,7 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundwave/engine/frame_codec.dart';
 import 'package:soundwave/engine/frame_geometry.dart';
+import 'package:soundwave/engine/link_frame.dart';
 import 'package:soundwave/engine/rx_engine.dart';
 import 'package:soundwave/native/bindings.dart';
 import 'package:soundwave/native/soundwave_native.dart';
@@ -107,6 +108,21 @@ void main() {
               reason: 'cfg=$cfg payload=$len');
         }
       }
+    });
+
+    test('TX frame budget at CSS SF10 / 2 kHz stays within the FFI cap', () {
+      final cfg = baseConfig(modulation: 0)..['sf'] = 10;
+      final g = FrameGeometry.fromConfig(cfg);
+      final codec = FrameCodec(native!);
+      final payload = g.maxPayloadWithin(
+          g.txFrameSampleBudget(minPayload: LinkFrame.headerLength + 1));
+      expect(payload, greaterThan(LinkFrame.headerLength));
+      final x = modulate(cfg, codec.encode(Uint8List(payload)));
+      expect(x.length, g.samplesForFrameBytes(payload + 36));
+      expect(x.length, lessThanOrEqualTo(SoundwaveNative.maxFrameSamples));
+      // A full single frame does not fit (the reason for the budget).
+      final full = codec.encode(Uint8List(FrameCodec.maxPayload));
+      expect(() => modulate(cfg, full), throwsA(isA<SwException>()));
     });
   }, skip: skip);
 

@@ -168,13 +168,9 @@ void main() {
       a.rx.startListening();
       b.rx.startListening();
       // Capture subscriptions are attached asynchronously; audio sent before
-      // that would be lost.
+      // that would be lost. No settling time: the first frame must decode
+      // right after capture starts (rx_stream_start_test.dart).
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      // A live microphone is already running when a transfer starts: give
-      // both receivers 0.5 s of background noise first so AGC has settled
-      // (the first frame right after capture start can otherwise fail).
-      a.audio.hear(Float64List(0), rnd, trailing: 22050);
-      b.audio.hear(Float64List(0), rnd, trailing: 22050);
     }
 
     tearDown(() async {

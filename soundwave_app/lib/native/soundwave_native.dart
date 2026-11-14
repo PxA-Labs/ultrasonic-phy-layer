@@ -527,8 +527,9 @@ class SoundwaveNative {
   static const int _errOverflow = -7;
 
   /// Upper bound on samples we are willing to allocate for one frame
-  /// (~95 s at 44.1 kHz). Guards against absurd sizes from bad configs.
-  static const int _maxFrameSamples = 1 << 22;
+  /// (~95 s at 44.1 kHz). Guards against absurd sizes from bad configs; the
+  /// TX path sizes frames to stay below it (FrameGeometry.txFrameSampleBudget).
+  static const int maxFrameSamples = 1 << 22;
 
   /// Modulates [frame] bytes. The C API counts *bits* (bit_len), so all
   /// frame.length * 8 bits are sent. The output size depends on the config,
@@ -549,7 +550,7 @@ class SoundwaveNative {
       final bitLen = frame.length * 8;
       var capacity = bitLen * 1024 + 65536;
       for (var attempt = 0; attempt < 2; attempt++) {
-        if (capacity <= 0 || capacity > _maxFrameSamples) {
+        if (capacity <= 0 || capacity > maxFrameSamples) {
           throw SwException(_errOverflow);
         }
         samplesPtr = calloc<Float>(capacity);

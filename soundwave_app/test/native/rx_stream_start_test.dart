@@ -68,8 +68,9 @@ void main() {
   Future<List<String>> receiveAfter(
     Map<String, dynamic> cfg,
     int lead, {
-    required bool noise,
+    bool noise = true,
     String text = 'first frame',
+    int chunk = 441,
   }) async {
     final audio = MockAudioService();
     final rx = RxEngine(
@@ -92,10 +93,10 @@ void main() {
     for (var i = 0; i < signal.length; i++) {
       x[lead + i] += signal[i];
     }
-    for (var i = 0; i < x.length; i += 441) {
-      final end = min(i + 441, x.length);
+    for (var i = 0; i < x.length; i += chunk) {
+      final end = min(i + chunk, x.length);
       audio.pushMockChunk(Float64List.sublistView(x, i, end));
-      if (i % (441 * 50) == 0) await Future<void>.delayed(Duration.zero);
+      if ((i ~/ chunk) % 50 == 0) await Future<void>.delayed(Duration.zero);
     }
     for (var i = 0; i < 100 && texts.isEmpty; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -127,6 +128,18 @@ void main() {
           }, timeout: const Timeout(Duration(minutes: 2)));
         }
       }
+
+      test('a full-size frame 45 ms after start decodes (link-test timing)',
+          () async {
+        // What the link loopback tests deliver: 2000 samples of noise, then
+        // a 219-byte payload, in 4096-sample chunks.
+        final text = List.generate(
+            FrameCodec.maxPayload, (i) => String.fromCharCode(0x41 + i % 26));
+        final cfg = config(modulation: modulation);
+        final want = text.join();
+        final got = await receiveAfter(cfg, 2000, text: want, chunk: 4096);
+        expect(got, [want]);
+      }, timeout: const Timeout(Duration(minutes: 2)));
 
       test('decodes wherever the preamble falls relative to the search window',
           () async {
