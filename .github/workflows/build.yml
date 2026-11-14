@@ -223,7 +223,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
         with:
-          flutter-version: '3.47.x'
+          # 3.47.x gen_snapshot crashes ("Class with illegal cid") on macOS
+          # AOT for this app; 3.50.0 builds cleanly. macOS only: 3.50 needs
+          # AGP >= 9.1.1 on Android and deprecates material.dart imports.
+          flutter-version: '3.50.0'
           cache: true
 
       - name: Build macOS
