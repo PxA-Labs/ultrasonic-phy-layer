@@ -321,6 +321,22 @@ The macOS certificate is detected by the `Developer ID Application` identity in 
 | RS encode | Known data block | Known codeword | Bit-exact match |
 | CRC-32 | Known payload | Known checksum | Bit-exact match |
 
+### 6.5 Coverage Gates & Quality Dashboard
+
+`ci.yml` measures coverage on every push and pull request and fails on regression:
+
+| Component | Job | Tool | Gate (lines / branches) | Measured |
+|---|---|---|---|---|
+| Native DSP core (`native/src`) | `dsp-coverage` | gcovr (Debug + `--coverage`, all CTest tests) | 86.0% / 74.0% | 86.43% / 74.32% |
+| Flutter app (`lib/`) | `flutter-quality-gate` | `flutter test --coverage` (real `libsoundwave` loaded) | 89.5% / n/a | 90.24% |
+
+- Thresholds live in the `NATIVE_MIN_LINE`, `NATIVE_MIN_BRANCH` and `FLUTTER_MIN_LINE` env vars at the top of `ci.yml`; set them just below the measured values and raise them when coverage improves.
+- `.github/scripts/coverage_report.py` parses the LCOV files, enforces the gates, writes a per-component summary (with the least-covered files) to the job summary and annotates the numbers and uncovered line ranges on the run.
+- The `quality-dashboard` job combines native and Flutter coverage, test counts and the integration-test result into one table in the run summary.
+- Artifacts: `coverage-native` (LCOV, HTML report, CTest JUnit) and `coverage-flutter` (LCOV, JSON test results).
+- `flutter-integration` runs `integration_test/` on the Linux desktop app under `xvfb` (onboarding → main shell → message over the real DSP with a loopback audio device).
+- Codecov uploads are optional and never fail CI (no token required).
+
 ---
 
 ## 7. Branch Strategy
