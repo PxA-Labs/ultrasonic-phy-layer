@@ -130,8 +130,8 @@ void main() {
         expect(done, isTrue);
         final envelope =
             LinkMessage.file(Uint8List(1000), fileName: 'z.bin').encode();
-        final count = PayloadFragmenter.fragmentCount(
-            envelope.length, tx.linkChunkBytes);
+        final count =
+            PayloadFragmenter.fragmentCount(envelope.length, tx.linkChunkBytes);
         expect(native.frames, hasLength(count));
         expect(tx.retransmissions, 0);
         final f0 =
