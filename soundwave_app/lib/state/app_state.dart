@@ -539,8 +539,18 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Reports (in [transferError]) and returns true when the current modem
+  /// settings cannot carry any frame, instead of failing deep in the FFI.
+  bool _rejectUnsendableConfig() {
+    _transferError = _txEngine.frameLimitError;
+    if (_transferError == null) return false;
+    notifyListeners();
+    return true;
+  }
+
   Future<void> sendCurrentMessage() async {
     if (_txMessage.isEmpty) return;
+    if (_rejectUnsendableConfig()) return;
     _isTransmitting = true;
     _metrics = _metrics.copyWith(connectionState: ModemLinkState.transmitting);
     _startThroughputTimer();
@@ -567,7 +577,7 @@ class AppState extends ChangeNotifier {
   /// listening first so the receiver's ACKs can be heard.
   Future<void> sendFileBytes(Uint8List data,
       {required String fileName, String? mimeType}) async {
-    _transferError = null;
+    if (_rejectUnsendableConfig()) return;
     if (_arqEnabled && !_isListening) toggleListening();
     _isTransmitting = true;
     _metrics = _metrics.copyWith(connectionState: ModemLinkState.transmitting);
@@ -598,8 +608,8 @@ class AppState extends ChangeNotifier {
   Future<void> emitTestTone() async {
     final samples =
         TestToneGenerator.generateSine(440, 1.0, _sampleRate.toDouble());
-    await _audio.enqueueForPlayback(samples);
     await _audio.startPlayback();
+    await _audio.enqueueForPlayback(samples);
   }
 
   Future<void> emitChirp() async {
@@ -609,11 +619,12 @@ class AppState extends ChangeNotifier {
       symbolDuration,
       _sampleRate.toDouble(),
     );
-    await _audio.enqueueForPlayback(samples);
     await _audio.startPlayback();
+    await _audio.enqueueForPlayback(samples);
   }
 
   Future<void> sendPresetMessage(String text) async {
+    if (_rejectUnsendableConfig()) return;
     _isTransmitting = true;
     _metrics = _metrics.copyWith(connectionState: ModemLinkState.transmitting);
     _startThroughputTimer();

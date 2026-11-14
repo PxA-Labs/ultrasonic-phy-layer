@@ -64,7 +64,7 @@ void main() {
     final rnd = Random(3436);
 
     /// Wires A <-> B (each mic also hears its own speaker) and starts B
-    /// listening with half a second of background noise for AGC to settle.
+    /// listening; the first frame arrives right after capture starts.
     Future<void> connect({required bool arq, MemoryFileSink? bSink}) async {
       a = Peer(arq: arq);
       b = Peer(arq: arq, sink: bSink);
@@ -80,8 +80,6 @@ void main() {
       };
       b.state.toggleListening();
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      b.audio.hear(Float64List(0), rnd, trailing: 22050);
-      a.audio.hear(Float64List(0), rnd, trailing: 22050);
     }
 
     Future<void> waitUntil(bool Function() done) async {

@@ -1,7 +1,10 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:soundwave/engine/tx_engine.dart';
 import 'package:soundwave/services/audio_service.dart';
+
+import '../engine/mock_native.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -120,6 +123,79 @@ void main() {
       expect(service.isPlaying, isFalse);
       expect(service.inputDevices.first.name, contains('Microphone'));
       expect(service.outputDevices.first.name, contains('Speaker'));
+    });
+  });
+
+  group('first frame reaches the output device', () {
+    test('TxEngine over NativeAudioService: every frame is written', () async {
+      final native = MockSoundwaveNative();
+      final audio = NativeAudioService(const {}, native: native);
+      final tx = TxEngine(
+        native: native,
+        audio: audio,
+        configMap: {'modulation': 0, 'sample_rate': 44100},
+        useIsolates: false,
+        nodeId: 1,
+      );
+      expect(audio.isPlaying, isFalse);
+
+      await tx.transmitPayload(Uint8List.fromList([1, 2, 3]));
+      expect(native.playbackWrites, hasLength(1),
+          reason: 'the first frame after playback starts must be played');
+      expect(native.playbackWrites.single, hasLength(100));
+      expect(audio.isPlaying, isTrue);
+
+      await tx.transmitPayload(Uint8List.fromList([4, 5]));
+      expect(native.playbackWrites, hasLength(2));
+      audio.dispose();
+    });
+
+    test('NativeAudioService holds audio enqueued before start', () async {
+      final native = MockSoundwaveNative();
+      final audio = NativeAudioService(const {}, native: native);
+      await audio.enqueueForPlayback(Float64List.fromList([0.25, -0.5]));
+      expect(native.playbackWrites, isEmpty);
+
+      await audio.startPlayback();
+      expect(native.playbackWrites, hasLength(1));
+      expect(native.playbackWrites.single, [0.25, -0.5]);
+
+      // Stopping discards audio that never reached the device.
+      await audio.stopPlayback();
+      await audio.enqueueForPlayback(Float64List.fromList([0.1]));
+      await audio.stopPlayback();
+      await audio.startPlayback();
+      expect(native.playbackWrites, hasLength(1));
+      audio.dispose();
+    });
+
+    test('RecordAudioService plays a short first frame immediately', () async {
+      final played = <Uint8List>[];
+      final audio = RecordAudioService(playWav: (wav) async => played.add(wav));
+      final tx = TxEngine(
+        native: MockSoundwaveNative(),
+        audio: audio,
+        configMap: {'modulation': 0, 'sample_rate': 44100},
+        useIsolates: false,
+        nodeId: 1,
+      );
+
+      await tx.transmitPayload(Uint8List.fromList([1, 2, 3]));
+      expect(played, hasLength(1));
+      expect(played.single.length, 44 + 2 * 100); // WAV header + 100 samples
+      await tx.transmitPayload(Uint8List.fromList([4]));
+      expect(played, hasLength(2));
+    });
+
+    test('RecordAudioService holds audio enqueued before start', () async {
+      final played = <Uint8List>[];
+      final audio = RecordAudioService(playWav: (wav) async => played.add(wav));
+      await audio.enqueueForPlayback(Float64List(10));
+      expect(played, isEmpty);
+      await audio.startPlayback();
+      expect(played, hasLength(1));
+      await audio.stopPlayback();
+      expect(audio.isPlaying, isFalse);
     });
   });
 }
