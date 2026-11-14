@@ -4,11 +4,52 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../native/native_status.dart';
 import '../state/app_state.dart';
 import '../theme/soundwave_theme.dart';
 import '../widgets/file_transfer_card.dart';
 import '../widgets/signal_status_bar.dart';
 import 'signal_files.dart';
+
+/// Whether the DSP library is loaded, in theme colours (#93).
+class NativeStatusBadge extends StatelessWidget {
+  final NativeStatus status;
+
+  const NativeStatusBadge({super.key, required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final signal = SignalColors.of(context);
+    final ok = status.isLoaded;
+    final text = ok ? 'DSP ${status.version ?? ''}'.trim() : 'DSP unavailable';
+    return Tooltip(
+      message: ok
+          ? 'Signal processing library loaded'
+          : 'Signal processing library not loaded: ${status.error}',
+      child: Semantics(
+        container: true,
+        label: ok
+            ? 'Signal processing library loaded, version ${status.version}'
+            : 'Signal processing library not available',
+        child: ExcludeSemantics(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                ok ? Icons.check_circle : Icons.error,
+                key: const Key('native_status_icon'),
+                size: 14,
+                color: ok ? signal.success : signal.danger,
+              ),
+              const SizedBox(width: 6),
+              Text(text, style: Theme.of(context).textTheme.labelMedium),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -22,20 +63,7 @@ class DashboardScreen extends StatelessWidget {
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: const BoxDecoration(
-                    color: Colors.green, // Native library is loaded
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text('Native Loaded', style: TextStyle(fontSize: 12)),
-              ],
-            ),
+            child: NativeStatusBadge(status: state.nativeStatus),
           ),
         ],
       ),

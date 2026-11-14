@@ -7,9 +7,11 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../dsp/band_activity.dart';
 import '../dsp/constellation.dart';
 import '../dsp/spectrum_analyzer.dart';
 import '../state/app_state.dart';
@@ -48,6 +50,11 @@ class _MonitorScreenState extends State<MonitorScreen> {
   late WaterfallController _waterfall;
   final WaveformController _waveform = WaveformController();
   final ConstellationController _constellation = ConstellationController();
+  final BandActivityDetector _activityDetector = BandActivityDetector();
+
+  /// Changes only when a signal starts or ends in 18-22 kHz (#93).
+  final ValueNotifier<BandActivity> _activity =
+      ValueNotifier(const BandActivity.quiet());
   int _sampleRate = 0;
   int _frameCount = 0;
   bool _paused = false;
@@ -109,6 +116,9 @@ class _MonitorScreenState extends State<MonitorScreen> {
     final dt = _analyzer.secondsPerFrame;
     for (final frame in _analyzer.addSamples(chunk)) {
       _spectrum.update(frame, dt);
+      if (_activityDetector.update(frame, _analyzer.binWidthHz, dt)) {
+        _activity.value = _activityDetector.state;
+      }
       if (_frameCount++ % MonitorScreen.waterfallDecimation == 0) {
         _waterfall.addRow(frame);
       }
@@ -128,6 +138,7 @@ class _MonitorScreenState extends State<MonitorScreen> {
     _waterfall.dispose();
     _waveform.dispose();
     _constellation.dispose();
+    _activity.dispose();
     if (!_state.isListening && _state.isAudioCapturing) {
       _state.stopAudioCapture();
     }
@@ -151,7 +162,11 @@ class _MonitorScreenState extends State<MonitorScreen> {
       ),
       body: Column(
         children: [
-          _LevelBar(waveform: _waveform, spectrum: _spectrum),
+          _LevelBar(
+            waveform: _waveform,
+            spectrum: _spectrum,
+            activity: _activity,
+          ),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -168,12 +183,19 @@ class _MonitorScreenState extends State<MonitorScreen> {
 
   Widget _spectrumPanel() => _Panel(
         title: 'Spectrum (dBFS)',
-        child: SpectrumAnalyzerWidget(controller: _spectrum),
+        child: SpectrumAnalyzerWidget(
+          controller: _spectrum,
+          activity: _activity,
+        ),
       );
 
   Widget _waterfallPanel(double carrierHz) => _Panel(
         title: 'Waterfall Spectrogram',
-        child: WaterfallView(controller: _waterfall, carrierHz: carrierHz),
+        child: WaterfallView(
+          controller: _waterfall,
+          carrierHz: carrierHz,
+          activity: _activity,
+        ),
       );
 
   Widget _constellationPanel() => _Panel(
@@ -279,8 +301,13 @@ class _Panel extends StatelessWidget {
 class _LevelBar extends StatelessWidget {
   final WaveformController waveform;
   final SpectrumController spectrum;
+  final ValueListenable<BandActivity> activity;
 
-  const _LevelBar({required this.waveform, required this.spectrum});
+  const _LevelBar({
+    required this.waveform,
+    required this.spectrum,
+    required this.activity,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -289,53 +316,91 @@ class _LevelBar extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: ListenableBuilder(
-          listenable: Listenable.merge([waveform, spectrum]),
-          builder: (context, _) {
-            final db = waveform.levelDbfs.clamp(-60.0, 0.0);
-            final progress = (db + 60) / 60;
-            final Color meter;
-            if (progress > 0.9) {
-              meter = colors.error;
-            } else if (progress > 0.7) {
-              meter = colors.tertiary;
-            } else {
-              meter = colors.primary;
-            }
-            final peak = spectrum.peakBin(18000, 22000);
-            final s = spectrum.spectrum;
-            var peakText = '-- kHz';
-            if (peak != null && s != null && s[peak] > -80) {
-              final khz = peak * spectrum.binWidthHz / 1000;
-              peakText = '${khz.toStringAsFixed(2)} kHz';
-            }
-            // Flexible labels wrap at large text scales instead of
-            // overflowing the row.
-            return Row(
-              children: [
-                Flexible(child: Text('Level ${db.toStringAsFixed(0)} dBFS')),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 2,
-                  child: LinearProgressIndicator(
-                    semanticsLabel: 'Input level',
-                    value: progress,
-                    backgroundColor: colors.surfaceContainerHighest,
-                    valueColor: AlwaysStoppedAnimation<Color>(meter),
-                  ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _levelRow(colors),
+            const SizedBox(height: 4),
+            // The one live region for the plots: announced when a signal
+            // starts or stops, not on every frame.
+            ValueListenableBuilder<BandActivity>(
+              valueListenable: activity,
+              builder: (context, a, _) => Semantics(
+                liveRegion: true,
+                container: true,
+                child: Row(
+                  children: [
+                    ExcludeSemantics(
+                      child: Icon(
+                        a.active ? Icons.graphic_eq : Icons.hearing_disabled,
+                        size: 16,
+                        color: a.active ? colors.primary : colors.outline,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        a.describe(),
+                        key: const Key('band_activity'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Flexible(
-                  child: Text(
-                    'Peak: $peakText',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            );
-          },
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _levelRow(ColorScheme colors) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([waveform, spectrum]),
+      builder: (context, _) {
+        final db = waveform.levelDbfs.clamp(-60.0, 0.0);
+        final progress = (db + 60) / 60;
+        final Color meter;
+        if (progress > 0.9) {
+          meter = colors.error;
+        } else if (progress > 0.7) {
+          meter = colors.tertiary;
+        } else {
+          meter = colors.primary;
+        }
+        final peak = spectrum.peakBin(18000, 22000);
+        final s = spectrum.spectrum;
+        var peakText = '-- kHz';
+        if (peak != null && s != null && s[peak] > -80) {
+          final khz = peak * spectrum.binWidthHz / 1000;
+          peakText = '${khz.toStringAsFixed(2)} kHz';
+        }
+        // Flexible labels wrap at large text scales instead of
+        // overflowing the row.
+        return Row(
+          children: [
+            Flexible(child: Text('Level ${db.toStringAsFixed(0)} dBFS')),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 2,
+              child: LinearProgressIndicator(
+                semanticsLabel: 'Input level',
+                value: progress,
+                backgroundColor: colors.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation<Color>(meter),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Flexible(
+              child: Text(
+                'Peak: $peakText',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

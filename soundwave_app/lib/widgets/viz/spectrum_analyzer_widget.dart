@@ -3,10 +3,13 @@
 
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
+import '../../dsp/band_activity.dart';
 import '../../dsp/fft.dart';
 import '../../dsp/spectrum_analyzer.dart';
+import 'band_activity_semantics.dart';
 import 'frame_throttle.dart';
 import 'plot_text.dart';
 
@@ -84,9 +87,13 @@ class SpectrumAnalyzerWidget extends StatelessWidget {
   final double minFrequencyHz;
   final double? maxFrequencyHz;
 
+  /// Band summary exposed as the plot's semantics value (#93).
+  final ValueListenable<BandActivity>? activity;
+
   const SpectrumAnalyzerWidget({
     super.key,
     required this.controller,
+    this.activity,
     this.bandLowHz = 18000,
     this.bandHighHz = 22000,
     this.minFrequencyHz = 0,
@@ -96,8 +103,8 @@ class SpectrumAnalyzerWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Semantics(
-      container: true,
+    return BandActivitySemantics(
+      activity: activity,
       label: 'Spectrum analyzer: signal level by frequency',
       child: RepaintBoundary(
         child: CustomPaint(
