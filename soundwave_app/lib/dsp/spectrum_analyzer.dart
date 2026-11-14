@@ -35,6 +35,7 @@ class SpectrumAnalyzer {
   int _write = 0;
   int _filled = 0;
   int _sinceFrame = 0;
+  int _skipped = 0;
 
   SpectrumAnalyzer({
     this.fftSize = 1024,
@@ -61,6 +62,10 @@ class SpectrumAnalyzer {
 
   /// Frequency spacing between bins in Hz.
   double get binWidthHz => sampleRate / fftSize;
+
+  /// Frames not computed because a push would have exceeded
+  /// [maxFramesPerPush] (cumulative since creation).
+  int get skippedFrames => _skipped;
 
   /// Seconds of audio between consecutive frames.
   double get secondsPerFrame => hopSize / sampleRate;
@@ -109,6 +114,7 @@ class SpectrumAnalyzer {
       }
     }
     var skip = math.max(0, due - maxFramesPerPush);
+    _skipped += skip;
 
     final out = <Float64List>[];
     for (var i = 0; i < samples.length; i++) {

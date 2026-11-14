@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:soundwave/dsp/spectrum_pipeline.dart';
 import 'package:soundwave/screens/monitor.dart';
 import 'package:soundwave/state/app_state.dart';
 import 'package:soundwave/widgets/viz/constellation_widget.dart';
@@ -21,7 +22,9 @@ void main() {
 
   Widget app() => ChangeNotifierProvider<AppState>.value(
         value: state,
-        child: const MaterialApp(home: MonitorScreen()),
+        child: const MaterialApp(
+          home: MonitorScreen(pipelineFactory: InlineSpectrumPipeline.new),
+        ),
       );
 
   setUp(() {
