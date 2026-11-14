@@ -74,7 +74,8 @@ void main() {
     if (base.existsSync()) base.deleteSync(recursive: true);
   });
 
-  /// Feeds 0.1 s of captured audio so a sample can be saved.
+  /// Feeds 0.1 s of captured audio so a sample can be saved. Captured audio
+  /// alone does not notify listeners, so this runs before the first build.
   Future<void> captureSomeAudio(WidgetTester tester) async {
     audio.pushMockChunk(Float64List(4410));
     await tester.pump();
@@ -89,9 +90,8 @@ void main() {
 
   testWidgets('saving a signal sample writes audio and the note',
       (tester) async {
-    await tester.pumpWidget(host(state, FailingShareGateway()));
     await captureSomeAudio(tester);
-    await tester.pump();
+    await tester.pumpWidget(host(state, FailingShareGateway()));
 
     final save = find.byKey(const Key('save_signal_sample_button'));
     expect(tester.widget<ButtonStyleButton>(save).onPressed, isNotNull);
@@ -113,9 +113,8 @@ void main() {
   });
 
   testWidgets('cancelling the dialog saves nothing', (tester) async {
-    await tester.pumpWidget(host(state, FailingShareGateway()));
     await captureSomeAudio(tester);
-    await tester.pump();
+    await tester.pumpWidget(host(state, FailingShareGateway()));
     await tester.tap(find.byKey(const Key('save_signal_sample_button')));
     await settle(tester);
     await tester.tap(find.text('Cancel'));
@@ -132,9 +131,8 @@ void main() {
   testWidgets('a storage failure is reported', (tester) async {
     state.storage = SoundwaveStorage(
         baseDirectory: () async => throw const FileSystemException('no disk'));
-    await tester.pumpWidget(host(state, FailingShareGateway()));
     await captureSomeAudio(tester);
-    await tester.pump();
+    await tester.pumpWidget(host(state, FailingShareGateway()));
     await tester.tap(find.byKey(const Key('save_signal_sample_button')));
     await settle(tester);
     await tester.tap(find.text('Save'));
