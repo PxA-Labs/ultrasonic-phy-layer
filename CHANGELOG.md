@@ -96,6 +96,7 @@ All notable changes to this project will be documented in this file.
 - **build:** Produce debug/split release APKs and AAB with packaged .so checks
 - **build:** Produce debug/split release APKs and AAB with packaged .so checks
 - **build:** Produce debug/split release APKs and AAB with packaged .so checks
+- Temporary format diff job (to be removed)
 
 ### Documentation
 
@@ -165,6 +166,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG.md [skip ci]
 - **ci:** Document desktop packaging, signing secrets and dry-run releases
 - **ci:** Note the macOS Flutter pin
+- Update CHANGELOG.md [skip ci]
 
 ### Features
 
@@ -203,6 +205,7 @@ All notable changes to this project will be documented in this file.
 - **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
 - **android:** Build libsoundwave.so with the NDK and use AAudio/OpenSL ES
 - **app:** Request RECORD_AUDIO at runtime and load libsoundwave.so on Android
+- **monitor:** Spectrum analyzer, waterfall and OFDM constellation widgets (#71, #91)
 
 ### Maintenance
 
@@ -223,6 +226,7 @@ All notable changes to this project will be documented in this file.
 - Remove trailing whitespace in dashboard_test.dart
 - **ui:** Format audio_service.dart according to dart format guidelines
 - **ui:** Apply standard dart format to audio_service.dart
+- Dart format test files; drop temporary format job
 
 ### Testing
 
@@ -230,6 +234,10 @@ All notable changes to this project will be documented in this file.
 - **app:** Fix ProviderNotFound, CSV csv contains format, closeTo tolerance, and ServicesBinding in tests
 - **native:** Real TX->audio->RX loopback tests, run in CI against this commit's DSP (#88)
 - **native:** Memory-safety regression suite and ASan canaries (#28)
+- **native:** Pad constellation test frames, report per-symbol EVM
+- Bound constellation EVM by the measured clean-loopback level
+- Check constellation decisions against frame bits; diagnose monitor peak
+- Pad native constellation frames; pump monitor test past throttle
 
 ### Merge
 
