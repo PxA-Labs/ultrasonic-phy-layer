@@ -4,6 +4,8 @@
 
 import 'package:flutter/material.dart';
 
+import '../legal/legal_document_screen.dart';
+import '../legal/legal_documents.dart';
 import '../services/mic_permission.dart';
 
 const _micGranted = 'Microphone access granted.';
@@ -18,11 +20,15 @@ class OnboardingPageData {
   final List<String> body;
   final bool asksMicPermission;
 
+  /// Whether the page links the privacy policy and terms (issue #97).
+  final bool showsLegalLinks;
+
   const OnboardingPageData({
     required this.icon,
     required this.title,
     required this.body,
     this.asksMicPermission = false,
+    this.showsLegalLinks = false,
   });
 }
 
@@ -80,6 +86,7 @@ const List<OnboardingPageData> onboardingPages = [
       'and tap Start Listening on the other.',
       'You can replay this tutorial at any time from Settings.',
     ],
+    showsLegalLinks: true,
   ),
 ];
 
@@ -308,6 +315,35 @@ class _OnboardingPage extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+          if (data.showsLegalLinks) ...[
+            const SizedBox(height: 24),
+            Text(
+              'By tapping Get started you agree to the Terms of Service. '
+              'The Privacy Policy explains what stays on this device.',
+              key: const Key('onboarding_legal_notice'),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              children: [
+                TextButton(
+                  key: const Key('onboarding_terms'),
+                  onPressed: () =>
+                      openLegalDocument(context, LegalDocument.termsOfService),
+                  child: Text(LegalDocument.termsOfService.title),
+                ),
+                TextButton(
+                  key: const Key('onboarding_privacy'),
+                  onPressed: () =>
+                      openLegalDocument(context, LegalDocument.privacyPolicy),
+                  child: Text(LegalDocument.privacyPolicy.title),
+                ),
+              ],
+            ),
           ],
         ],
       ),

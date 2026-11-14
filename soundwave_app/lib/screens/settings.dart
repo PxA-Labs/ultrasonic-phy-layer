@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../engine/frame_geometry.dart';
+import '../legal/legal_document_screen.dart';
+import '../legal/legal_documents.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../state/app_state.dart';
 import '../state/ui_preferences.dart';
@@ -190,6 +192,8 @@ class SettingsScreen extends StatelessWidget {
           const StorageCard(),
           const SizedBox(height: 16),
           const _AppearanceCard(),
+          const SizedBox(height: 16),
+          const _AboutLegalCard(),
           const SizedBox(height: 24),
         ],
       ),
@@ -273,6 +277,61 @@ class _AppearanceCard extends StatelessWidget {
               subtitle: const Text('Replay the introduction to Soundwave'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _openTutorial(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Privacy policy, terms and third-party licences (issue #97). The policy
+/// and terms are bundled, so they can be read offline.
+class _AboutLegalCard extends StatelessWidget {
+  const _AboutLegalCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('About & Legal',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            ListTile(
+              key: const Key('legal_privacy_policy'),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: Text(LegalDocument.privacyPolicy.title),
+              subtitle: const Text('No accounts, servers or analytics'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () =>
+                  openLegalDocument(context, LegalDocument.privacyPolicy),
+            ),
+            ListTile(
+              key: const Key('legal_terms_of_service'),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.gavel_outlined),
+              title: Text(LegalDocument.termsOfService.title),
+              subtitle: const Text('Acceptable use and hearing safety'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () =>
+                  openLegalDocument(context, LegalDocument.termsOfService),
+            ),
+            ListTile(
+              key: const Key('legal_licenses'),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('Open-source licences'),
+              subtitle: const Text('Flutter packages and native libraries'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => showLicensePage(
+                context: context,
+                applicationName: 'Soundwave',
+              ),
             ),
           ],
         ),

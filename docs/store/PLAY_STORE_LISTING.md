@@ -81,4 +81,4 @@ Screenshots must come from a real build. Do not mock up UI that does not exist.
 - [ ] 16 KB page-size alignment confirmed (the `build-android` job checks `libsoundwave.so`)
 - [ ] Icon, feature graphic and screenshots
 - [ ] [Data safety form](DATA_SAFETY.md) completed
-- [ ] Optionally add a link to the privacy policy and terms in the app's Settings and onboarding screens (issue #97). **Not implemented yet**
+- [x] Privacy policy and terms are readable in the app, offline: Settings → *About & Legal*, and the last onboarding page (issue #97). The app bundles `soundwave_app/assets/legal/`, which a test keeps identical to `docs/legal/`
