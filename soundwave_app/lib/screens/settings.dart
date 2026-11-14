@@ -172,6 +172,16 @@ class SettingsScreen extends StatelessWidget {
                     label: '${(state.volume * 100).toInt()}%',
                     onChanged: (v) => state.setVolume(v),
                   ),
+                  SwitchListTile(
+                    key: const Key('agc_toggle'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Automatic Gain Control (AGC)'),
+                    subtitle: const Text(
+                        'Normalises microphone level before decoding '
+                        '(-20 to +32 dB). Turn off for manual gain testing.'),
+                    value: state.agcEnabled,
+                    onChanged: state.setAgcEnabled,
+                  ),
                 ],
               ),
             ),
@@ -269,23 +279,43 @@ class _OfdmSettingsCard extends StatelessWidget {
               onChanged: (v) => state.setNumSubcarriers(v ?? 256),
             ),
             const SizedBox(height: 12),
+            const Text('Constellation (bits per subcarrier)'),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<int>(
+                key: const Key('ofdm_modulation_selector'),
+                segments: const [
+                  ButtonSegment(value: 0, label: Text('BPSK (robust)')),
+                  ButtonSegment(value: 1, label: Text('QPSK (2x rate)')),
+                ],
+                selected: {state.ofdmModulation},
+                onSelectionChanged: (v) => state.setOfdmModulation(v.first),
+              ),
+            ),
+            const SizedBox(height: 12),
             DropdownButtonFormField<int>(
-              initialValue: state.cpLength,
+              // Keyed by FFT size: the options change with it, and a stale
+              // selection outside the new item list would assert.
+              key: ValueKey('cp_${state.numSubcarriers}'),
+              initialValue: AppState.cpOptionsFor(state.numSubcarriers)
+                      .contains(state.cpLength)
+                  ? state.cpLength
+                  : null,
               decoration:
                   const InputDecoration(labelText: 'Cyclic Prefix (CP) Length'),
               items: [
-                DropdownMenuItem(
-                    value: state.numSubcarriers ~/ 4,
-                    child: const Text('1/4 of FFT')),
-                DropdownMenuItem(
-                    value: state.numSubcarriers ~/ 8,
-                    child: const Text('1/8 of FFT')),
-                DropdownMenuItem(
-                    value: state.numSubcarriers ~/ 16,
-                    child: const Text('1/16 of FFT')),
+                for (final (i, label) in const [
+                  (4, '1/4 of FFT'),
+                  (8, '1/8 of FFT'),
+                  (16, '1/16 of FFT'),
+                ])
+                  DropdownMenuItem(
+                      value: state.numSubcarriers ~/ i,
+                      child: Text('$label (${state.numSubcarriers ~/ i})')),
               ],
               onChanged: (v) =>
-                  state.setCpLength(v ?? (state.numSubcarriers ~/ 4)),
+                  state.setCpLength(v ?? (state.numSubcarriers ~/ 8)),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(

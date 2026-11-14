@@ -43,6 +43,28 @@ SW_API const char* sw_version(void);
 // --- CRC-32 Checksum ---
 
 /**
+ * @brief Validate a modem configuration before it reaches the DSP core.
+ *
+ * Every sw_* function that takes an sw_config_t calls this first, so invalid
+ * settings are rejected with SW_ERR_BAD_PARAM instead of driving allocation
+ * sizes or loop bounds. A zero value means "use the module default".
+ *
+ * Accepted ranges (0 = default):
+ *  - modulation: 0 (CSS) or 1 (OFDM); equalizer, ofdm_modulation: 0 or 1
+ *  - sample_rate: 8000..192000 Hz
+ *  - all float fields finite; threshold, carrier_freq, bandwidth,
+ *    symbol_duration >= 0; amplitude in [0, 1]
+ *  - CSS: sf 6..12; carrier_freq and bandwidth <= sample_rate / 2;
+ *    symbol_duration <= 1 s
+ *  - OFDM: num_subcarriers a power of two in 16..4096;
+ *    cp_length <= num_subcarriers; num_pilots <= num_subcarriers / 2
+ *
+ * @param cfg Configuration to check.
+ * @return SW_OK if valid, SW_ERR_BAD_PARAM otherwise.
+ */
+SW_API int sw_config_validate(sw_config_t cfg);
+
+/**
  * @brief Computes IEEE 802.3 CRC-32 checksum over input data bytes.
  * @param data Pointer to input data buffer.
  * @param len Byte length of data buffer.
@@ -206,6 +228,36 @@ SW_API int sw_audio_playback_stop(void* handle);
  */
 SW_API int sw_audio_playback_write(void* handle, const float* buffer,
                                    size_t count);
+
+/* ------------------------------------------------------------------------
+ * Automatic Gain Control (issue #92)
+ * ------------------------------------------------------------------------ */
+
+/**
+ * @brief Creates an AGC instance for the RX pipeline.
+ * Attack 1 ms, release 100 ms, 10 ms RMS window, gain in [0.1, 40]
+ * (-20..+32 dB), output peak-limited to full scale.
+ * @param sample_rate 8000..192000 Hz.
+ * @param target_rms  Output RMS target in (0, 1]; 0 selects the default 0.25.
+ * @param handle      Receives the opaque instance; free with sw_agc_destroy().
+ * @return SW_OK, SW_ERR_BAD_PARAM or SW_ERR_MEMORY.
+ */
+SW_API int sw_agc_create(int sample_rate, float target_rms, void** handle);
+
+/**
+ * @brief Applies AGC to samples in place (non-finite samples become 0).
+ * @return SW_OK, or SW_ERR_BAD_PARAM for a NULL/invalid handle or buffer.
+ */
+SW_API int sw_agc_process(void* handle, float* samples, size_t len);
+
+/** @brief Current gain in dB. */
+SW_API int sw_agc_get_gain_db(void* handle, float* gain_db);
+
+/** @brief Resets the gain to unity (e.g. after a config change). */
+SW_API int sw_agc_reset(void* handle);
+
+/** @brief Destroys an instance. The handle must not be used afterwards. */
+SW_API int sw_agc_destroy(void* handle);
 
 #ifdef __cplusplus
 }

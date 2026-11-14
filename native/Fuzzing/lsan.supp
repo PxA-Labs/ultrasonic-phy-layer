@@ -1,0 +1,5 @@
+# LeakSanitizer suppressions for libFuzzer runs.
+# libFuzzer's RSS-monitor std::thread is intentionally never joined; its
+# thread object is reported as leaked at exit on some platforms. This is not
+# project code. Do NOT add suppressions for native/src here: fix the leak.
+leak:fuzzer::StartRssThread

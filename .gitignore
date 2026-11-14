@@ -20,6 +20,13 @@ dist/
 build/
 build-*/
 native/build/
+native/build_*/
+native/build-*/
+# libFuzzer outputs
+crash-*
+leak-*
+timeout-*
+oom-*
 node_modules/
 venv/
 .venv/

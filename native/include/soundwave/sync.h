@@ -18,9 +18,18 @@ typedef struct {
 } sync_config_t;
 
 // Matched filter cross-correlation: R_ys[m] = sum y[n+m] * s[n]
+// R must have room for y_len - s_len + 1 floats; no-op if y_len < s_len.
 void sync_matched_filter(const float* y, size_t y_len,
                          const float* s, size_t s_len, float* R);
 
+// FFT (overlap-save) version of the same correlation, O(y_len log s_len).
+// Returns 0 on success, -1 on bad arguments or allocation failure.
+int  sync_xcorr_fft(const float* y, size_t y_len,
+                    const float* s, size_t s_len, float* R);
+// power[m] = R[m]^2 for m < count (count <= y_len - s_len + 1).
+int  sync_xcorr_power_fft(const float* y, size_t y_len,
+                          const float* s, size_t s_len,
+                          float* power, size_t count);
 // Peak detection with noise-normalized threshold.
 int  sync_detect_preamble(const float* R, size_t R_len,
                           float threshold, float noise_var,

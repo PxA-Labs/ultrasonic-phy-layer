@@ -328,6 +328,20 @@ class _SignalStatusBarState extends State<SignalStatusBar>
                       ),
                     ),
                   ),
+                  if (metrics.agcGainDb != null) ...[
+                    const SizedBox(width: 8),
+                    Tooltip(
+                      message: 'Receiver automatic gain control',
+                      child: Text(
+                        'AGC ${metrics.formattedAgcGain}',
+                        key: const Key('agc_gain_readout'),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],

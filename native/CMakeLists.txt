@@ -10,14 +10,67 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Options
 option(SW_BUILD_TESTS      "Build C/C++ tests"       ON)
 option(SW_BUILD_BENCHMARKS "Build C benchmarks"      OFF)
-option(SW_BUILD_FUZZ       "Build fuzz harnesses"    OFF)
-option(SW_USE_SANITIZER    "Enable ASan+UBSan"       OFF)
 option(SW_BUILD_COVERAGE   "Enable code coverage"    OFF)
 
-# Sanitizers (Must be before any add_library or add_executable)
+# Memory-safety options (issue #28). See docs/DEVELOPER_GUIDE.md "Sanitizers & Fuzzing".
+option(SW_ENABLE_ASAN      "Enable AddressSanitizer (+LeakSanitizer where supported)" OFF)
+option(SW_ENABLE_UBSAN     "Enable UndefinedBehaviorSanitizer (fatal on first report)" OFF)
+option(SW_ENABLE_FUZZER    "Build libFuzzer harnesses (requires LLVM Clang)"          OFF)
+option(SW_FUZZ_SMOKE       "Build fuzz harnesses as CTest smoke tests (no libFuzzer)"  ON)
+set(SW_FUZZ_SMOKE_RUNS "500" CACHE STRING "Random inputs per fuzz smoke test")
+# Deprecated aliases kept for existing scripts/presets.
+option(SW_USE_SANITIZER    "Deprecated: same as SW_ENABLE_ASAN + SW_ENABLE_UBSAN" OFF)
+option(SW_BUILD_FUZZ       "Deprecated: same as SW_ENABLE_FUZZER"                 OFF)
 if(SW_USE_SANITIZER)
-    add_compile_options(-fsanitize=address -fno-omit-frame-pointer -g)
-    add_link_options(-fsanitize=address)
+    set(SW_ENABLE_ASAN ON)
+    set(SW_ENABLE_UBSAN ON)
+endif()
+if(SW_BUILD_FUZZ)
+    set(SW_ENABLE_FUZZER ON)
+endif()
+
+# Sanitizers (must be configured before any add_library/add_executable)
+if(SW_ENABLE_ASAN)
+    if(MSVC)
+        # MSVC ASan is incompatible with /RTC and incremental linking.
+        foreach(flag_var CMAKE_C_FLAGS_DEBUG CMAKE_CXX_FLAGS_DEBUG)
+            string(REGEX REPLACE "/RTC[1csu]+" "" ${flag_var} "${${flag_var}}")
+        endforeach()
+        add_compile_options(/fsanitize=address /Zi)
+        add_link_options(/INCREMENTAL:NO)
+    elseif(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        add_compile_options(-fsanitize=address -fno-omit-frame-pointer -g)
+        add_link_options(-fsanitize=address)
+    else()
+        message(WARNING "SW_ENABLE_ASAN: unsupported compiler ${CMAKE_C_COMPILER_ID}; ignored")
+    endif()
+endif()
+
+if(SW_ENABLE_UBSAN)
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        add_compile_options(-fsanitize=undefined -fno-sanitize-recover=undefined
+                            -fno-omit-frame-pointer -g)
+        add_link_options(-fsanitize=undefined)
+        if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+            # Not UB under IEEE-754, but in DSP code a /0 means a missing guard
+            # and silently propagates Inf/NaN into decoded data.
+            add_compile_options(-fsanitize=float-divide-by-zero
+                                -fno-sanitize-recover=float-divide-by-zero)
+            add_link_options(-fsanitize=float-divide-by-zero)
+        endif()
+    else()
+        message(WARNING "SW_ENABLE_UBSAN: unsupported compiler ${CMAKE_C_COMPILER_ID}; ignored")
+    endif()
+endif()
+
+if(SW_ENABLE_FUZZER)
+    if(NOT CMAKE_C_COMPILER_ID STREQUAL "Clang")
+        message(FATAL_ERROR "SW_ENABLE_FUZZER requires LLVM Clang with libFuzzer "
+                            "(found ${CMAKE_C_COMPILER_ID}; AppleClang ships no libFuzzer). "
+                            "Use -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++.")
+    endif()
+    # Instrument the library for coverage feedback; harnesses link the runtime.
+    add_compile_options(-fsanitize=fuzzer-no-link)
 endif()
 
 # Code coverage (Must be before any add_library or add_executable)
@@ -61,6 +114,7 @@ set(SW_SOURCES
     src/api/soundwave_api.c
     src/api/ffi_helpers.c
     src/audio/audio_io.c
+    src/agc/agc.c
     src/chanest/chanest.c
     src/crc/crc32.c
     src/css/css_modulate.c
@@ -74,6 +128,7 @@ set(SW_SOURCES
     src/rs/rs_decoder.c
     src/sync/sync_cfo.c
     src/sync/sync_frame.c
+    src/sync/sync_xcorr.c
 )
 
 # Object library target containing common compiled objects
@@ -141,7 +196,7 @@ if(SW_BUILD_BENCHMARKS)
     add_subdirectory(benchmarks)
 endif()
 
-if(SW_BUILD_FUZZ)
+if(SW_ENABLE_FUZZER OR (SW_BUILD_TESTS AND SW_FUZZ_SMOKE))
     add_subdirectory(Fuzzing)
 endif()
 

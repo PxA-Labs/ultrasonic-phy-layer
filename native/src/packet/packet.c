@@ -4,15 +4,32 @@
 #include "soundwave/crc.h"
 #include <string.h>
 
+// Header layout: [len:1][flags:1][reserved...]. The length field is one byte,
+// so payloads are limited to 255 bytes (a 256-byte payload used to encode as
+// length 0 and could never be decoded).
+#define PACKET_MAX_PAYLOAD   255
+#define PACKET_MIN_HEADER    2
+#define PACKET_MAX_HEADER    256
+#define PACKET_MAX_PREAMBLE  4096
+
+static int packet_cfg_valid(const packet_config_t* cfg) {
+    return cfg && cfg->preamble_len >= 0 && cfg->preamble_len <= PACKET_MAX_PREAMBLE &&
+           cfg->header_len >= PACKET_MIN_HEADER && cfg->header_len <= PACKET_MAX_HEADER &&
+           cfg->max_payload <= PACKET_MAX_PAYLOAD;
+}
+
 void packet_init(packet_config_t* cfg) {
+    if (!cfg) return;
     cfg->sync_word = 0xA53C;
-    cfg->max_payload = 256;
+    cfg->max_payload = PACKET_MAX_PAYLOAD;
     cfg->preamble_len = 64;
     cfg->header_len = 8;
 }
 
 int packet_encode(const packet_config_t* cfg, const uint8_t* payload, size_t payload_len,
                   uint8_t* frame, size_t frame_cap, size_t* frame_len) {
+    if (!packet_cfg_valid(cfg) || !frame || !frame_len || (payload_len && !payload))
+        return -1;
     if (payload_len > cfg->max_payload) return -1;
     size_t total = (size_t)cfg->preamble_len + 2 + (size_t)cfg->header_len + payload_len + 4;
     if (frame_cap < total) return -1;
@@ -34,7 +51,7 @@ int packet_encode(const packet_config_t* cfg, const uint8_t* payload, size_t pay
     pos += (size_t)cfg->header_len - 2;
 
     // Payload
-    memcpy(frame + pos, payload, payload_len);
+    if (payload_len) memcpy(frame + pos, payload, payload_len);
     pos += payload_len;
 
     // CRC-32 over header + payload
@@ -51,6 +68,8 @@ int packet_encode(const packet_config_t* cfg, const uint8_t* payload, size_t pay
 
 int packet_decode(const packet_config_t* cfg, const uint8_t* frame, size_t frame_len,
                   uint8_t* payload, size_t payload_cap, size_t* payload_len) {
+    if (!packet_cfg_valid(cfg) || !frame || !payload_len || (payload_cap && !payload))
+        return -1;
     size_t min_len = (size_t)cfg->preamble_len + 2 + (size_t)cfg->header_len + 4;
     if (frame_len < min_len) return -1;
 
@@ -77,7 +96,7 @@ int packet_decode(const packet_config_t* cfg, const uint8_t* frame, size_t frame
 
     // Extract payload
     if (payload_cap < plen) return -1;
-    memcpy(payload, frame + pos + (size_t)cfg->header_len, plen);
+    if (plen) memcpy(payload, frame + pos + (size_t)cfg->header_len, plen);
     *payload_len = plen;
     return 0;
 }

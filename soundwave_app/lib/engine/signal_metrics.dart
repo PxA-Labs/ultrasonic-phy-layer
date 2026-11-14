@@ -62,6 +62,9 @@ class SignalMetrics {
   final int framesReceived;
   final int framesDetected;
   final int frameErrors;
+
+  /// Current RX AGC gain in dB [-20, +32]; null when AGC is off or unused.
+  final double? agcGainDb;
   final DateTime lastUpdated;
 
   SignalMetrics({
@@ -72,8 +75,12 @@ class SignalMetrics {
     this.framesReceived = 0,
     this.framesDetected = 0,
     this.frameErrors = 0,
+    double? agcGainDb,
     DateTime? lastUpdated,
-  })  : snr = snr.clamp(0.0,
+  })  : agcGainDb = (agcGainDb == null || !agcGainDb.isFinite)
+            ? null
+            : agcGainDb.clamp(-20.0, 32.0), // native AGC gain range
+        snr = snr.clamp(0.0,
             60.0), // OpenSSF secure bounds check: SNR clamped to physical bounds
         bitsPerSecond =
             bitsPerSecond.clamp(0.0, 10000000.0), // OpenSSF secure bounds check
@@ -101,6 +108,13 @@ class SignalMetrics {
     return '${snr.toStringAsFixed(1)} dB';
   }
 
+  /// Human-readable AGC gain (e.g. '+12 dB'), or '---' when AGC is off.
+  String get formattedAgcGain {
+    final g = agcGainDb;
+    if (g == null) return '---';
+    return '${g >= 0 ? '+' : ''}${g.toStringAsFixed(0)} dB';
+  }
+
   /// Human-readable connection status label.
   String get statusLabel {
     switch (connectionState) {
@@ -126,6 +140,8 @@ class SignalMetrics {
     int? framesReceived,
     int? framesDetected,
     int? frameErrors,
+    double? agcGainDb,
+    bool clearAgcGain = false,
     DateTime? lastUpdated,
   }) {
     return SignalMetrics(
@@ -137,12 +153,13 @@ class SignalMetrics {
       framesReceived: framesReceived ?? this.framesReceived,
       framesDetected: framesDetected ?? this.framesDetected,
       frameErrors: frameErrors ?? this.frameErrors,
+      agcGainDb: clearAgcGain ? null : (agcGainDb ?? this.agcGainDb),
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }
 
   @override
   String toString() {
-    return 'SignalMetrics(state: $connectionState, snr: $formattedSnr, throughput: $formattedThroughput, frames: $framesReceived/$framesDetected, errors: $frameErrors)';
+    return 'SignalMetrics(state: $connectionState, snr: $formattedSnr, throughput: $formattedThroughput, frames: $framesReceived/$framesDetected, errors: $frameErrors, agc: $formattedAgcGain)';
   }
 }

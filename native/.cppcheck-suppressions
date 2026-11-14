@@ -1,0 +1,8 @@
+// cppcheck suppressions for the DSP core (issue #28). Keep this list short and
+// justified; prefer fixing findings or inline `// cppcheck-suppress` with a reason.
+
+// System headers are not analysed (no --library for every platform SDK).
+missingIncludeSystem
+
+// Vendored third-party code is out of scope for project analysis.
+*:native/vendor/*

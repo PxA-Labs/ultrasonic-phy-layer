@@ -149,6 +149,22 @@ typedef AudioCaptureStartDart = int Function(
   Pointer<Pointer<Void>> handle,
 );
 
+// AGC (issue #92)
+typedef AgcCreateCNative = Int32 Function(
+    Int32 sampleRate, Float targetRms, Pointer<Pointer<Void>> handle);
+typedef AgcCreateDart = int Function(
+    int sampleRate, double targetRms, Pointer<Pointer<Void>> handle);
+typedef AgcProcessCNative = Int32 Function(
+    Pointer<Void> handle, Pointer<Float> samples, IntPtr len);
+typedef AgcProcessDart = int Function(
+    Pointer<Void> handle, Pointer<Float> samples, int len);
+typedef AgcGainDbCNative = Int32 Function(
+    Pointer<Void> handle, Pointer<Float> gainDb);
+typedef AgcGainDbDart = int Function(
+    Pointer<Void> handle, Pointer<Float> gainDb);
+typedef AgcHandleCNative = Int32 Function(Pointer<Void> handle);
+typedef AgcHandleDart = int Function(Pointer<Void> handle);
+
 typedef AudioCaptureStopCNative = Int32 Function(Pointer<Void> handle);
 typedef AudioCaptureStopDart = int Function(Pointer<Void> handle);
 
@@ -268,18 +284,25 @@ class SoundwaveNative {
   static SoundwaveNative get instance => _instance ??= SoundwaveNative._();
 
   static DynamicLibrary _loadLibrary() {
+    // SOUNDWAVE_LIB pins an exact library (CI, sanitizer builds, or when
+    // several stale builds exist); it is tried before the relative paths.
+    final override = Platform.environment['SOUNDWAVE_LIB'];
     final searchPaths = [
+      if (override != null && override.isNotEmpty) override,
       if (Platform.isWindows) 'soundwave.dll',
       if (Platform.isMacOS) 'libsoundwave.dylib',
       if (Platform.isLinux) 'libsoundwave.so',
-      if (Platform.isMacOS) '../build/libsoundwave.dylib',
-      if (Platform.isLinux) '../build/libsoundwave.so',
-      if (Platform.isWindows) '../build/Release/soundwave.dll',
+      // native/build is the documented build directory (DEVELOPER_GUIDE,
+      // CI); the legacy repo-root build/ is only a fallback so a stale copy
+      // there cannot shadow a fresh build.
       if (Platform.isMacOS) '../native/build/libsoundwave.dylib',
       if (Platform.isMacOS) '../native/build/asan/libsoundwave.dylib',
       if (Platform.isLinux) '../native/build/libsoundwave.so',
       if (Platform.isWindows) '../native/build/Release/soundwave.dll',
       if (Platform.isWindows) '../native/build/Debug/soundwave.dll',
+      if (Platform.isMacOS) '../build/libsoundwave.dylib',
+      if (Platform.isLinux) '../build/libsoundwave.so',
+      if (Platform.isWindows) '../build/Release/soundwave.dll',
     ];
 
     for (final path in searchPaths) {
@@ -294,6 +317,61 @@ class SoundwaveNative {
     throw UnsupportedError(
       'Could not load native Soundwave library. Searched in: $searchPaths',
     );
+  }
+
+  // AGC symbols are resolved lazily so a library built before the AGC module
+  // still loads for everything else; callers can check [hasAgc].
+  late final AgcCreateDart _agcCreate =
+      _lib.lookupFunction<AgcCreateCNative, AgcCreateDart>('sw_agc_create');
+  late final AgcProcessDart _agcProcess =
+      _lib.lookupFunction<AgcProcessCNative, AgcProcessDart>('sw_agc_process');
+  late final AgcGainDbDart _agcGainDb = _lib
+      .lookupFunction<AgcGainDbCNative, AgcGainDbDart>('sw_agc_get_gain_db');
+  late final AgcHandleDart _agcReset =
+      _lib.lookupFunction<AgcHandleCNative, AgcHandleDart>('sw_agc_reset');
+  late final AgcHandleDart _agcDestroy =
+      _lib.lookupFunction<AgcHandleCNative, AgcHandleDart>('sw_agc_destroy');
+
+  /// Whether the loaded library exports the AGC API.
+  bool get hasAgc => _lib.providesSymbol('sw_agc_create');
+
+  /// Creates a native AGC instance ([targetRms] 0 = default 0.25).
+  Pointer<Void> agcCreate(int sampleRate, {double targetRms = 0.0}) {
+    final handlePtr = calloc<Pointer<Void>>();
+    try {
+      final ret = _agcCreate(sampleRate, targetRms, handlePtr);
+      if (ret != 0) throw SwException(ret);
+      return handlePtr.value;
+    } finally {
+      calloc.free(handlePtr);
+    }
+  }
+
+  /// Applies AGC in place to [len] floats at [samples] (caller-owned buffer).
+  void agcProcess(Pointer<Void> handle, Pointer<Float> samples, int len) {
+    final ret = _agcProcess(handle, samples, len);
+    if (ret != 0) throw SwException(ret);
+  }
+
+  double agcGainDb(Pointer<Void> handle) {
+    final out = calloc<Float>();
+    try {
+      final ret = _agcGainDb(handle, out);
+      if (ret != 0) throw SwException(ret);
+      return out.value;
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  void agcReset(Pointer<Void> handle) {
+    final ret = _agcReset(handle);
+    if (ret != 0) throw SwException(ret);
+  }
+
+  void agcDestroy(Pointer<Void> handle) {
+    final ret = _agcDestroy(handle);
+    if (ret != 0) throw SwException(ret);
   }
 
   String get version => _version().toDartString();
@@ -362,48 +440,79 @@ class SoundwaveNative {
     }
   }
 
-  Float32List cssModulate(Uint8List bits, Pointer<SwConfig> config) {
-    final bitsPtr = calloc<Uint8>(bits.length);
-    final samplesCapacity = bits.length * 4096 + 65536;
-    final samplesPtr = calloc<Float>(samplesCapacity);
-    final samplesLenPtr = calloc<IntPtr>();
+  /// SW_ERR_OVERFLOW: the output buffer was too small; the API reports the
+  /// required size in the length out-parameter.
+  static const int _errOverflow = -7;
+
+  /// Upper bound on samples we are willing to allocate for one frame
+  /// (~95 s at 44.1 kHz). Guards against absurd sizes from bad configs.
+  static const int _maxFrameSamples = 1 << 22;
+
+  /// Modulates [frame] bytes. The C API counts *bits* (bit_len), so all
+  /// frame.length * 8 bits are sent. The output size depends on the config,
+  /// so the buffer is sized with the API's own overflow protocol: try a first
+  /// estimate, and on SW_ERR_OVERFLOW retry once with the exact length.
+  Float32List _modulate(
+    int Function(Pointer<Uint8>, int, SwConfig, Pointer<Float>, Pointer<IntPtr>)
+        fn,
+    Uint8List frame,
+    Pointer<SwConfig> config,
+  ) {
+    if (frame.isEmpty) throw SwException(-1);
+    final bitsPtr = calloc<Uint8>(frame.length);
+    final lenPtr = calloc<IntPtr>();
+    Pointer<Float> samplesPtr = nullptr;
     try {
-      bitsPtr.asTypedList(bits.length).setAll(0, bits);
-      samplesLenPtr.value = samplesCapacity;
-      final ret = _cssModulate(
-        bitsPtr,
-        bits.length,
-        config.ref,
-        samplesPtr,
-        samplesLenPtr,
-      );
-      if (ret != 0) throw SwException(ret);
-      return Float32List.fromList(samplesPtr.asTypedList(samplesLenPtr.value));
+      bitsPtr.asTypedList(frame.length).setAll(0, frame);
+      final bitLen = frame.length * 8;
+      var capacity = bitLen * 1024 + 65536;
+      for (var attempt = 0; attempt < 2; attempt++) {
+        if (capacity <= 0 || capacity > _maxFrameSamples) {
+          throw SwException(_errOverflow);
+        }
+        samplesPtr = calloc<Float>(capacity);
+        lenPtr.value = capacity;
+        final ret = fn(bitsPtr, bitLen, config.ref, samplesPtr, lenPtr);
+        if (ret == 0) {
+          return Float32List.fromList(samplesPtr.asTypedList(lenPtr.value));
+        }
+        calloc.free(samplesPtr);
+        samplesPtr = nullptr;
+        if (ret != _errOverflow || lenPtr.value <= capacity) {
+          throw SwException(ret);
+        }
+        capacity = lenPtr.value;
+      }
+      throw SwException(_errOverflow);
     } finally {
       calloc.free(bitsPtr);
-      calloc.free(samplesPtr);
-      calloc.free(samplesLenPtr);
+      calloc.free(lenPtr);
+      if (samplesPtr != nullptr) calloc.free(samplesPtr);
     }
   }
 
-  Uint8List cssDemodulate(Float32List samples, Pointer<SwConfig> config) {
+  /// Demodulates [samples] into bytes. The capacity passed to C is in *bits*;
+  /// one bit per sample is a safe upper bound for both CSS and OFDM.
+  Uint8List _demodulate(
+    int Function(Pointer<Float>, int, SwConfig, Pointer<Uint8>, Pointer<IntPtr>)
+        fn,
+    Float32List samples,
+    Pointer<SwConfig> config,
+  ) {
+    if (samples.isEmpty) throw SwException(-1);
     final samplesPtr = calloc<Float>(samples.length);
-    // Output bits capacity estimation
-    final bitsCapacity = samples.length ~/ 16 + 1024;
-    final bitsPtr = calloc<Uint8>(bitsCapacity);
+    final capacityBytes = (samples.length + 7) ~/ 8 + 1;
+    final bitsPtr = calloc<Uint8>(capacityBytes);
     final bitsLenPtr = calloc<IntPtr>();
     try {
       samplesPtr.asTypedList(samples.length).setAll(0, samples);
-      bitsLenPtr.value = bitsCapacity;
-      final ret = _cssDemodulate(
-        samplesPtr,
-        samples.length,
-        config.ref,
-        bitsPtr,
-        bitsLenPtr,
-      );
+      bitsLenPtr.value = capacityBytes * 8;
+      final ret =
+          fn(samplesPtr, samples.length, config.ref, bitsPtr, bitsLenPtr);
       if (ret != 0) throw SwException(ret);
-      return Uint8List.fromList(bitsPtr.asTypedList(bitsLenPtr.value ~/ 8));
+      final outBytes = bitsLenPtr.value ~/ 8;
+      if (outBytes > capacityBytes) throw SwException(_errOverflow);
+      return Uint8List.fromList(bitsPtr.asTypedList(outBytes));
     } finally {
       calloc.free(samplesPtr);
       calloc.free(bitsPtr);
@@ -411,53 +520,17 @@ class SoundwaveNative {
     }
   }
 
-  Float32List ofdmModulate(Uint8List bits, Pointer<SwConfig> config) {
-    final bitsPtr = calloc<Uint8>(bits.length);
-    final samplesCapacity = bits.length * 4096 + 65536;
-    final samplesPtr = calloc<Float>(samplesCapacity);
-    final samplesLenPtr = calloc<IntPtr>();
-    try {
-      bitsPtr.asTypedList(bits.length).setAll(0, bits);
-      samplesLenPtr.value = samplesCapacity;
-      final ret = _ofdmModulate(
-        bitsPtr,
-        bits.length,
-        config.ref,
-        samplesPtr,
-        samplesLenPtr,
-      );
-      if (ret != 0) throw SwException(ret);
-      return Float32List.fromList(samplesPtr.asTypedList(samplesLenPtr.value));
-    } finally {
-      calloc.free(bitsPtr);
-      calloc.free(samplesPtr);
-      calloc.free(samplesLenPtr);
-    }
-  }
+  Float32List cssModulate(Uint8List frame, Pointer<SwConfig> config) =>
+      _modulate(_cssModulate, frame, config);
 
-  Uint8List ofdmDemodulate(Float32List samples, Pointer<SwConfig> config) {
-    final samplesPtr = calloc<Float>(samples.length);
-    final bitsCapacity = samples.length ~/ 4;
-    final bitsPtr = calloc<Uint8>(bitsCapacity);
-    final bitsLenPtr = calloc<IntPtr>();
-    try {
-      samplesPtr.asTypedList(samples.length).setAll(0, samples);
-      bitsLenPtr.value = bitsCapacity;
-      final ret = _ofdmDemodulate(
-        samplesPtr,
-        samples.length,
-        config.ref,
-        bitsPtr,
-        bitsLenPtr,
-      );
-      if (ret != 0) throw SwException(ret);
-      return Uint8List.fromList(bitsPtr.asTypedList(bitsLenPtr.value ~/ 8));
-    } finally {
-      calloc.free(samplesPtr);
-      calloc.free(bitsPtr);
-      calloc.free(bitsLenPtr);
-    }
-  }
+  Uint8List cssDemodulate(Float32List samples, Pointer<SwConfig> config) =>
+      _demodulate(_cssDemodulate, samples, config);
+
+  Float32List ofdmModulate(Uint8List frame, Pointer<SwConfig> config) =>
+      _modulate(_ofdmModulate, frame, config);
+
+  Uint8List ofdmDemodulate(Float32List samples, Pointer<SwConfig> config) =>
+      _demodulate(_ofdmDemodulate, samples, config);
 
   Map<String, dynamic> detectFrame(
     Float32List samples,

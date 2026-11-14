@@ -13,12 +13,19 @@
 #include <stdio.h>
 
 void ofdm_dft_demodulate(const float* y, int N, int cp_length, kiss_fft_cpx* Y) {
-    kiss_fft_cpx* temp = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
+    if (!y || !Y || N <= 0 || cp_length < 0) return;
+    kiss_fft_cpx* temp = (kiss_fft_cpx*)malloc((size_t)N * sizeof(kiss_fft_cpx));
+    kiss_fft_cfg fft_cfg = kiss_fft_alloc(N, 0, NULL, NULL); // 0 = forward
+    if (!temp || !fft_cfg) {
+        memset(Y, 0, (size_t)N * sizeof(kiss_fft_cpx)); // no data on OOM
+        free(temp);
+        free(fft_cfg);
+        return;
+    }
     for (int n = 0; n < N; n++) {
         temp[n].r = y[cp_length + n];
         temp[n].i = 0.0f;
     }
-    kiss_fft_cfg fft_cfg = kiss_fft_alloc(N, 0, NULL, NULL); // 0 = forward
     kiss_fft(fft_cfg, temp, Y);
     float norm = 1.0f / sqrtf((float)N);
     for (int n = 0; n < N; n++) {
@@ -48,6 +55,10 @@ int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** d
 
     int N = cfg.num_subcarriers;
     int cp = cfg.cp_length;
+    // Internal callers bypass sw_config_validate(): enforce the invariants the
+    // index arithmetic below relies on (power-of-two FFT, CP within a symbol).
+    if (N < 16 || N > 4096 || (N & (N - 1)) != 0 || cp < 0 || cp > N)
+        return SW_ERR_BAD_PARAM;
     float fs = (float)cfg.sample_rate;
     int modulation = cfg.ofdm_modulation; // 0 = BPSK, 1 = QPSK
 
@@ -88,6 +99,10 @@ int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** d
     int num_data, num_pilots, num_nulls;
     ofdm_allocate_subcarriers(N, data_indices, pilot_indices, null_indices,
                                &num_data, &num_pilots, &num_nulls);
+    if (num_data <= 0 || num_pilots <= 0 || num_pilots > N || num_data > N) {
+        ret_code = SW_ERR_BAD_PARAM;
+        goto cleanup;
+    }
 
     int N_guard = N / 8;
     int N_active = N / 2 - N_guard - 1;
@@ -160,6 +175,14 @@ int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** d
     }
 
     // 4. CFO Schmidl-Cox Estimation & Correction
+    // Need the two preamble symbols plus at least one data symbol after
+    // frame_start; otherwise the reads below run past the sample buffer and
+    // num_symbols underflows into a huge allocation.
+    size_t sym_len = (size_t)N + (size_t)cp;
+    if (frame_start >= len || len - frame_start < 3 * sym_len) {
+        ret_code = SW_ERR_SYNC;
+        goto cleanup;
+    }
     size_t payload_len = len - frame_start;
     float cfo = sync_schmidl_cox_cfo(samples + frame_start, 2 * ((size_t)N + (size_t)cp), N + cp, fs);
 
@@ -170,7 +193,10 @@ int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** d
         ret_code = SW_ERR_MEMORY;
         goto cleanup;
     }
-    sync_real_to_analytic(samples + frame_start, payload_len, analytic_real, analytic_imag);
+    if (sync_real_to_analytic(samples + frame_start, payload_len, analytic_real, analytic_imag) != 0) {
+        ret_code = SW_ERR_MEMORY;
+        goto cleanup;
+    }
     sync_apply_cfo_correction(analytic_real, analytic_imag, payload_len, cfo, fs, corrected);
 
     // Free analytic buffers early as they are no longer needed
@@ -221,8 +247,11 @@ int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** d
         H_p[p] = H[idx];
     }
     float snr_db = chanest_estimate_snr(Y_p, X_p, H_p, num_pilots);
-    float inv_snr = 1.0f / powf(10.0f, snr_db / 10.0f);
-    if (inv_snr > 10.0f) inv_snr = 10.0f;
+    // 1/SNR_linear = 10^(-SNR_dB/10), computed without a division: silent or
+    // garbage pilots give SNR = -inf/NaN, which used to divide by zero
+    // (libFuzzer + UBSan, issue #28). Clamp to the regularisation ceiling.
+    float inv_snr = isfinite(snr_db) ? powf(10.0f, -snr_db / 10.0f) : 10.0f;
+    if (!(inv_snr <= 10.0f)) inv_snr = 10.0f;
 
     // 6. Demodulate, Equalize & Demap each data symbol
     int num_symbols = (int)((payload_len - (size_t)2 * ((size_t)N + (size_t)cp)) / ((size_t)N + (size_t)cp));
