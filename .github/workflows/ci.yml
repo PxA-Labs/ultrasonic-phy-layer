@@ -15,10 +15,11 @@ concurrency:
 env:
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   # Coverage gates (issue #36): CI fails if coverage drops below these.
-  # Set just below the measured numbers; raise them as coverage improves.
-  NATIVE_MIN_LINE: '0'
-  NATIVE_MIN_BRANCH: '0'
-  FLUTTER_MIN_LINE: '0'
+  # Set just below the measured numbers (native 86.43% lines / 74.32%
+  # branches, Flutter 90.24% lines); raise them as coverage improves.
+  NATIVE_MIN_LINE: '86.0'
+  NATIVE_MIN_BRANCH: '74.0'
+  FLUTTER_MIN_LINE: '89.5'
 
 jobs:
   flutter-quality-gate:
