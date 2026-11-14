@@ -115,6 +115,9 @@ fmt_numbered() { # fp dn
 fmt_minsdk() { # fp dn  (v3.1 / rotation style; one cert listed twice)
   printf 'Verifies\nVerified using v3.1 scheme (APK Signature Scheme v3.1): true\nSigner (minSdkVersion=33, maxSdkVersion=2147483647) certificate DN: %s\nSigner (minSdkVersion=33, maxSdkVersion=2147483647) certificate SHA-256 digest: %s\nSigner (minSdkVersion=24, maxSdkVersion=32) certificate DN: %s\nSigner (minSdkVersion=24, maxSdkVersion=32) certificate SHA-256 digest: %s\n' "$2" "$1" "$2" "$1"
 }
+fmt_scheme() { # fp dn  (build-tools 34+ on ubuntu-latest, captured from CI)
+  printf 'Verifies\nVerified using v1 scheme (JAR signing): false\nVerified using v2 scheme (APK Signature Scheme v2): true\nVerified using v3 scheme (APK Signature Scheme v3): false\nVerified for SourceStamp: false\nV2 Signer: certificate DN: %s\nV2 Signer: certificate SHA-256 digest: %s\nV2 Signer: certificate SHA-1 digest: 3265eae27468695f2e467f91a02d99bd9661e1ce\nV2 Signer: key algorithm: RSA\nV2 Signer: public key SHA-256 digest: 2569e7a0ed0b3e1324c8e6210d078610616d79006d5935c3a0aaefac7c7c1d38\n' "$2" "$1"
+}
 apk_verify() { env APKSIGNER="$work/stub-apksigner" STUB_OUT="$work/stub.out" "$tool" verify --apk-dir apks "$@"; }
 
 fmt_numbered "$release_fp" "CN=Soundwave Upload, O=PxA Labs" > stub.out
@@ -122,6 +125,13 @@ expect_ok "APKs: 'Signer #1' output format" apk_verify
 check "APKs: signer DN is printed" grep -q "Signer: CN=Soundwave Upload" "$work/log"
 expect_ok "APKs and AAB with the same certificate" apk_verify --aab release.aab --require-release-key
 expect_fail "APKs and AAB with different certificates" "different certificates" apk_verify --aab other.aab
+
+fmt_scheme "$release_fp" "CN=Soundwave Upload, O=PxA Labs" > stub.out
+expect_ok "APKs: 'V2 Signer:' format (public key digest ignored)" apk_verify --aab release.aab
+{ fmt_scheme "$release_fp" "CN=Soundwave Upload"; printf 'V3 Signer: certificate DN: CN=Soundwave Upload\nV3 Signer: certificate SHA-256 digest: %s\n' "$release_fp"; } > stub.out
+expect_ok "APKs: same certificate under V2 and V3 schemes" apk_verify --aab release.aab
+fmt_scheme "$debug_fp" "C=US, O=Android, CN=Android Debug" > stub.out
+expect_fail "APKs: debug certificate (C=US, O=Android, CN=...) refused" "refusing to publish" apk_verify --require-release-key
 
 fmt_minsdk "$release_fp" "CN=Soundwave Upload, O=PxA Labs" > stub.out
 expect_ok "APKs: '(minSdkVersion=...)' format with a repeated certificate" apk_verify --aab release.aab

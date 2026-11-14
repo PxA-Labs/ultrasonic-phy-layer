@@ -85,6 +85,12 @@ cmd_cleanup() {
   echo "Removed keystore and key.properties."
 }
 
+# Values of "<signer prefix> <field>: value" lines in apksigner output.
+signer_field() { # output field
+  # No match is not an error here; callers check for an empty result.
+  { printf '%s\n' "$1" | grep -E "^(V[0-9.]+ )?Signer.*$2: " || true; } | sed -E "s/^.*$2: *//"
+}
+
 find_apksigner() {
   if [ -n "${APKSIGNER:-}" ]; then echo "$APKSIGNER"; return; fi
   local sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
@@ -125,11 +131,12 @@ cmd_verify() {
       out="$("$apksigner" verify --verbose --print-certs "$apk")" || die "apksigner rejected $apk"
       echo "$out" | grep -E '^Verified using .*: true' || true
       # Signer lines vary by build-tools version and scheme ("Signer #1
-      # certificate DN: ...", "Signer (minSdkVersion=..., ...) certificate
-      # ..."), and key rotation can list one certificate several times, so
-      # match any signer line and require exactly one distinct digest.
+      # certificate DN: ...", "V2 Signer: certificate DN: ...", "Signer
+      # (minSdkVersion=...) certificate ..."), and several schemes or key
+      # rotation can list one certificate more than once, so match any
+      # signer line and require exactly one distinct digest.
       local digests
-      digests="$(echo "$out" | sed -n 's/^Signer.*certificate SHA-256 digest: *//p' | normalize_lines | sort -u)"
+      digests="$(signer_field "$out" 'certificate SHA-256 digest' | normalize_lines | sort -u)"
       if [ -z "$digests" ]; then
         echo "$out" >&2
         die "could not read the signing certificate of $apk"
@@ -139,7 +146,7 @@ cmd_verify() {
         die "$apk must be signed by exactly one certificate"
       fi
       fp="$digests"
-      dn="$(echo "$out" | sed -n 's/^Signer.*certificate DN: *//p' | head -1)"
+      dn="$(signer_field "$out" 'certificate DN' | head -1)"
       echo "Signer: $dn"
       fps+="$(basename "$apk") $fp"$'\n'
       dns+="$dn"$'\n'
