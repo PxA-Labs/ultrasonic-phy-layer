@@ -99,7 +99,7 @@ int ofdm_layout_compute(int N, float sample_rate, float carrier_freq,
 
     double k_lo = ceil(f_lo * (double)N / fs) + OFDM_EDGE_GUARD_BINS;
     double k_hi = floor(f_hi * (double)N / fs) - OFDM_EDGE_GUARD_BINS;
-    if (k_lo < 1.0 || k_hi > (double)(N / 2 - 1) ||
+    if (k_lo < 1.0 || k_hi > 0.5 * (double)N - 1.0 ||
         k_hi - k_lo + 1.0 < (double)OFDM_MIN_ACTIVE_BINS)
         return SW_ERR_BAD_PARAM;
 
@@ -183,13 +183,23 @@ int ofdm_preamble_spectrum(const ofdm_layout_t* lay, int N, int cp, kiss_fft_cpx
     return SW_OK;
 }
 
+void ofdm_scramble(uint8_t* bits, size_t nbits) {
+    if (!bits) return;
+    unsigned state = 0x7FFFu;
+    for (size_t i = 0; i < nbits; i++) {
+        unsigned pn = ((state >> 14) ^ (state >> 13)) & 1u;
+        state = ((state << 1) | pn) & 0x7FFFu;
+        if (pn) bits[i / 8] ^= (uint8_t)(0x80u >> (i % 8));
+    }
+}
+
 void ofdm_map_constellation(const ofdm_config_t* cfg, const uint8_t* bits,
                             size_t bit_len, kiss_fft_cpx* X) {
     if (!cfg || !bits || !X) return;
     ofdm_layout_t lay;
     if (ofdm_layout_from_config(cfg, &lay) != SW_OK) return;
     int N = cfg->num_subcarriers > 0 ? cfg->num_subcarriers : 256;
-    int* data_indices = (int*)malloc((size_t)lay.num_data * sizeof(int));
+    int* data_indices = (int*)calloc((size_t)lay.num_data, sizeof(int));
     if (!data_indices) return;
     ofdm_allocate_subcarriers(&lay, data_indices, NULL);
 
@@ -310,14 +320,19 @@ int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
         return SW_ERR_OVERFLOW;
     }
 
-    int* data_indices = (int*)malloc((size_t)lay.num_data * sizeof(int));
+    int* data_indices = (int*)calloc((size_t)lay.num_data, sizeof(int));
     kiss_fft_cpx* X = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
     float* sym = (float*)calloc(L, sizeof(float));
     float* ramp = (float*)malloc(((size_t)W + 1) * sizeof(float));
-    if (!data_indices || !X || !sym || !ramp) {
-        free(data_indices); free(X); free(sym); free(ramp);
+    uint8_t* wbits = (uint8_t*)malloc(bit_len / 8 + 1);
+    if (!data_indices || !X || !sym || !ramp || !wbits) {
+        free(data_indices); free(X); free(sym); free(ramp); free(wbits);
         return SW_ERR_MEMORY;
     }
+    // Whitened copy of the data bits (see ofdm_scramble).
+    memcpy(wbits, bits, (bit_len + 7) / 8);
+    ofdm_scramble(wbits, bit_len);
+    bits = wbits;
     ofdm_allocate_subcarriers(&lay, data_indices, NULL);
     // Raised-cosine rise r[n]; the matching fall is r[W - 1 - n], and
     // r[n] + r[W - 1 - n] = 1, so overlapping symbols cross-fade at unit gain.
@@ -332,7 +347,7 @@ int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
     // symbol are windowed.
     int rc = ofdm_preamble_spectrum(&lay, N, cp, X);
     if (rc != SW_OK) {
-        free(data_indices); free(X); free(sym); free(ramp);
+        free(data_indices); free(X); free(sym); free(ramp); free(wbits);
         return rc;
     }
     ofdm_modulate_symbol(cfg, X, sym);
@@ -364,6 +379,7 @@ int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
     free(X);
     free(sym);
     free(ramp);
+    free(wbits);
 
     *sample_len = total_samples;
     return SW_OK;

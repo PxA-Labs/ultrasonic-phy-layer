@@ -60,6 +60,13 @@ static int bit_at(const uint8_t* bytes, size_t i) {
     return (bytes[i / 8] >> (7 - (i % 8))) & 1;
 }
 
+// The modulator whitens the data bits (ofdm_scramble), so the constellation
+// points carry payload XOR PRBS15. Returns that on-air bit sequence.
+static void on_air_bits(const uint8_t* payload, size_t nbytes, uint8_t* out) {
+    memcpy(out, payload, nbytes);
+    ofdm_scramble(out, nbytes * 8);
+}
+
 // Modulates payload; returns a malloc'd sample buffer (caller frees).
 static float* modulate(const uint8_t* payload, size_t nbytes, sw_config_t cfg,
                        size_t* out_len) {
@@ -104,8 +111,9 @@ static double evm_rms(const float* iq, size_t n, int ofdm_modulation) {
 }
 
 static void test_qpsk_points_match_payload(void) {
-    uint8_t payload[32];
+    uint8_t payload[32], air[32];
     for (int i = 0; i < 32; i++) payload[i] = (uint8_t)(i * 37 + 11);
+    on_air_bits(payload, sizeof payload, air);
     sw_config_t cfg = ofdm_config(1);
     size_t n = 0;
     float* s = modulate(payload, sizeof payload, cfg, &n);
@@ -130,7 +138,7 @@ static void test_qpsk_points_match_payload(void) {
     for (size_t k = 0; k < sizeof payload * 8 / 2; k++) {
         int b1 = iq[2 * k + 1] < 0.0f;
         int b2 = iq[2 * k] < 0.0f;
-        if (b1 != bit_at(payload, 2 * k) || b2 != bit_at(payload, 2 * k + 1))
+        if (b1 != bit_at(air, 2 * k) || b2 != bit_at(air, 2 * k + 1))
             mismatches++;
     }
     CHECK(mismatches == 0);
@@ -163,7 +171,8 @@ static void test_qpsk_points_match_payload(void) {
 }
 
 static void test_bpsk_points_on_real_axis(void) {
-    uint8_t payload[8] = {0xA5, 0x3C, 0xFF, 0x00, 0x12, 0x34, 0x56, 0x78};
+    uint8_t payload[8] = {0xA5, 0x3C, 0xFF, 0x00, 0x12, 0x34, 0x56, 0x78}, air[8];
+    on_air_bits(payload, sizeof payload, air);
     sw_config_t cfg = ofdm_config(0);
     size_t n = 0;
     float* s = modulate(payload, sizeof payload, cfg, &n);
@@ -177,7 +186,7 @@ static void test_bpsk_points_on_real_axis(void) {
     int mismatches = 0;
     for (size_t k = 0; k < sizeof payload * 8; k++) {
         int bit = iq[2 * k] > 0.0f; // bpsk_map: 0 -> -1, 1 -> +1
-        if (bit != bit_at(payload, k)) mismatches++;
+        if (bit != bit_at(air, k)) mismatches++;
     }
     CHECK(mismatches == 0);
 
@@ -217,8 +226,9 @@ typedef struct {
 static loopback_t loopback(int ofdm_modulation, int cp, int equalizer,
                            size_t lead, size_t drop, double noise) {
     loopback_t res = {INFINITY, -1, 0};
-    uint8_t payload[64];
+    uint8_t payload[64], air[64];
     for (int i = 0; i < 64; i++) payload[i] = (uint8_t)(i * 151 + 29);
+    on_air_bits(payload, sizeof payload, air);
     sw_config_t cfg = ofdm_config(ofdm_modulation);
     cfg.cp_length = cp;
     cfg.equalizer = equalizer;
@@ -249,11 +259,11 @@ static loopback_t loopback(int ofdm_modulation, int cp, int equalizer,
     for (size_t k = 0; k < want; k++) {
         float re = iq[2 * k], im = iq[2 * k + 1];
         if (ofdm_modulation == 0) {
-            int bit = k < nbits ? bit_at(payload, k) : 0; // bpsk_map: 0 -> -1
+            int bit = k < nbits ? bit_at(air, k) : 0; // bpsk_map: 0 -> -1
             errors += (re > 0.0f) != bit;
         } else {
-            int b1 = 2 * k < nbits ? bit_at(payload, 2 * k) : 0;
-            int b2 = 2 * k + 1 < nbits ? bit_at(payload, 2 * k + 1) : 0;
+            int b1 = 2 * k < nbits ? bit_at(air, 2 * k) : 0;
+            int b2 = 2 * k + 1 < nbits ? bit_at(air, 2 * k + 1) : 0;
             errors += (im < 0.0f) != b1;
             errors += (re < 0.0f) != b2;
         }

@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../engine/frame_geometry.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../state/app_state.dart';
 import '../state/ui_preferences.dart';
@@ -373,6 +374,8 @@ class _OfdmSettingsCard extends StatelessWidget {
           children: [
             Text('OFDM Modulation Config',
                 style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            _OfdmBandInfo(config: state.configMap),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
               isExpanded: true,
@@ -515,6 +518,38 @@ class _LinkLayerCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Computed (not measured) OFDM band plan and raw rate for the current
+/// settings. OFDM uses Carrier Frequency +- Bandwidth / 2 from the CSS card.
+class _OfdmBandInfo extends StatelessWidget {
+  final Map<String, dynamic> config;
+  const _OfdmBandInfo({required this.config});
+
+  @override
+  Widget build(BuildContext context) {
+    final cfg = {...config, 'modulation': 1};
+    final band = OfdmBand.fromConfig(cfg);
+    final style = Theme.of(context).textTheme.bodySmall;
+    if (band == null) {
+      return Text(
+        'Band does not fit: OFDM needs Carrier ± Bandwidth/2 below '
+        'Nyquist with at least 4 subcarriers.',
+        key: const Key('ofdm_band_info'),
+        style: style?.copyWith(color: Theme.of(context).colorScheme.error),
+      );
+    }
+    final g = FrameGeometry.fromConfig(cfg);
+    String khz(double hz) => (hz / 1000).toStringAsFixed(2);
+    return Text(
+      'Subcarriers ${khz(band.lowestHz)}–${khz(band.highestHz)} kHz '
+      '(${band.dataSubcarriers} data + ${band.pilotSubcarriers} pilot), '
+      '${g.bitsPerSymbol} bit/symbol, raw '
+      '${(g.rawBitRate / 1000).toStringAsFixed(2)} kbit/s (computed)',
+      key: const Key('ofdm_band_info'),
+      style: style,
     );
   }
 }

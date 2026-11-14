@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:soundwave/engine/frame_geometry.dart';
 import 'package:soundwave/state/app_state.dart';
 import 'package:soundwave/engine/signal_metrics.dart';
 import '../engine/mock_native.dart';
@@ -49,6 +50,11 @@ void main() {
       state.loadPreset('high_speed');
       expect(state.mode, 1);
       expect(state.numSubcarriers, 2048);
+      // The preset's OFDM band is valid and stays inside 18-21 kHz.
+      final band = OfdmBand.fromConfig(state.configMap);
+      expect(band, isNotNull);
+      expect(band!.lowestHz, greaterThanOrEqualTo(18000));
+      expect(band.highestHz, lessThanOrEqualTo(21000));
     });
 
     test('setters update configMap dynamically', () {

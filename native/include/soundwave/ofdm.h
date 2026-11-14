@@ -92,6 +92,14 @@ void ofdm_allocate_subcarriers(const ofdm_layout_t* lay, int* data_indices,
 // Returns SW_OK, or SW_ERR_MEMORY / SW_ERR_BAD_PARAM.
 int ofdm_preamble_spectrum(const ofdm_layout_t* lay, int N, int cp, kiss_fft_cpx* X);
 
+// Data whitening: XORs bits[0 .. nbits) (MSB-first) with the PRBS15
+// sequence x^15 + x^14 + 1 (seed all ones), restarting at bit 0 of every
+// frame. Self-inverse. The modulator scrambles the data bits and the
+// demodulator descrambles them, so repeated payload bytes (runs of zeros,
+// "0000", padding) never produce identical consecutive OFDM symbols, which
+// the repetition-based (Schmidl-Cox) detector would take for a preamble.
+void ofdm_scramble(uint8_t* bits, size_t nbits);
+
 // Map bits to the data subcarriers of the configured band (BPSK/QPSK).
 void ofdm_map_constellation(const ofdm_config_t* cfg, const uint8_t* bits,
                             size_t bit_len, kiss_fft_cpx* X);
@@ -130,6 +138,21 @@ sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg);
 // Returns the refined start, or frame_start if it cannot be refined.
 size_t ofdm_refine_timing(const float* samples, size_t len, size_t frame_start,
                           int N, int cp, const ofdm_layout_t* lay);
+
+// Minimum preamble score |sum D_k| / sum |D_k| (D_k = H_{k+1} conj(H_k) of
+// the preamble channel estimate) for a detection to count as the known
+// preamble rather than some other repetition.
+#define OFDM_PREAMBLE_MIN_SCORE 0.5
+
+// Locates the frame start (first sample of the first preamble copy):
+// Schmidl-Cox repetition metric, then ofdm_refine_timing, then a check
+// against the known preamble. If the Schmidl-Cox candidate fails that check
+// (or, with allow_fallback, if Schmidl-Cox finds nothing) a matched filter on
+// the known two-copy preamble proposes a candidate and the better-scoring one
+// is returned. Returns 1 if a start was found, 0 otherwise.
+int ofdm_locate_preamble(const float* samples, size_t len, int N, int cp,
+                         const ofdm_layout_t* lay, float threshold, int allow_fallback,
+                         size_t* frame_start, float* snr);
 
 // DFT demodulation: skip cp_length samples (the FFT window offset), FFT, normalize.
 void ofdm_dft_demodulate(const float* y, int N, int cp_length, kiss_fft_cpx* Y);

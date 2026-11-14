@@ -50,42 +50,50 @@ static float preamble_phase_advance(const kiss_fft_cpx* Y1, const kiss_fft_cpx* 
     return isfinite(a) ? (float)a : 0.0f;
 }
 
-size_t ofdm_refine_timing(const float* samples, size_t len, size_t frame_start,
-                          int N, int cp, const ofdm_layout_t* lay) {
-    if (!samples || !lay || N <= 0 || cp < 0 || lay->num_active < 2) return frame_start;
+// Phase-slope statistics of the two preamble copies starting at `start`:
+// with H_k = Y_k conj(X_k) (|X_k| = 1) on the active bins, D_k =
+// H_{k+1} conj(H_k). *acc = sum D_k (its phase is the slope 2 pi s / N of the
+// cyclic shift s between FFT window and symbol body), *mag = sum |D_k|.
+// |acc| / mag is ~1 for the real preamble (channel smooth across adjacent
+// bins) and ~1/sqrt(num_active) for anything else. Returns 0 if out of range.
+static int preamble_slope(const float* samples, size_t len, size_t start, int N, int cp,
+                          const ofdm_layout_t* lay, const kiss_fft_cpx* X, kiss_fft_cpx* Y,
+                          double* acc_r, double* acc_i, double* mag) {
     size_t L = (size_t)N + (size_t)cp;
+    *acc_r = *acc_i = *mag = 0.0;
+    if (start >= len || len - start < 2 * L) return 0;
     int b = OFDM_TIMING_BACKOFF(cp);
-    kiss_fft_cpx* X = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
-    kiss_fft_cpx* Y = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
-    if (!X || !Y || ofdm_preamble_spectrum(lay, N, cp, X) != SW_OK) {
-        free(X);
-        free(Y);
-        return frame_start;
+    for (int copy = 0; copy < 2; copy++) {
+        ofdm_dft_demodulate(samples + start + (size_t)copy * L, N, cp - b, Y);
+        double pr = 0.0, pi = 0.0;
+        for (int k = lay->first_bin; k <= lay->last_bin; k++) {
+            double hr = (double)Y[k].r * X[k].r + (double)Y[k].i * X[k].i;
+            double hi = (double)Y[k].i * X[k].r - (double)Y[k].r * X[k].i;
+            if (k > lay->first_bin) {
+                double dr = hr * pr + hi * pi;
+                double di = hi * pr - hr * pi;
+                *acc_r += dr;
+                *acc_i += di;
+                *mag += sqrt(dr * dr + di * di);
+            }
+            pr = hr;
+            pi = hi;
+        }
     }
+    return isfinite(*acc_r) && isfinite(*acc_i) && isfinite(*mag);
+}
+
+static size_t refine_with(const float* samples, size_t len, size_t frame_start, int N,
+                          int cp, const ofdm_layout_t* lay, const kiss_fft_cpx* X,
+                          kiss_fft_cpx* Y) {
+    size_t L = (size_t)N + (size_t)cp;
     size_t start = frame_start;
     for (int pass = 0; pass < 2; pass++) {
-        if (start >= len || len - start < 2 * L) break;
-        // H_k = Y_k conj(X_k) (|X_k| = 1) on both preamble copies; the phase
-        // of sum_k H_{k+1} conj(H_k) is the slope 2 pi s / N of the cyclic
-        // shift s = e - b between the FFT window and the symbol body.
-        double acc_r = 0.0, acc_i = 0.0;
-        for (int copy = 0; copy < 2; copy++) {
-            ofdm_dft_demodulate(samples + start + (size_t)copy * L, N, cp - b, Y);
-            double pr = 0.0, pi = 0.0;
-            for (int k = lay->first_bin; k <= lay->last_bin; k++) {
-                double hr = (double)Y[k].r * X[k].r + (double)Y[k].i * X[k].i;
-                double hi = (double)Y[k].i * X[k].r - (double)Y[k].r * X[k].i;
-                if (k > lay->first_bin) {
-                    acc_r += hr * pr + hi * pi;
-                    acc_i += hi * pr - hr * pi;
-                }
-                pr = hr;
-                pi = hi;
-            }
-        }
-        if (!(acc_r * acc_r + acc_i * acc_i > 0.0)) break;
-        double s = atan2(acc_i, acc_r) * (double)N / (2.0 * (double)SW_PI);
-        double e = s + (double)b; // detected start minus true start, samples
+        double ar, ai, mag;
+        if (!preamble_slope(samples, len, start, N, cp, lay, X, Y, &ar, &ai, &mag)) break;
+        if (!(ar * ar + ai * ai > 0.0)) break;
+        double s = atan2(ai, ar) * (double)N / (2.0 * (double)SW_PI);
+        double e = s + (double)OFDM_TIMING_BACKOFF(cp); // detected - true start
         if (!isfinite(e) || fabs(e) >= 0.5 * (double)L) break;
         long shift = lround(e);
         if (shift == 0) break;
@@ -95,9 +103,111 @@ size_t ofdm_refine_timing(const float* samples, size_t len, size_t frame_start,
             start += (size_t)(-shift);
         }
     }
+    return start;
+}
+
+static double preamble_score(const float* samples, size_t len, size_t start, int N, int cp,
+                             const ofdm_layout_t* lay, const kiss_fft_cpx* X,
+                             kiss_fft_cpx* Y) {
+    double ar, ai, mag;
+    if (!preamble_slope(samples, len, start, N, cp, lay, X, Y, &ar, &ai, &mag) ||
+        !(mag > 0.0))
+        return 0.0;
+    return sqrt(ar * ar + ai * ai) / mag;
+}
+
+size_t ofdm_refine_timing(const float* samples, size_t len, size_t frame_start,
+                          int N, int cp, const ofdm_layout_t* lay) {
+    if (!samples || !lay || N <= 0 || cp < 0 || lay->num_active < 2) return frame_start;
+    kiss_fft_cpx* X = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
+    kiss_fft_cpx* Y = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
+    size_t start = frame_start;
+    if (X && Y && ofdm_preamble_spectrum(lay, N, cp, X) == SW_OK)
+        start = refine_with(samples, len, frame_start, N, cp, lay, X, Y);
     free(X);
     free(Y);
     return start;
+}
+
+int ofdm_locate_preamble(const float* samples, size_t len, int N, int cp,
+                         const ofdm_layout_t* lay, float threshold, int allow_fallback,
+                         size_t* frame_start, float* snr) {
+    if (!samples || !lay || !frame_start || !snr || N <= 0 || cp < 0 || cp > N ||
+        lay->num_active < 2)
+        return 0;
+    *frame_start = 0;
+    *snr = 0.0f;
+    size_t L = (size_t)N + (size_t)cp;
+    if (len < 2 * L) return 0;
+
+    int found = 0;
+    kiss_fft_cpx* X = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
+    kiss_fft_cpx* Y = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
+    float* tmpl = (float*)calloc(L, sizeof(float));
+    float* R = (float*)malloc((len - L + 1) * sizeof(float));
+    if (!X || !Y || !tmpl || !R || ofdm_preamble_spectrum(lay, N, cp, X) != SW_OK) goto done;
+
+    // 1. Schmidl-Cox repetition metric (sync_frame.c).
+    sync_config_t sc;
+    memset(&sc, 0, sizeof sc);
+    sc.mode = 1;
+    sc.threshold = threshold;
+    sc.zc_root = 1;
+    sc.zc_length = lay->num_active;
+    sc.matched_filter_len = (int)L;
+    size_t sc_start = 0;
+    float sc_snr = 0.0f;
+    double sc_score = -1.0;
+    if (sync_detect_frame(samples, len, &sc, &sc_start, &sc_snr)) {
+        sc_start = refine_with(samples, len, sc_start, N, cp, lay, X, Y);
+        sc_score = preamble_score(samples, len, sc_start, N, cp, lay, X, Y);
+        *frame_start = sc_start;
+        *snr = sc_snr;
+        found = 1;
+        if (sc_score >= OFDM_PREAMBLE_MIN_SCORE) goto done;
+    } else if (!allow_fallback) {
+        goto done;
+    }
+
+    // 2. Any repetition passes Schmidl-Cox -- two identical data symbols, a
+    // periodic interferer -- so a candidate that does not look like the known
+    // preamble is re-checked with a matched filter on the known waveform
+    // (both copies), and the better-matching candidate wins.
+    {
+        ofdm_config_t oc;
+        memset(&oc, 0, sizeof oc);
+        oc.num_subcarriers = N;
+        oc.cp_length = cp;
+        ofdm_modulate_symbol(&oc, X, tmpl);
+        if (sync_xcorr_fft(samples, len, tmpl, L, R) != 0) goto done;
+        size_t n_r = len - L + 1;
+        double best = -INFINITY;
+        size_t best_m = 0;
+        for (size_t m = 0; m + L < n_r; m++) {
+            double v = (double)R[m] + (double)R[m + L];
+            if (v > best) {
+                best = v;
+                best_m = m;
+            }
+        }
+        if (!(best > 0.0)) goto done;
+        size_t mf_start = refine_with(samples, len, best_m, N, cp, lay, X, Y);
+        double mf_score = preamble_score(samples, len, mf_start, N, cp, lay, X, Y);
+        if (!found || mf_score > sc_score) {
+            *frame_start = mf_start;
+            // Same SNR proxy as the Schmidl-Cox path: 10 log10(rho / (1 - rho)).
+            double rho = mf_score < 0.999999 ? mf_score : 0.999999;
+            *snr = (float)(10.0 * log10(rho / (1.0 - rho) + 1e-12));
+            found = 1;
+        }
+    }
+
+done:
+    free(X);
+    free(Y);
+    free(tmpl);
+    free(R);
+    return found;
 }
 
 int ofdm_demodulate(const float* samples, size_t len, sw_config cfg, uint8_t** decoded, size_t* out_len) {
@@ -137,7 +247,6 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     int* data_indices = NULL;
     int* pilot_indices = NULL;
     kiss_fft_cpx* X_pre = NULL;
-    float* pre_symbol = NULL;
     float* analytic_real = NULL;
     float* analytic_imag = NULL;
     float* corrected = NULL;
@@ -164,8 +273,8 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
     int num_data = lay.num_data;
     int N_active = lay.num_active;
     int active_start = lay.first_bin;
-    data_indices = (int*)malloc((size_t)num_data * sizeof(int));
-    pilot_indices = (int*)malloc((size_t)lay.num_pilots * sizeof(int));
+    data_indices = (int*)calloc((size_t)num_data, sizeof(int));
+    pilot_indices = (int*)calloc((size_t)lay.num_pilots, sizeof(int));
     if (!data_indices || !pilot_indices) {
         ret_code = SW_ERR_MEMORY;
         goto cleanup;
@@ -174,74 +283,23 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
 
     // 1. Preamble ZC-OFDM frequency-domain template X_pre (active bins only)
     X_pre = (kiss_fft_cpx*)calloc(N, sizeof(kiss_fft_cpx));
-    pre_symbol = (float*)calloc((size_t)N + (size_t)cp, sizeof(float));
-    if (!X_pre || !pre_symbol) {
+    if (!X_pre) {
         ret_code = SW_ERR_MEMORY;
         goto cleanup;
     }
     ret_code = ofdm_preamble_spectrum(&lay, N, cp, X_pre);
     if (ret_code != SW_OK) goto cleanup;
 
-    // 2. Modulate preamble symbol to time domain for correlation template
-    ofdm_config_t ofdm_cfg;
-    memset(&ofdm_cfg, 0, sizeof ofdm_cfg);
-    ofdm_cfg.num_subcarriers = N;
-    ofdm_cfg.cp_length = cp;
-    ofdm_cfg.num_pilots = lay.num_pilots;
-    ofdm_cfg.pilot_spacing = OFDM_PILOT_SPACING;
-    ofdm_cfg.pilot_boost = 1.0f;
-    ofdm_cfg.modulation = modulation;
-    ofdm_cfg.sample_rate = fs;
-    ofdm_cfg.carrier_freq = cfg.carrier_freq;
-    ofdm_cfg.bandwidth = cfg.bandwidth;
-
-    ofdm_modulate_symbol(&ofdm_cfg, X_pre, pre_symbol);
-
-    // 3. Timing synchronization / Preamble detection
+    // 2. Timing synchronization / preamble detection: Schmidl-Cox metric,
+    // fine timing from the preamble phase slope (MATHEMATICAL_MODEL.md 3.2),
+    // verified against the known preamble with a matched-filter fallback.
     size_t frame_start = 0;
     float detected_snr = 0.0f;
-    sync_config_t sync_cfg;
-    sync_cfg.mode = 1;
-    sync_cfg.threshold = cfg.threshold;
-    sync_cfg.zc_root = 1;
-    sync_cfg.zc_length = N_active;
-    sync_cfg.matched_filter_len = N + cp;
-    sync_cfg.carrier_freq = cfg.carrier_freq;
-    sync_cfg.bandwidth = cfg.bandwidth;
-    sync_cfg.sample_rate = fs;
-
-    int sync_ok = sync_detect_frame(samples, len, &sync_cfg, &frame_start, &detected_snr);
-    if (!sync_ok) {
-        // Fallback matched-filter timing detector
-        int max_search = (int)len - (int)(2 * ((size_t)N + (size_t)cp));
-        float max_corr = -1e9f;
-        int best_m = -1;
-        for (int m = 0; m < max_search; m++) {
-            float corr = 0.0f;
-            for (size_t n = 0; n < ((size_t)N + (size_t)cp); n++) {
-                corr += samples[(size_t)m + n] * pre_symbol[n];
-            }
-            if (corr > max_corr) {
-                max_corr = corr;
-                best_m = m;
-            }
-        }
-        if (best_m >= 0) {
-            frame_start = (size_t)best_m;
-            sync_ok = 1;
-        }
-    }
-
-    if (!sync_ok) {
+    if (!ofdm_locate_preamble(samples, len, N, cp, &lay, cfg.threshold, 1,
+                              &frame_start, &detected_snr)) {
         ret_code = SW_ERR_SYNC;
         goto cleanup;
     }
-
-    // Fine timing from the preamble's phase slope (MATHEMATICAL_MODEL.md 3.2):
-    // with a narrow band the Schmidl-Cox peak is broad and can land a few
-    // samples off; this puts the FFT windows back in the middle of their
-    // ISI-free range.
-    frame_start = ofdm_refine_timing(samples, len, frame_start, N, cp, &lay);
 
     // 4. Timing backoff, CFO estimation & correction
     // Need the two preamble symbols plus at least one data symbol after
@@ -431,6 +489,9 @@ int ofdm_demodulate_ex(const float* samples, size_t len, sw_config cfg,
         }
     }
 
+    // Undo the transmitter's data whitening (ofdm_scramble is self-inverse).
+    ofdm_scramble(decoded_buf, total_bits_demodulated);
+
     *decoded = decoded_buf;
     *out_len = total_bits_demodulated;
     ret_code = SW_OK;
@@ -439,7 +500,6 @@ cleanup:
     free(data_indices);
     free(pilot_indices);
     free(X_pre);
-    free(pre_symbol);
     free(analytic_real);
     free(analytic_imag);
     free(corrected);

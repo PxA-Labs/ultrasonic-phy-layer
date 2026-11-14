@@ -209,8 +209,53 @@ static void test_band_plan_and_validation(void) {
     CHECK(sw_config_validate(css) == SW_OK);
 }
 
+// Repetitive payloads (runs of zeros, "SW0000", repeated letters) used to
+// give two identical consecutive 16-bit OFDM symbols -- a second
+// "preamble" for the repetition detector. Data whitening plus the
+// known-preamble check must make them decode, with exact frame timing.
+static void test_repetitive_payloads_decode(void) {
+    uint8_t p[3][64];
+    memset(p[0], 0x00, 64);
+    memset(p[1], 0xFF, 64);
+    memcpy(p[2], "SW0000|", 7);
+    memset(p[2] + 7, 'a', 64 - 7);
+    const int cps[2] = {32, 64};
+    for (int c = 0; c < 2; c++) {
+        for (int i = 0; i < 3; i++) {
+            sw_config_t cfg = ofdm_cfg(256, cps[c], 19000.0f, 2000.0f);
+            size_t cap = 1 << 16, n = cap;
+            float* tx = (float*)malloc(cap * sizeof(float));
+            float* rx = (float*)calloc(cap, sizeof(float));
+            CHECK(tx && rx);
+            if (!tx || !rx) { free(tx); free(rx); return; }
+            CHECK(sw_ofdm_modulate(p[i], 64 * 8, cfg, tx, &n) == SW_OK);
+            const size_t lead = 700;
+            size_t L = (size_t)(256 + cps[c]);
+            size_t total = lead + n + L - 1;
+            memcpy(rx + lead, tx, n * sizeof(float));
+
+            size_t start = 0;
+            float snr = 0.0f;
+            CHECK(sw_detect_frame(rx, total, cfg, &start, &snr) == SW_OK);
+            CHECK(start == lead);
+
+            uint8_t out[256];
+            size_t bits = sizeof out * 8;
+            int rc = sw_ofdm_demodulate(rx, total, cfg, out, &bits);
+            CHECK(rc == SW_OK && bits >= 64 * 8);
+            int ok = rc == SW_OK && memcmp(out, p[i], 64) == 0;
+            if (!ok) fprintf(stderr, "payload %d cp=%d: start %zu, rc %d
+", i, cps[c], start, rc);
+            CHECK(ok);
+            free(tx);
+            free(rx);
+        }
+    }
+}
+
 int main(void) {
     test_band_plan_and_validation();
+    test_repetitive_payloads_decode();
     check_spectrum(256, 32, 19000.0f, 2000.0f);
     check_spectrum(256, 64, 19000.0f, 2000.0f); // app / CLI default
     check_spectrum(512, 64, 19000.0f, 2000.0f);

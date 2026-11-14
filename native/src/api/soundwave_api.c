@@ -273,15 +273,20 @@ SW_API int sw_detect_frame(const float* samples, size_t len,
         sync_cfg.sample_rate = (float)cfg.sample_rate;
     }
     
-    int ok = sync_detect_frame(samples, len, &sync_cfg, frame_start, snr);
-    if (!ok) {
-        return SW_ERR_SYNC;
-    }
+    int ok;
     if (cfg.modulation == 1 && sync_cfg.zc_length > 0) {
-        // Same fine timing as the demodulator (preamble phase slope).
+        // Same detector as the demodulator: Schmidl-Cox, fine timing and the
+        // known-preamble check (no matched-filter-only detections here, so
+        // noise does not count as a frame).
         int N = cfg.num_subcarriers ? cfg.num_subcarriers : 256;
         int cp = cfg.cp_length ? cfg.cp_length : N / 8;
-        *frame_start = ofdm_refine_timing(samples, len, *frame_start, N, cp, &lay);
+        ok = ofdm_locate_preamble(samples, len, N, cp, &lay, cfg.threshold, 0,
+                                  frame_start, snr);
+    } else {
+        ok = sync_detect_frame(samples, len, &sync_cfg, frame_start, snr);
+    }
+    if (!ok) {
+        return SW_ERR_SYNC;
     }
     return SW_OK;
 }

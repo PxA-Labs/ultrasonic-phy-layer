@@ -54,9 +54,11 @@ CORR_RE = re.compile(r"Errors corrected: (\d+)")
 START_RE = re.compile(r"sw_detect_frame returned 0, frame_start = (\d+)")
 ALPHABET = string.ascii_letters + string.digits
 VERBOSE = False
-CLI_MAX_PAYLOAD = 217  # 223 RS data bytes - 4 CRC - 2 length (main.c)
+# PHY frame shared by soundwave-cli and the app (docs/DEVELOPER_GUIDE.md,
+# "PHY frame format"): [CRC-32 LE][payload][RS parity 32 B], no length field.
+CLI_MAX_PAYLOAD = 219  # 223 RS data bytes - 4 CRC
 RS_PARITY = 32
-CLI_HEADER = 6  # CRC-32 + 16-bit length
+CLI_HEADER = 4  # CRC-32
 
 
 # --------------------------------------------------------------------------

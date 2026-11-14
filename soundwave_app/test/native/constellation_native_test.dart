@@ -42,6 +42,19 @@ Map<String, dynamic> ofdmConfig({int ofdmModulation = 1}) => {
       'agc_enabled': false,
     };
 
+/// The modulator whitens data bits with PRBS15 (x^15 + x^14 + 1, seed all
+/// ones; native ofdm_scramble), so the points carry frame XOR PRBS15.
+Uint8List onAirBits(Uint8List frame) {
+  final out = Uint8List.fromList(frame);
+  var state = 0x7FFF;
+  for (var i = 0; i < out.length * 8; i++) {
+    final pn = ((state >> 14) ^ (state >> 13)) & 1;
+    state = ((state << 1) | pn) & 0x7FFF;
+    if (pn == 1) out[i >> 3] ^= 0x80 >> (i & 7);
+  }
+  return out;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -92,7 +105,7 @@ void main() {
       final cfg = ofdmConfig();
       const text = 'constellation test 123';
       final iq = symbols(cfg, frameSamples(cfg, text));
-      final frame = FrameCodec(native!).encode(utf8.encode(text));
+      final frame = onAirBits(FrameCodec(native!).encode(utf8.encode(text)));
       expect(iq.length, greaterThanOrEqualTo(frame.length * 8));
       // Gray map: first bit = (Q < 0), second bit = (I < 0).
       for (var k = 0; k < frame.length * 4; k++) {
@@ -108,7 +121,7 @@ void main() {
     test('BPSK frame: points carry the frame bits', () {
       final cfg = ofdmConfig(ofdmModulation: 0);
       final iq = symbols(cfg, frameSamples(cfg, 'bpsk'));
-      final frame = FrameCodec(native!).encode(utf8.encode('bpsk'));
+      final frame = onAirBits(FrameCodec(native!).encode(utf8.encode('bpsk')));
       expect(iq.length, greaterThanOrEqualTo(frame.length * 16));
       for (var k = 0; k < frame.length * 8; k++) {
         final bit = (frame[k ~/ 8] >> (7 - k % 8)) & 1;
