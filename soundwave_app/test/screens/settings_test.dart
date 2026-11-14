@@ -20,6 +20,10 @@ void main() {
       expect(find.textContaining('CSS'), findsWidgets);
       expect(find.textContaining('OFDM'), findsWidgets);
       expect(find.text('Spreading Factor (SF): 8'), findsOneWidget);
+      // CSS shows its computed rate, no OFDM pilots and no dead FEC knob.
+      expect(find.byKey(const Key('css_computed_rate')), findsOneWidget);
+      expect(find.textContaining('Pilot'), findsNothing);
+      expect(find.textContaining('Coding Rate'), findsNothing);
       expect(find.text('Defaults'), findsOneWidget);
     });
 
@@ -89,7 +93,7 @@ void main() {
       await tester.pumpWidget(createApp());
       await tester.tap(find.textContaining('Long Range'));
       await tester.pumpAndSettle();
-      expect(find.text('Spreading Factor (SF): 12'), findsOneWidget);
+      expect(find.text('Spreading Factor (SF): 10'), findsOneWidget);
     });
   });
 }

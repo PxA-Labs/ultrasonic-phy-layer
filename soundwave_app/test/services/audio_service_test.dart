@@ -87,6 +87,32 @@ void main() {
     });
   });
 
+  group('PlaybackGuard (playback safety net)', () {
+    test('in-range samples pass through unchanged and are not counted', () {
+      final before = PlaybackGuard.clippedSamples;
+      final x = Float64List.fromList([0.0, 0.5, -1.0, 1.0, -0.25]);
+      expect(PlaybackGuard.clampInPlace(x), 0);
+      expect(x, [0.0, 0.5, -1.0, 1.0, -0.25]);
+      final f = PlaybackGuard.toPlaybackSamples(x);
+      expect(f, isA<Float32List>());
+      expect(f.length, 5);
+      expect(f[3], 1.0);
+      expect(PlaybackGuard.clippedSamples, before);
+    });
+
+    test('out-of-range and NaN samples are clamped and counted', () {
+      final before = PlaybackGuard.clippedSamples;
+      final x = Float64List.fromList([1.5, -2.0, double.nan, 0.3]);
+      final f = PlaybackGuard.toPlaybackSamples(x);
+      expect(f[0], 1.0);
+      expect(f[1], -1.0);
+      expect(f[2], 0.0);
+      expect(f[3], closeTo(0.3, 1e-7));
+      expect(x[0], 1.5, reason: 'toPlaybackSamples must not modify its input');
+      expect(PlaybackGuard.clippedSamples, before + 3);
+    });
+  });
+
   group('RecordAudioService Lifecycle Checks', () {
     test('1. Basic status fields getter verification', () {
       final service = RecordAudioService();

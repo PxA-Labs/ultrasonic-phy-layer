@@ -1,5 +1,7 @@
 # Product Requirements Document (PRD)
 
+> **Planning document.** The targets below are goals. None of the acoustic or performance targets has been verified on real hardware yet; see the [field test plan](testing/FIELD_TEST_PLAN.md) and the [hardware profiling plan](testing/HARDWARE_PROFILING_PLAN.md).
+
 **Project:** Soundwave — Ultrasonic Physical Layer
 **Version:** 1.0
 **Date:** July 18, 2026

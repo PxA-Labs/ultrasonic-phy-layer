@@ -7,6 +7,7 @@
 // before it reaches the native DSP layer.
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:soundwave/engine/frame_geometry.dart';
 
 abstract class SettingsStore {
   Future<Map<String, Object>> load();
@@ -32,37 +33,81 @@ class InMemorySettingsStore implements SettingsStore {
   }
 }
 
+/// Persists settings in SharedPreferences, one key per setting.
+///
+/// Callers fire [save] without awaiting it (a settings setter saves on every
+/// change), so several saves can be in flight at once. Writes are therefore
+/// serialised through one queue shared by every instance (they all write the
+/// same preferences file): saves issued while a write is running are merged,
+/// latest value per key, into a single pending write, and each write applies
+/// its whole snapshot without yielding between keys. [load] waits for queued
+/// writes first, so a read never observes a half-applied save.
 class SharedPreferencesSettingsStore implements SettingsStore {
-  static const String _prefix = 'soundwave.modem.';
+  /// Key namespace, so independent stores (modem settings, UI preferences)
+  /// never overwrite each other's values.
+  final String prefix;
+
+  SharedPreferencesSettingsStore({this.prefix = 'soundwave.modem.'});
+
+  /// Tail of the write queue; completes when every queued write has finished.
+  static Future<void> _idle = Future<void>.value();
+
+  /// Prefixed values waiting for the next write, merged latest-wins.
+  static Map<String, Object>? _pending;
+  static Future<void>? _pendingWrite;
 
   @override
   Future<Map<String, Object>> load() async {
+    await _idle;
     final prefs = await SharedPreferences.getInstance();
     final out = <String, Object>{};
     for (final key in prefs.getKeys()) {
-      if (!key.startsWith(_prefix)) continue;
+      if (!key.startsWith(prefix)) continue;
       final v = prefs.get(key);
-      if (v != null) out[key.substring(_prefix.length)] = v;
+      if (v != null) out[key.substring(prefix.length)] = v;
     }
     return out;
   }
 
   @override
-  Future<void> save(Map<String, Object> values) async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> save(Map<String, Object> values) {
+    final batch = _pending ??= <String, Object>{};
     for (final e in values.entries) {
-      final key = '$_prefix${e.key}';
+      batch['$prefix${e.key}'] = e.value;
+    }
+    return _pendingWrite ??= _enqueue();
+  }
+
+  static Future<void> _enqueue() {
+    final write = _idle.then((_) {
+      // Detach the batch: saves from now on start the next write.
+      final batch = _pending!;
+      _pending = null;
+      _pendingWrite = null;
+      return _write(batch);
+    });
+    _idle = write.then<void>((_) {}, onError: (Object _) {});
+    return write;
+  }
+
+  static Future<void> _write(Map<String, Object> batch) async {
+    final prefs = await SharedPreferences.getInstance();
+    // Issue every set before awaiting any, so the in-memory preferences take
+    // the whole snapshot at once.
+    final writes = <Future<bool>>[];
+    for (final e in batch.entries) {
       final v = e.value;
       if (v is bool) {
-        await prefs.setBool(key, v);
+        writes.add(prefs.setBool(e.key, v));
       } else if (v is int) {
-        await prefs.setInt(key, v);
+        writes.add(prefs.setInt(e.key, v));
       } else if (v is double) {
-        await prefs.setDouble(key, v);
+        writes.add(prefs.setDouble(e.key, v));
       } else if (v is String) {
-        await prefs.setString(key, v);
+        writes.add(prefs.setString(e.key, v));
       }
     }
+    await Future.wait(writes);
   }
 }
 
@@ -91,7 +136,8 @@ class ModemSettingsSchema {
     intIn('sample_rate', (v) => v >= 8000 && v <= 192000);
     final nyquist = ((out['sample_rate'] as int?) ?? 44100) / 2;
     intIn('modulation', (v) => v == 0 || v == 1);
-    intIn('sf', (v) => v >= 6 && v <= 12);
+    // CSS spreading factors the modem supports (native CSS_MIN/MAX_SF).
+    intIn('sf', (v) => v >= FrameGeometry.minSf && v <= FrameGeometry.maxSf);
     intIn('num_subcarriers', subcarrierOptions.contains);
     final n = (out['num_subcarriers'] as int?) ?? 256;
     intIn('cp_length', (v) => v > 0 && v <= n);
@@ -100,13 +146,14 @@ class ModemSettingsSchema {
     intIn('equalizer', (v) => v == 0 || v == 1);
     doubleIn('carrier_freq', (v) => v > 0 && v <= nyquist);
     doubleIn('bandwidth', (v) => v > 0 && v <= nyquist);
-    doubleIn('symbol_duration', (v) => v > 0 && v <= 1.0);
     doubleIn('amplitude', (v) => v >= 0 && v <= 1.0);
     doubleIn('threshold', (v) => v > 0 && v <= 100);
-    doubleIn('coding_rate', (v) => v > 0 && v <= 1.0);
     doubleIn('volume', (v) => v >= 0 && v <= 1.0);
     if (raw['enable_rs'] is bool) out['enable_rs'] = raw['enable_rs']!;
     if (raw['agc_enabled'] is bool) out['agc_enabled'] = raw['agc_enabled']!;
+    if (raw['arq_enabled'] is bool) out['arq_enabled'] = raw['arq_enabled']!;
+    intIn('arq_max_retries', (v) => v == 1 || v == 3 || v == 5);
+    intIn('arq_ack_timeout_ms', (v) => v >= 200 && v <= 2000);
     return out;
   }
 }

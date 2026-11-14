@@ -97,7 +97,8 @@ class SpectrumAnalyzerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Semantics(
-      label: 'Spectrum analyzer',
+      container: true,
+      label: 'Spectrum analyzer: signal level by frequency',
       child: RepaintBoundary(
         child: CustomPaint(
           painter: SpectrumPainter(

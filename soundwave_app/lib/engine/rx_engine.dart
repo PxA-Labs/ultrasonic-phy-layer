@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:ffi/ffi.dart';
 import 'package:soundwave/native/soundwave_native.dart';
@@ -12,6 +13,9 @@ import 'package:soundwave/engine/signal_metrics.dart';
 import 'package:soundwave/engine/frame_codec.dart';
 import 'package:soundwave/engine/frame_geometry.dart';
 import 'package:soundwave/engine/agc_processor.dart';
+import 'package:soundwave/engine/arq.dart';
+import 'package:soundwave/engine/link_frame.dart';
+import 'package:soundwave/engine/link_receiver.dart';
 import 'package:soundwave/dsp/constellation.dart';
 
 class DecodedMessage {
@@ -25,6 +29,25 @@ class DecodedMessage {
     required this.snr,
     required this.timestamp,
     required this.rawBytes,
+  });
+}
+
+/// A file received through the link layer (#89).
+class ReceivedFile {
+  final String fileName;
+  final String mimeType;
+  final Uint8List data;
+  final int src;
+  final double snr;
+  final DateTime timestamp;
+
+  const ReceivedFile({
+    required this.fileName,
+    required this.mimeType,
+    required this.data,
+    required this.src,
+    required this.snr,
+    required this.timestamp,
   });
 }
 
@@ -45,7 +68,21 @@ class RxEngine {
   final StreamController<ConstellationFrame> _constellationController =
       StreamController<ConstellationFrame>.broadcast();
 
+  final StreamController<ReceivedFile> _filesController =
+      StreamController<ReceivedFile>.broadcast();
+  final StreamController<LinkFrame> _controlInController =
+      StreamController<LinkFrame>.broadcast();
+  final StreamController<LinkFrame> _controlOutController =
+      StreamController<LinkFrame>.broadcast();
+  final StreamController<RxTransferProgress> _transfersController =
+      StreamController<RxTransferProgress>.broadcast();
+
   StreamSubscription<Float64List>? _audioSubscription;
+
+  /// Link-layer address of this device (shared with its TxEngine).
+  final int nodeId;
+  late final LinkReceiver _link = LinkReceiver(nodeId: nodeId);
+  Timer? _reassemblyTimer;
 
   int _framesDetected = 0;
   int _framesReceived = 0;
@@ -58,16 +95,31 @@ class RxEngine {
     required AudioService audio,
     required Map<String, dynamic> configMap,
     bool useIsolates = true,
+    int? nodeId,
   })  : _native = native,
         _audio = audio,
         _configMap = configMap,
-        _useIsolates = useIsolates;
+        _useIsolates = useIsolates,
+        nodeId = nodeId ?? 1 + math.Random().nextInt(0xFFFE);
 
   SoundwaveNative get native => _native ?? SoundwaveNative.instance;
 
   Stream<DecodedMessage> get messages => _messageStreamController.stream;
   Stream<SignalMetrics> get metrics => _metricsController.stream;
   Stream<RxFrameEvent> get frameEvents => _frameEventsController.stream;
+
+  /// Files delivered by the link layer.
+  Stream<ReceivedFile> get files => _filesController.stream;
+
+  /// ACK/NACKs addressed to this node; feed them to TxEngine.onControlFrame.
+  Stream<LinkFrame> get controlFrames => _controlInController.stream;
+
+  /// ACK/NACK replies this node should transmit (only when ARQ is enabled);
+  /// send them with TxEngine.sendControl.
+  Stream<LinkFrame> get controlReplies => _controlOutController.stream;
+
+  /// Progress / completion / failure of incoming multi-fragment messages.
+  Stream<RxTransferProgress> get transfers => _transfersController.stream;
 
   /// Equalized OFDM constellation points of each frame that was decoded or
   /// given up on. Only computed while someone listens (it costs one extra
@@ -108,15 +160,16 @@ class RxEngine {
   // 2. DECODE: as audio keeps arriving, demodulate the buffer and let
   //    FrameCodec search for a frame length whose RS + CRC-32 verify. Short
   //    messages decode as soon as their last symbol arrives; attempts are
-  //    spaced by [retryStepSymbols] symbols to bound CPU use.
+  //    spaced by FrameGeometry.retryStepSymbols symbols to bound CPU use.
   // 3. If nothing verifies by the longest possible frame, count a frame error
   //    and skip past the preamble.
   // ---------------------------------------------------------------------
 
-  /// Symbols of new audio required between two decode attempts. Bounds CPU
-  /// use (each attempt demodulates the whole pending frame) at the cost of up
-  /// to this many symbols of extra latency (0.64 s CSS / 0.23 s OFDM default).
-  static const int retryStepSymbols = 32;
+  /// Upper bound on the symbols of new audio required between two decode
+  /// attempts (FrameGeometry.retryStepSymbols: 32 for OFDM, about 0.25 s but
+  /// at least 4 chirps for CSS). Bounds CPU use (each attempt demodulates the
+  /// whole pending frame) at the cost of that much extra latency.
+  static const int retryStepSymbols = FrameGeometry.ofdmRetryStepSymbols;
 
   int? _pendingFrameSince; // buffer length at the last decode attempt
   double _pendingSnr = 0.0;
@@ -229,7 +282,7 @@ class RxEngine {
     // Two symbols of slack: the OFDM demodulator only emits a symbol when
     // audio follows it, so the longest frame needs a little trailing audio.
     final maxFrame = geometry.maxFrameSamples + 2 * geometry.samplesPerSymbol;
-    final step = retryStepSymbols * geometry.samplesPerSymbol;
+    final step = geometry.retryStepSymbols * geometry.samplesPerSymbol;
     final reachedMax = available >= maxFrame;
     if (available < geometry.minFrameSamples) return false;
     if (!reachedMax &&
@@ -259,9 +312,9 @@ class RxEngine {
     if (frame != null) {
       _onFrameDecoded(frame);
       final consumed = geometry.samplesForFrameBytes(frame.frameLength);
-      // Up to one symbol of trailing audio: detection may place the frame
-      // start a few samples late and only whole symbols are demodulated.
-      final end = consumed + geometry.samplesPerSymbol - 1;
+      // The frame's own samples: the demodulator returns every symbol whose
+      // FFT window fits, so no trailing audio is needed.
+      final end = consumed;
       _emitConstellation(
         end < n ? Float32List.sublistView(samples, 0, end) : samples,
         decoded: true,
@@ -332,12 +385,16 @@ class RxEngine {
     _framesReceived++;
     _totalBytesReceived += frame.payload.length;
     final now = DateTime.now();
-    _messageStreamController.add(DecodedMessage(
-      text: utf8.decode(frame.payload, allowMalformed: true),
-      snr: _pendingSnr,
-      timestamp: now,
-      rawBytes: frame.payload,
-    ));
+    if (LinkFrame.isLinkPayload(frame.payload)) {
+      handleLinkPayload(frame.payload, snr: _pendingSnr, now: now);
+    } else {
+      _messageStreamController.add(DecodedMessage(
+        text: utf8.decode(frame.payload, allowMalformed: true),
+        snr: _pendingSnr,
+        timestamp: now,
+        rawBytes: frame.payload,
+      ));
+    }
     _frameEventsController.add(RxFrameEvent(
       detected: true,
       decoded: true,
@@ -359,6 +416,91 @@ class RxEngine {
       errorMessage: 'CRC / RS decoding check failed',
     ));
     _emitCurrentMetrics(ModemLinkState.error);
+    final nack = _link.onFrameError(DateTime.now(), arqEnabled: _arqEnabled);
+    if (nack != null) _controlOutController.add(nack);
+  }
+
+  // ---------------------------------------------------------------------
+  // Link layer (#89 fragmentation, #100 ARQ)
+  // ---------------------------------------------------------------------
+
+  bool get _arqEnabled => ArqConfig.fromMap(_configMap).enabled;
+
+  /// Idle time before an incomplete message is abandoned: generous enough
+  /// for the sender's whole retry schedule of one fragment (estimated from
+  /// the local ARQ settings) at the current frame airtime.
+  Duration get reassemblyTimeout {
+    final g = FrameGeometry.fromConfig(_configMap);
+    final sr = (_configMap['sample_rate'] as num?)?.toInt() ?? 44100;
+    final frameUs = g.maxFrameSamples * 1000000 ~/ (sr > 0 ? sr : 44100);
+    final arq = ArqConfig.fromMap(_configMap);
+    final perAttempt =
+        Duration(microseconds: 2 * frameUs) + arq.backoffFor(arq.maxRetries);
+    return const Duration(seconds: 30) + perAttempt * (arq.maxRetries + 2);
+  }
+
+  /// Routes one decoded link-layer payload (public for tests and imports).
+  void handleLinkPayload(Uint8List payload, {double snr = 0.0, DateTime? now}) {
+    final f = LinkFrame.decode(payload);
+    if (f == null) {
+      debugPrint('RX: malformed link frame (${payload.length} bytes)');
+      return;
+    }
+    final t = now ?? DateTime.now();
+    _link.reassembler.timeout = reassemblyTimeout;
+    final out = _link.handle(f, t, arqEnabled: _arqEnabled);
+    if (out.control != null) _controlInController.add(out.control!);
+    if (out.reply != null) _controlOutController.add(out.reply!);
+    if (out.progress != null) _transfersController.add(out.progress!);
+    final msg = out.message;
+    if (msg != null) {
+      if (msg.kind == PayloadKind.text) {
+        _messageStreamController.add(DecodedMessage(
+          text: msg.text,
+          snr: snr,
+          timestamp: t,
+          rawBytes: msg.content,
+        ));
+      } else {
+        _filesController.add(ReceivedFile(
+          fileName: msg.fileName ?? 'received.bin',
+          mimeType: msg.mimeType ?? LinkMessage.defaultMime,
+          data: msg.content,
+          src: f.src,
+          snr: snr,
+          timestamp: t,
+        ));
+      }
+    }
+    _reportReassemblyFailures(t);
+    _scheduleReassemblyCheck();
+  }
+
+  void _reportReassemblyFailures(DateTime now) {
+    for (final failure in _link.reassembler.expire(now)) {
+      _transfersController.add(RxTransferProgress(
+        src: failure.src,
+        msgId: failure.msgId,
+        received: failure.received,
+        count: failure.count,
+        state: RxTransferState.failed,
+        error: failure.reason,
+      ));
+    }
+  }
+
+  void _scheduleReassemblyCheck() {
+    _reassemblyTimer?.cancel();
+    _reassemblyTimer = null;
+    final deadline = _link.reassembler.nextDeadline;
+    if (deadline == null) return;
+    var delay = deadline.difference(DateTime.now());
+    if (delay.isNegative) delay = Duration.zero;
+    _reassemblyTimer = Timer(delay + const Duration(milliseconds: 10), () {
+      _reassemblyTimer = null;
+      _reportReassemblyFailures(DateTime.now());
+      _scheduleReassemblyCheck();
+    });
   }
 
   void stopListening() {
@@ -369,6 +511,9 @@ class RxEngine {
     _audioSubscription = null;
     _audio.stopCapture();
     _agc.dispose(); // frees the native instance; recreated on next listen
+    _reassemblyTimer?.cancel();
+    _reassemblyTimer = null;
+    _link.reassembler.clear();
     _emitCurrentMetrics(ModemLinkState.idle);
   }
 

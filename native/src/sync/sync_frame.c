@@ -72,88 +72,22 @@ int sync_detect_frame(const float* samples, size_t len,
     *detected_snr = 0.0f;
 
     if (cfg->mode == 0) {
-        // CSS Mode timing synchronization (8 up-chirps + 2 down-chirps matched filter)
-        double f0 = (cfg->carrier_freq > 0.0f) ? (double)cfg->carrier_freq : 18000.0;
-        double B = (cfg->bandwidth > 0.0f) ? (double)cfg->bandwidth : 4000.0;
-        double fs = (cfg->sample_rate > 0.0f) ? (double)cfg->sample_rate : 44100.0;
-        size_t N_pre = cfg->matched_filter_len; // symbol duration in samples
-        if (N_pre <= 0) N_pre = 882; // default for fs=44100, T=0.02
-        double T = (double)N_pre / fs;
-        double amplitude = 0.8;
-        
-        sw_signal pre_up = css_generate_chirp(f0, B, T, amplitude, 0.0, fs);
-        sw_signal pre_down = css_generate_chirp(f0, -B, T, amplitude, 0.0, fs);
-        
-        if (!pre_up.data || !pre_down.data) {
-            free(pre_up.data); free(pre_down.data);
+        // CSS: preamble search over the whole buffer (css_demodulate.c).
+        sw_config c;
+        memset(&c, 0, sizeof c);
+        c.sample_rate = (isfinite(cfg->sample_rate) && cfg->sample_rate >= 1000.0f &&
+                         cfg->sample_rate <= 1.0e6f) ? (int)cfg->sample_rate : 0;
+        c.sf = cfg->sf;
+        c.carrier_freq = cfg->carrier_freq;
+        c.bandwidth = cfg->bandwidth;
+        css_geometry_t g;
+        css_sync_result_t r;
+        if (css_geometry(&c, &g) != 0 ||
+            css_detect_frame(samples, len, &g, cfg->threshold, &r) != 1)
             return 0;
-        }
-        
-        size_t max_search = len - 10 * N_pre;
-        if (len < 10 * N_pre) {
-            free(pre_up.data); free(pre_down.data);
-            return 0;
-        }
-
-        float* power_up = (float*)calloc(max_search, sizeof(float));
-        float* power_down = (float*)calloc(max_search, sizeof(float));
-        if (!power_up || !power_down) {
-            free(pre_up.data); free(pre_down.data);
-            free(power_up); free(power_down);
-            return 0;
-        }
-        
-        // Matched-filter power via FFT correlation (see sync_xcorr.c).
-        if (sync_xcorr_power_fft(samples, len, pre_up.data, N_pre,
-                                 power_up, max_search) != 0 ||
-            sync_xcorr_power_fft(samples, len, pre_down.data, N_pre,
-                                 power_down, max_search) != 0) {
-            free(power_up); free(power_down);
-            free(pre_up.data); free(pre_down.data);
-            return 0;
-        }
-        
-        float max_score = 0.0f;
-        int best_m = -1;
-        
-        for (size_t m = 0; m < max_search; m++) {
-            float score = 0.0f;
-            for (int i = 0; i < 8; i++) {
-                if (m + i * N_pre < max_search) {
-                    score += power_up[m + i * N_pre];
-                }
-            }
-            for (int i = 8; i < 10; i++) {
-                if (m + i * N_pre < max_search) {
-                    score += power_down[m + i * N_pre];
-                }
-            }
-            if (score > max_score) {
-                max_score = score;
-                best_m = (int)m;
-            }
-        }
-        
-        float energy_up = 0.0f;
-        float energy_down = 0.0f;
-        for (size_t n = 0; n < N_pre; n++) {
-            energy_up += pre_up.data[n] * pre_up.data[n];
-            energy_down += pre_down.data[n] * pre_down.data[n];
-        }
-        
-        float noise_var = sync_estimate_noise(samples, len);
-        float threshold = cfg->threshold * noise_var * (8.0f * energy_up * energy_up + 2.0f * energy_down * energy_down);
-        
-        free(power_up); free(power_down);
-        free(pre_up.data); free(pre_down.data);
-        
-        if (best_m >= 0 && max_score >= threshold) {
-            *frame_start = (size_t)best_m;
-            float total_energy = 8.0f * energy_up + 2.0f * energy_down;
-            *detected_snr = 10.0f * log10f((max_score / (total_energy + 1e-10f)) / (noise_var + 1e-10f));
-            return 1;
-        }
-        return 0;
+        *frame_start = (size_t)(r.start + 0.5);
+        *detected_snr = r.snr_db;
+        return 1;
 
     } else if (cfg->mode == 1) {
         // OFDM timing synchronization (Schmidl-Cox timing metric on analytic signal)

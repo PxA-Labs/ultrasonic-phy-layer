@@ -10,11 +10,69 @@
 typedef struct {
     int num_subcarriers;  // FFT size (256, 512, 1024, 2048)
     int cp_length;        // Cyclic prefix length
-    int num_pilots;       // Number of pilot subcarriers
-    int pilot_spacing;    // Pilot insertion spacing
+    int num_pilots;       // Number of pilot subcarriers (informational)
+    int pilot_spacing;    // Pilot insertion spacing (informational; see OFDM_PILOT_SPACING)
     float pilot_boost;    // Pilot amplitude boost factor
-    int modulation;       // 0=BPSK, 1=QPSK, 2=16QAM
+    int modulation;       // 0=BPSK, 1=QPSK
+    // Occupied band (MATHEMATICAL_MODEL.md 2.2.2). 0 selects the default.
+    float sample_rate;    // Hz (default 44100)
+    float carrier_freq;   // band centre in Hz (default 19000)
+    float bandwidth;      // band width in Hz (default 2000)
+    // Transmit peak level: ofdm_modulate_frame scales every frame so that
+    // max |sample| == amplitude exactly (see OFDM_DEFAULT_AMPLITUDE). Values
+    // <= 0, > 1 or non-finite select the default.
+    float amplitude;
 } ofdm_config_t;
+
+// Default transmit peak (sw_config.amplitude == 0 selects it too).
+#define OFDM_DEFAULT_AMPLITUDE 0.8f
+
+// --- Ultrasonic band plan ----------------------------------------------------
+//
+// Active (data + pilot) subcarriers are confined to the configured band
+// [carrier_freq - bandwidth/2, carrier_freq + bandwidth/2]. Every other bin --
+// DC, the whole audible range, the Nyquist bin and their Hermitian mirrors --
+// is zero, on TX and RX alike. OFDM_EDGE_GUARD_BINS bins at each band edge
+// also stay empty so that the main lobe of the outermost subcarriers does not
+// spill past the band edge.
+#define OFDM_DEFAULT_SAMPLE_RATE  44100.0f
+#define OFDM_DEFAULT_CARRIER_HZ   19000.0f
+#define OFDM_DEFAULT_BANDWIDTH_HZ 2000.0f
+#define OFDM_EDGE_GUARD_BINS      1
+#define OFDM_MIN_ACTIVE_BINS      4   // >= 1 pilot + 3 data subcarriers
+#define OFDM_PILOT_SPACING        8   // every 8th active bin, starting with the first
+
+// Transmit windowing (WOLA): each symbol's first OFDM_WOLA_LEN(cp) samples
+// (inside its cyclic prefix) rise with a raised-cosine ramp while the
+// previous symbol's cyclic suffix of the same length fades out over them.
+// This removes the symbol-boundary discontinuities whose sinc sidelobes would
+// otherwise put audible energy below 16 kHz. The receiver's FFT window starts
+// OFDM_TIMING_BACKOFF(cp) before the end of the CP, i.e. after the ramp, so
+// windowing costs no throughput; the frame is OFDM_WOLA_LEN(cp) samples
+// longer (the last symbol's fade-out). The junction between the two preamble
+// copies is not windowed so that they stay sample-identical (Schmidl-Cox).
+#define OFDM_WOLA_LEN(cp) ((cp) / 2)
+
+typedef struct {
+    int first_bin;   // lowest active subcarrier index k (f = k * fs / N)
+    int last_bin;    // highest active subcarrier index
+    int num_active;  // last_bin - first_bin + 1
+    int num_pilots;  // ceil(num_active / OFDM_PILOT_SPACING)
+    int num_data;    // num_active - num_pilots
+} ofdm_layout_t;
+
+// Computes the active-subcarrier layout of the band
+// [carrier - bw/2, carrier + bw/2] for an N-point FFT at sample_rate.
+// Zero sample_rate / carrier_freq / bandwidth select the defaults above.
+// Returns SW_ERR_BAD_PARAM if N is not a power of two in 16..4096, any value
+// is non-finite or negative, the band does not lie in (0, fs/2 - fs/N]
+// (one subcarrier of guard below Nyquist), or fewer than
+// OFDM_MIN_ACTIVE_BINS subcarriers fit. *out is zeroed on error.
+int ofdm_layout_compute(int N, float sample_rate, float carrier_freq,
+                        float bandwidth, ofdm_layout_t* out);
+
+// Same, from an ofdm_config_t (num_subcarriers <= 0 selects 256).
+int ofdm_layout_from_config(const ofdm_config_t* cfg, ofdm_layout_t* out);
 
 void ofdm_init(ofdm_config_t* cfg);
 
@@ -26,20 +84,31 @@ int bpsk_demap(kiss_fft_cpx symbol);
 void qpsk_map(uint8_t dibit, kiss_fft_cpx* out);
 uint8_t qpsk_demap_hard(kiss_fft_cpx symbol);
 
-// Subcarrier allocation
-/**
- * @brief Allocates subcarriers for OFDM.
- * 
- * Note: The third parameter null_indices contains both true nulls (DC, guard bands, middle null)
- * and the dependent/conjugate symmetric subcarriers in the negative frequencies. The positive
- * active data and pilot symbols are mirrored into these conjugate bins to ensure a real-valued
- * time-domain signal. Demodulators/equalizers should only process the positive frequencies
- * returned in data_indices and pilot_indices.
- */
-void ofdm_allocate_subcarriers(int N, int* data_indices, int* pilot_indices, int* null_indices,
-                               int* num_data, int* num_pilots, int* num_nulls);
+// Subcarrier allocation inside the active band: every OFDM_PILOT_SPACING-th
+// active bin (starting with first_bin) is a pilot, the rest carry data. Writes
+// lay->num_data data indices and lay->num_pilots pilot indices (ascending).
+// Only the positive-frequency bins are listed; ofdm_modulate_symbol() mirrors
+// them into the conjugate-symmetric negative bins. All other bins are null.
+void ofdm_allocate_subcarriers(const ofdm_layout_t* lay, int* data_indices,
+                               int* pilot_indices);
 
-// Map bits to constellation symbols (BPSK/QPSK/16QAM).
+// Frequency-domain preamble: a Zadoff-Chu sequence (root 1) of length
+// lay->num_active on the active bins, zero elsewhere, times a common phase
+// chosen so that the un-windowed junction between the two preamble copies
+// (cyclic prefix length cp) is continuous. X holds N bins.
+// Returns SW_OK, or SW_ERR_MEMORY / SW_ERR_BAD_PARAM.
+int ofdm_preamble_spectrum(const ofdm_layout_t* lay, int N, int cp, kiss_fft_cpx* X);
+
+// Data whitening: XORs bits[0 .. nbits) (MSB-first) with the PRBS15
+// sequence x^15 + x^14 + 1 (seed all ones), restarting at bit 0 of every
+// frame. Self-inverse. The modulator scrambles the data bits including the
+// zero padding of the last symbol (so it is not a constant, high-crest-factor
+// symbol) and the demodulator descrambles every demodulated bit, so repeated payload bytes (runs of zeros,
+// "0000", padding) never produce identical consecutive OFDM symbols, which
+// the repetition-based (Schmidl-Cox) detector would take for a preamble.
+void ofdm_scramble(uint8_t* bits, size_t nbits);
+
+// Map bits to the data subcarriers of the configured band (BPSK/QPSK).
 void ofdm_map_constellation(const ofdm_config_t* cfg, const uint8_t* bits,
                             size_t bit_len, kiss_fft_cpx* X);
 
@@ -50,14 +119,62 @@ void ofdm_insert_pilots(const ofdm_config_t* cfg, kiss_fft_cpx* X);
 void ofdm_modulate_symbol(const ofdm_config_t* cfg, const kiss_fft_cpx* X,
                           float* time);
 
-// Full frame modulation (multiple OFDM symbols). Returns SW_OK or error.
+// Full frame modulation: two identical preamble symbols, then
+// ceil(bit_len / bits_per_symbol) data symbols, each N + cp samples, plus the
+// OFDM_WOLA_LEN(cp)-sample fade-out of the last symbol:
+//   (2 + num_symbols) * (N + cp) + OFDM_WOLA_LEN(cp) samples.
+// Output level: the whole frame is multiplied by one gain g so that its peak
+// max |sample| equals cfg->amplitude (deterministic per-frame peak
+// normalization; ofdm_peak_normalize). A single real gain per frame is a
+// flat channel for the receiver, which estimates the channel from the
+// preamble, so demodulation is unaffected.
+// Returns SW_OK, SW_ERR_BAD_PARAM (invalid FFT size / CP / band) or
+// SW_ERR_OVERFLOW (*sample_len then holds the required size).
 int ofdm_modulate_frame(const ofdm_config_t* cfg, const uint8_t* bits,
                          size_t bit_len, float* samples, size_t* sample_len);
 
-// Full frame modulation returning sw_signal
+// Scales samples[0 .. len) by amplitude / max|samples| so that the peak
+// equals amplitude (0 < amplitude <= 1), and clamps the at most one-ulp
+// rounding excess so max |sample| <= amplitude holds exactly. All-zero input
+// is left unchanged. Returns the gain applied (0 for all-zero input).
+float ofdm_peak_normalize(float* samples, size_t len, float amplitude);
+
+// Full frame modulation returning sw_signal (cfg.amplitude: frame peak,
+// 0 selects OFDM_DEFAULT_AMPLITUDE).
 sw_signal ofdm_modulate(const uint8_t* bits, size_t num_bits, sw_config cfg);
 
-// DFT demodulation: remove CP, FFT, normalize.
+// Receiver timing backoff b: the FFT window of every symbol starts b samples
+// before the end of its cyclic prefix (offset cp - b). The first
+// OFDM_WOLA_LEN(cp) samples of a symbol hold the transmit window's overlap,
+// so detection errors in [-(cp - b - OFDM_WOLA_LEN(cp)), +b] samples stay
+// ISI-free (+-cp/4 for the defaults). See MATHEMATICAL_MODEL.md 4.0.
+#define OFDM_TIMING_BACKOFF(cp) ((cp) / 4)
+
+// Fine timing. frame_start is a coarse estimate of the frame's first sample
+// (start of the first preamble copy). The preamble channel estimate of an
+// FFT window that is s samples off the symbol body is the channel times
+// e^{j 2 pi k s / N}; its phase slope across the active bins gives the
+// detection error, which is removed (rounded to whole samples, two passes).
+// Returns the refined start, or frame_start if it cannot be refined.
+size_t ofdm_refine_timing(const float* samples, size_t len, size_t frame_start,
+                          int N, int cp, const ofdm_layout_t* lay);
+
+// Minimum preamble score |sum D_k| / sum |D_k| (D_k = H_{k+1} conj(H_k) of
+// the preamble channel estimate) for a detection to count as the known
+// preamble rather than some other repetition.
+#define OFDM_PREAMBLE_MIN_SCORE 0.5
+
+// Locates the frame start (first sample of the first preamble copy):
+// Schmidl-Cox repetition metric, then ofdm_refine_timing, then a check
+// against the known preamble. If the Schmidl-Cox candidate fails that check
+// (or, with allow_fallback, if Schmidl-Cox finds nothing) a matched filter on
+// the known two-copy preamble proposes a candidate and the better-scoring one
+// is returned. Returns 1 if a start was found, 0 otherwise.
+int ofdm_locate_preamble(const float* samples, size_t len, int N, int cp,
+                         const ofdm_layout_t* lay, float threshold, int allow_fallback,
+                         size_t* frame_start, float* snr);
+
+// DFT demodulation: skip cp_length samples (the FFT window offset), FFT, normalize.
 void ofdm_dft_demodulate(const float* y, int N, int cp_length, kiss_fft_cpx* Y);
 
 // Full frame demodulation (detect, FFT, equalize, demap). Returns SW_OK or error.

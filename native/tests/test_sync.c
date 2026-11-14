@@ -65,7 +65,7 @@ int main(void) {
     memset(&sync_cfg_css, 0, sizeof(sync_cfg_css));
     sync_cfg_css.mode = 0; // CSS
     sync_cfg_css.threshold = 3.0f;
-    sync_cfg_css.matched_filter_len = (int)(css_cfg.symbol_duration * css_cfg.sample_rate + 0.5f);
+    sync_cfg_css.sf = css_cfg.sf; // symbol length is 2^sf * round(fs / B) samples
     sync_cfg_css.carrier_freq = css_cfg.carrier_freq;
     sync_cfg_css.bandwidth = css_cfg.bandwidth;
     sync_cfg_css.sample_rate = (float)css_cfg.sample_rate;
@@ -128,7 +128,15 @@ int main(void) {
 
     size_t noise_detected_start = 0;
     float noise_detected_snr = 0.0f;
-    int noise_sync_ok_css = sync_detect_frame(noise_samples, 10000, &sync_cfg_css, &noise_detected_start, &noise_detected_snr);
+    // CSS needs a whole preamble (10 x 5632 samples at SF8, 2 kHz) to decide.
+    size_t css_noise_len = 80000;
+    float* css_noise = (float*)malloc(css_noise_len * sizeof(float));
+    assert(css_noise != NULL);
+    for (size_t i = 0; i < css_noise_len; i++) {
+        css_noise[i] = ((float)rand() / (float)RAND_MAX - 0.5f) * 0.01f;
+    }
+    int noise_sync_ok_css = sync_detect_frame(css_noise, css_noise_len, &sync_cfg_css, &noise_detected_start, &noise_detected_snr);
+    free(css_noise);
     int noise_sync_ok_ofdm = sync_detect_frame(noise_samples, 10000, &sync_cfg_ofdm, &noise_detected_start, &noise_detected_snr);
     assert(noise_sync_ok_css == 0);
     assert(noise_sync_ok_ofdm == 0);

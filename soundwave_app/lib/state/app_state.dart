@@ -6,6 +6,10 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:soundwave/dsp/constellation.dart';
+import 'package:soundwave/engine/arq.dart';
+import 'package:soundwave/engine/frame_geometry.dart';
+import 'package:soundwave/engine/link_receiver.dart';
+import 'package:soundwave/services/received_file_store.dart';
 import 'package:soundwave/engine/tx_engine.dart';
 import 'package:soundwave/engine/rx_engine.dart';
 import 'package:soundwave/engine/tx_queue.dart';
@@ -30,15 +34,17 @@ class AppState extends ChangeNotifier {
   int _numPilots = 8;
   double _carrierFreq = 19000.0;
   double _bandwidth = 2000.0;
-  double _symbolDuration = 0.02; // CSS symbol/chirp duration
   double _amplitude = 0.8;
   int _ofdmModulation = 1; // QPSK
   double _threshold = 3.0;
   int _equalizer = 0; // 0 = ZF, 1 = MMSE
-  double _codingRate = 0.5;
   bool _enableRs = true;
   double _volume = 0.8;
   bool _agcEnabled = true; // RX automatic gain control (#92)
+  // Link-layer ARQ (#100). Off by default so one-way broadcast just works.
+  bool _arqEnabled = false;
+  int _arqMaxRetries = 3;
+  int _arqAckTimeoutMs = 500;
 
   // Audio devices
   AudioDevice? _inputDevice;
@@ -61,6 +67,15 @@ class AppState extends ChangeNotifier {
   StreamSubscription<DecodedMessage>? _rxSubscription;
   StreamSubscription<RxFrameEvent>? _rxFrameEventsSubscription;
   StreamSubscription<TxMetrics>? _txMetricsSubscription;
+  final List<StreamSubscription<Object?>> _linkSubscriptions = [];
+
+  // File transfer (#89)
+  late final int nodeId;
+  final ReceivedFileSink _fileSink;
+  TxTransferProgress? _txTransfer;
+  RxTransferProgress? _rxTransfer;
+  String? _transferError;
+  final List<ReceivedFileRecord> _receivedFiles = [];
   Timer? _throughputTimer;
   bool _isDisposed = false;
 
@@ -78,25 +93,38 @@ class AppState extends ChangeNotifier {
     _configMap['num_pilots'] = _numPilots;
     _configMap['carrier_freq'] = _carrierFreq;
     _configMap['bandwidth'] = _bandwidth;
-    _configMap['symbol_duration'] = _symbolDuration;
     _configMap['amplitude'] = _amplitude;
     _configMap['ofdm_modulation'] = _ofdmModulation;
     _configMap['threshold'] = _threshold;
     _configMap['equalizer'] = _equalizer;
-    _configMap['coding_rate'] = _codingRate;
     _configMap['enable_rs'] = _enableRs;
     _configMap['volume'] = _volume;
     _configMap['agc_enabled'] = _agcEnabled;
+    _configMap['arq_enabled'] = _arqEnabled;
+    _configMap['arq_max_retries'] = _arqMaxRetries;
+    _configMap['arq_ack_timeout_ms'] = _arqAckTimeoutMs;
   }
 
-  AppState({AudioService? audio, SettingsStore? store}) : _store = store {
+  AppState({
+    AudioService? audio,
+    SettingsStore? store,
+    ReceivedFileSink? fileSink,
+  })  : _store = store,
+        _fileSink = fileSink ?? DirectoryFileSink() {
     _configMap = {};
     _syncConfigMap();
     _audio = audio ?? AudioService.preferred(_configMap);
-    _txEngine =
-        TxEngine(audio: _audio, configMap: _configMap, useIsolates: false);
-    _rxEngine =
-        RxEngine(audio: _audio, configMap: _configMap, useIsolates: false);
+    nodeId = TxEngine.randomNodeId();
+    _txEngine = TxEngine(
+        audio: _audio,
+        configMap: _configMap,
+        useIsolates: false,
+        nodeId: nodeId);
+    _rxEngine = RxEngine(
+        audio: _audio,
+        configMap: _configMap,
+        useIsolates: false,
+        nodeId: nodeId);
     _txQueue = TxQueue(txEngine: _txEngine);
     _throughputCalculator =
         ThroughputCalculator(windowDuration: const Duration(seconds: 5));
@@ -112,6 +140,54 @@ class AppState extends ChangeNotifier {
 
     _subscribeToEngineMetrics();
     _captureTap = _audio.audioStream.listen(_onCapturedAudio);
+    _subscribeToLinkLayer();
+  }
+
+  /// Wires the link layer: ACK/NACKs heard by RX go to the TX ARQ sender,
+  /// replies requested by RX are transmitted, received files are saved.
+  void _subscribeToLinkLayer() {
+    _linkSubscriptions.addAll([
+      _rxEngine.controlFrames.listen(_txEngine.onControlFrame),
+      _rxEngine.controlReplies.listen((frame) {
+        _txEngine.sendControl(frame).catchError((Object e) {
+          debugPrint('Failed to send $frame: $e');
+        });
+      }),
+      _rxEngine.files.listen(_onFileReceived),
+      _rxEngine.transfers.listen((p) {
+        _rxTransfer = p;
+        notifyListeners();
+      }),
+      _txEngine.transfers.listen((p) {
+        _txTransfer = p;
+        notifyListeners();
+      }),
+    ]);
+  }
+
+  Future<void> _onFileReceived(ReceivedFile file) async {
+    String? path;
+    String? error;
+    try {
+      path = await _fileSink.save(file.fileName, file.data);
+    } catch (e) {
+      error = '$e';
+      debugPrint('Failed to save received file: $e');
+    }
+    if (_isDisposed) return;
+    _receivedFiles.insert(
+      0,
+      ReceivedFileRecord(
+        fileName: file.fileName,
+        mimeType: file.mimeType,
+        size: file.data.length,
+        timestamp: file.timestamp,
+        savedPath: path,
+        error: error,
+      ),
+    );
+    if (_receivedFiles.length > 50) _receivedFiles.removeLast();
+    addMessage('File "${file.fileName}" (${file.data.length} B)', file.snr);
   }
 
   void _subscribeToEngineMetrics() {
@@ -204,15 +280,33 @@ class AppState extends ChangeNotifier {
   int get numPilots => _numPilots;
   double get carrierFreq => _carrierFreq;
   double get bandwidth => _bandwidth;
-  double get symbolDuration => _symbolDuration;
+
+  /// CSS waveform derived from the current SF / bandwidth / sample rate:
+  /// symbol duration 2^SF / B and SF bits per chirp (computed, not a knob).
+  FrameGeometry get cssGeometry =>
+      FrameGeometry.fromConfig({..._configMap, 'modulation': 0});
+
+  /// Duration of one CSS chirp symbol in seconds (computed from SF and B).
+  double get symbolDuration => cssGeometry.symbolSeconds;
   double get amplitude => _amplitude;
   int get ofdmModulation => _ofdmModulation;
   double get threshold => _threshold;
   int get equalizer => _equalizer;
-  double get codingRate => _codingRate;
   bool get enableRs => _enableRs;
   double get volume => _volume;
   bool get agcEnabled => _agcEnabled;
+  bool get arqEnabled => _arqEnabled;
+  int get arqMaxRetries => _arqMaxRetries;
+  int get arqAckTimeoutMs => _arqAckTimeoutMs;
+
+  /// Latest outgoing / incoming fragmented transfer, for progress display.
+  TxTransferProgress? get txTransfer => _txTransfer;
+  RxTransferProgress? get rxTransfer => _rxTransfer;
+
+  /// Error of the last failed outgoing file transfer, if any.
+  String? get transferError => _transferError;
+  List<ReceivedFileRecord> get receivedFiles =>
+      List.unmodifiable(_receivedFiles);
 
   AudioDevice? get inputDevice => _inputDevice;
   AudioDevice? get outputDevice => _outputDevice;
@@ -266,15 +360,16 @@ class AppState extends ChangeNotifier {
     _numPilots = v['num_pilots'] as int? ?? _numPilots;
     _carrierFreq = v['carrier_freq'] as double? ?? _carrierFreq;
     _bandwidth = v['bandwidth'] as double? ?? _bandwidth;
-    _symbolDuration = v['symbol_duration'] as double? ?? _symbolDuration;
     _amplitude = v['amplitude'] as double? ?? _amplitude;
     _ofdmModulation = v['ofdm_modulation'] as int? ?? _ofdmModulation;
     _threshold = v['threshold'] as double? ?? _threshold;
     _equalizer = v['equalizer'] as int? ?? _equalizer;
-    _codingRate = v['coding_rate'] as double? ?? _codingRate;
     _enableRs = v['enable_rs'] as bool? ?? _enableRs;
     _volume = v['volume'] as double? ?? _volume;
     _agcEnabled = v['agc_enabled'] as bool? ?? _agcEnabled;
+    _arqEnabled = v['arq_enabled'] as bool? ?? _arqEnabled;
+    _arqMaxRetries = v['arq_max_retries'] as int? ?? _arqMaxRetries;
+    _arqAckTimeoutMs = v['arq_ack_timeout_ms'] as int? ?? _arqAckTimeoutMs;
     // A cp from a different FFT size must still be a valid option.
     if (!cpOptionsFor(_numSubcarriers).contains(_cpLength)) {
       _cpLength = _numSubcarriers ~/ 8;
@@ -338,11 +433,6 @@ class AppState extends ChangeNotifier {
     _updateConfigField('bandwidth', v);
   }
 
-  void setSymbolDuration(double v) {
-    _symbolDuration = v;
-    _updateConfigField('symbol_duration', v);
-  }
-
   void setAmplitude(double v) {
     _amplitude = v;
     _updateConfigField('amplitude', v);
@@ -363,11 +453,6 @@ class AppState extends ChangeNotifier {
     _updateConfigField('equalizer', v);
   }
 
-  void setCodingRate(double v) {
-    _codingRate = v;
-    _updateConfigField('coding_rate', v);
-  }
-
   void setEnableRs(bool v) {
     _enableRs = v;
     _updateConfigField('enable_rs', v);
@@ -382,6 +467,23 @@ class AppState extends ChangeNotifier {
     _agcEnabled = v;
     if (!v) _metrics = _metrics.copyWith(clearAgcGain: true);
     _updateConfigField('agc_enabled', v);
+  }
+
+  void setArqEnabled(bool v) {
+    _arqEnabled = v;
+    _updateConfigField('arq_enabled', v);
+  }
+
+  void setArqMaxRetries(int v) {
+    _arqMaxRetries = v;
+    _updateConfigField('arq_max_retries', v);
+  }
+
+  void setArqAckTimeoutMs(int v) {
+    _arqAckTimeoutMs = v < ArqConfig.minAckTimeoutMs
+        ? ArqConfig.minAckTimeoutMs
+        : (v > ArqConfig.maxAckTimeoutMs ? ArqConfig.maxAckTimeoutMs : v);
+    _updateConfigField('arq_ack_timeout_ms', _arqAckTimeoutMs);
   }
 
   void setInputDevice(AudioDevice? device) {
@@ -461,6 +563,38 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Sends [data] as a file through the TX queue. With ARQ on, starts
+  /// listening first so the receiver's ACKs can be heard.
+  Future<void> sendFileBytes(Uint8List data,
+      {required String fileName, String? mimeType}) async {
+    _transferError = null;
+    if (_arqEnabled && !_isListening) toggleListening();
+    _isTransmitting = true;
+    _metrics = _metrics.copyWith(connectionState: ModemLinkState.transmitting);
+    _startThroughputTimer();
+    notifyListeners();
+    try {
+      await _txQueue.enqueueFile(data,
+          fileName: fileName,
+          mimeType: mimeType ?? mimeTypeForFileName(fileName));
+    } catch (e) {
+      _transferError = '$e';
+    } finally {
+      _isTransmitting = false;
+      _metrics = _metrics.copyWith(
+        connectionState:
+            _isListening ? ModemLinkState.listening : ModemLinkState.idle,
+      );
+      if (!_isListening) {
+        _stopThroughputTimer();
+      }
+      notifyListeners();
+    }
+  }
+
+  /// Aborts the outgoing fragmented transfer.
+  void cancelTransfer() => _txEngine.cancelTransfer();
+
   Future<void> emitTestTone() async {
     final samples =
         TestToneGenerator.generateSine(440, 1.0, _sampleRate.toDouble());
@@ -472,7 +606,7 @@ class AppState extends ChangeNotifier {
     final samples = TestToneGenerator.generateChirp(
       _carrierFreq - _bandwidth / 2,
       _carrierFreq + _bandwidth / 2,
-      _symbolDuration,
+      symbolDuration,
       _sampleRate.toDouble(),
     );
     await _audio.enqueueForPlayback(samples);
@@ -524,21 +658,21 @@ class AppState extends ChangeNotifier {
         _cpLength = 64;
         _carrierFreq = 19000.0;
         _bandwidth = 2000.0;
-        _symbolDuration = 0.02;
         break;
       case 'long_range':
         _mode = 0;
-        _sf = 12;
+        _sf = FrameGeometry.maxSf; // 0.51 s chirps, ~20 bit/s at 2 kHz
         _carrierFreq = 18000.0;
-        _bandwidth = 1000.0;
-        _symbolDuration = 0.05;
+        _bandwidth = 2000.0;
         break;
       case 'high_speed':
+        // OFDM occupies carrier +- bandwidth/2: 18-21 kHz (inaudible band,
+        // one subcarrier of guard below Nyquist at 44.1 kHz).
         _mode = 1;
         _numSubcarriers = 2048;
         _cpLength = 128;
-        _carrierFreq = 19000.0;
-        _bandwidth = 4000.0;
+        _carrierFreq = 19500.0;
+        _bandwidth = 3000.0;
         break;
     }
     _syncConfigMap();
@@ -594,8 +728,12 @@ class AppState extends ChangeNotifier {
   String get modeName => _mode == 1 ? 'OFDM' : 'CSS';
 
   void _onCapturedAudio(Float64List chunk) {
+    final wasEmpty = _recentAudio.isEmpty;
     _recentAudio.add(chunk);
     _wavRecorder?.addSamples(chunk);
+    // [hasRecentAudio] only changes on the first non-empty chunk; notify then
+    // (so "Save Signal Sample" enables) rather than on every audio chunk.
+    if (wasEmpty && !_recentAudio.isEmpty && !_isDisposed) notifyListeners();
   }
 
   /// Records captured audio to
@@ -709,6 +847,10 @@ class AppState extends ChangeNotifier {
     _rxSubscription?.cancel();
     _rxFrameEventsSubscription?.cancel();
     _txMetricsSubscription?.cancel();
+    for (final s in _linkSubscriptions) {
+      s.cancel();
+    }
+    _txEngine.cancelTransfer();
     _captureTap?.cancel();
     _finishRecordingQuietly();
     _rxEngine.stopListening();

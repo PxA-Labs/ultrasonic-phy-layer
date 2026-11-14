@@ -1,0 +1,165 @@
+name: Docs
+
+# Builds the documentation site (MkDocs Material + Doxygen C API + dart doc)
+# in strict mode on every change, and deploys it to GitHub Pages (gh-pages
+# branch) only on pushes to main. Branch and manual runs never deploy.
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'CHANGELOG.md'
+      - 'native/include/**'
+      - 'native/tools/soundwave_cli/**'
+      - 'soundwave_app/lib/**'
+      - 'soundwave_app/pubspec.*'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'native/include/**'
+      - 'native/tools/soundwave_cli/**'
+      - 'soundwave_app/lib/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+
+      - name: Install MkDocs and Doxygen
+        run: |
+          pip install -r docs/requirements.txt
+          sudo apt-get update
+          sudo apt-get install -y doxygen
+
+      - name: Generate C API reference (Doxygen)
+        run: |
+          doxygen docs/api/Doxyfile
+          test -f docs/api/c/html/index.html
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.x'
+          channel: stable
+          cache: true
+
+      - name: Generate Dart API reference (dart doc)
+        working-directory: soundwave_app
+        run: |
+          flutter pub get
+          dart doc --output ../docs/api/dart .
+          test -f ../docs/api/dart/index.html
+
+      - name: Build site (strict; broken links and anchors fail)
+        run: mkdocs build --strict
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: docs-site
+          path: site/
+          retention-days: 7
+
+  # Smoke test for docs/testing/ber_sweep.py against the real soundwave-cli:
+  # generate frames, decode a shifted noisy "recording" of the playlist, and
+  # run a short simulated AWGN sweep. Simulation only - not a field result.
+  ber-sweep-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build soundwave-cli
+        run: |
+          cmake -S native -B native/build-cli -DCMAKE_BUILD_TYPE=Release \
+            -DSW_BUILD_TESTS=OFF -DSW_FUZZ_SMOKE=OFF
+          cmake --build native/build-cli --target soundwave_cli -j "$(nproc)"
+          echo "SOUNDWAVE_CLI=$PWD/native/build-cli/soundwave-cli" >> "$GITHUB_ENV"
+
+      - name: CSS - generate, decode offset recording, AWGN sweep
+        run: |
+          S=docs/testing/ber_sweep.py
+          python3 $S generate --mode css --frames 3 --payload-bytes 12 --gap 0.5 \
+            --lead-in 1.0 --verify --out out/css
+          # Clean playlist first (alignment only), then a shifted noisy copy.
+          python3 $S -v decode --manifest out/css/manifest.json --recording out/css/playlist.wav --out out/css/clean
+          # Fake "recording": 0.37 s extra lead-in, then mild AWGN.
+          python3 - <<'EOF'
+          import sys; sys.path.insert(0, "docs/testing")
+          import ber_sweep as b
+          s, r = b.read_wav("out/css/playlist.wav")
+          b.write_wav16("out/css/shifted.wav", [0.0] * int(0.37 * r) + s, r)
+          EOF
+          "$SOUNDWAVE_CLI" simulate --input out/css/shifted.wav --snr 20 --output out/css/rec.wav
+          python3 $S -v decode --manifest out/css/manifest.json --recording out/css/rec.wav \
+            --label ci-smoke --out out/css/result
+          python3 -c "import json,sys; s=json.load(open('out/css/result/summary.json')); sys.exit(0 if s['frames_delivered']==s['frames_sent'] else 'not all frames decoded')"
+          python3 $S simulate --manifest out/css/manifest.json --snr 0,10,20 \
+            --out out/css/awgn.json --min-delivered-at 10 1.0
+
+      - name: CSS SF6 / 4 kHz - generate, decode offset recording, AWGN sweep
+        run: |
+          S=docs/testing/ber_sweep.py
+          python3 $S generate --mode css --sf 6 --bw 4000 --frames 3 --payload-bytes 24 --gap 0.3 --lead-in 0.7 --verify --out out/css6
+          "$SOUNDWAVE_CLI" simulate --input out/css6/playlist.wav --snr 15 --output out/css6/rec.wav
+          python3 $S -v decode --manifest out/css6/manifest.json --recording out/css6/rec.wav --label ci-smoke-sf6 --out out/css6/result
+          python3 -c "import json,sys; s=json.load(open('out/css6/result/summary.json')); sys.exit(0 if s['frames_delivered']==s['frames_sent'] else 'not all frames decoded')"
+          python3 $S simulate --manifest out/css6/manifest.json --snr 0,10 --out out/css6/awgn.json --min-delivered-at 10 1.0
+
+      - name: OFDM - generate and AWGN sweep
+        run: |
+          S=docs/testing/ber_sweep.py
+          python3 $S generate --mode ofdm --frames 3 --payload-bytes 64 --gap 0.3 \
+            --lead-in 0.5 --verify --out out/ofdm
+          python3 $S simulate --manifest out/ofdm/manifest.json --snr 10,20,30 \
+            --out out/ofdm/awgn.json
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ber-sweep-smoke
+          path: |
+            out/**/*.json
+            out/**/*.csv
+          retention-days: 7
+
+  deploy:
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: docs-site
+          path: site
+
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          publish_branch: gh-pages
+          # Keep anything else stored on gh-pages (e.g. benchmark data).
+          keep_files: true
+          commit_message: 'docs: deploy site from ${{ github.sha }}'

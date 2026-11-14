@@ -17,8 +17,9 @@ int main(void) {
 
     int N = 64;
     int cp = 16;
-    int num_data = 20;
 
+    // A wide test band (3.0-19.0 kHz at 44.1 kHz) so the 64-point FFT has
+    // enough subcarriers for the equalizer/estimator unit tests below.
     ofdm_config_t cfg = {
         .num_subcarriers = N,
         .cp_length = cp,
@@ -26,16 +27,34 @@ int main(void) {
         .num_pilots = 8,
         .pilot_boost = 1.0f,
         .pilot_spacing = 8,
+        .sample_rate = 44100.0f,
+        .carrier_freq = 11025.0f,
+        .bandwidth = 16000.0f,
     };
     ofdm_init(&cfg);
+
+    ofdm_layout_t lay;
+    int lay_rc = ofdm_layout_from_config(&cfg, &lay);
+    assert(lay_rc == SW_OK);
+    (void)lay_rc;
+    // df = 689.06 Hz: bins ceil(3025/df) + 1 = 6 .. floor(19025/df) - 1 = 26.
+    assert(lay.first_bin == 6 && lay.last_bin == 26);
+    assert(lay.num_active == 21 && lay.num_pilots == 3 && lay.num_data == 18);
+    int num_data = lay.num_data;
 
     // Indices definitions
     int* data_indices = (int*)malloc(N * sizeof(int));
     int* pilot_indices = (int*)malloc(N * sizeof(int));
-    int* null_indices = (int*)malloc(N * sizeof(int));
-    int n_data, n_pilots, n_nulls;
-    ofdm_allocate_subcarriers(N, data_indices, pilot_indices, null_indices, &n_data, &n_pilots, &n_nulls);
-    assert(n_data == num_data);
+    ofdm_allocate_subcarriers(&lay, data_indices, pilot_indices);
+    int n_pilots = lay.num_pilots;
+    // Pilots on every 8th active bin from the first; data on the rest, all
+    // strictly inside the band.
+    for (int p = 0; p < n_pilots; p++) assert(pilot_indices[p] == lay.first_bin + 8 * p);
+    for (int i = 0; i < num_data; i++) {
+        assert(data_indices[i] > lay.first_bin && data_indices[i] <= lay.last_bin);
+        assert((data_indices[i] - lay.first_bin) % 8 != 0);
+        if (i > 0) assert(data_indices[i] > data_indices[i - 1]);
+    }
 
     // --- Test 1: Flat Channel H=[1,1,...1] ZF Equalizer -> identity ---
     kiss_fft_cpx* Y_flat = (kiss_fft_cpx*)malloc(N * sizeof(kiss_fft_cpx));
@@ -127,6 +146,7 @@ int main(void) {
 
     // --- Test 4: Modulate -> Demodulate own modulated signal (100% recovery) ---
     sw_config_t sw_cfg;
+    memset(&sw_cfg, 0, sizeof sw_cfg); // carrier/bandwidth 0 = default 18-20 kHz band
     sw_cfg.sample_rate = 44100;
     sw_cfg.num_subcarriers = 256;
     sw_cfg.cp_length = 32;
@@ -163,7 +183,7 @@ int main(void) {
     printf("PASS: Modulate -> Demodulate loopback returned 100%% matching bits.\n");
 
     // Clean up
-    free(data_indices); free(pilot_indices); free(null_indices);
+    free(data_indices); free(pilot_indices);
     free(Y_flat); free(H_flat); free(X_hat);
     free(X_p); free(H_p_expected); free(H_p_est); free(Y_p); free(Y_full);
     free(X_hat_zf); free(X_hat_mmse); free(H_fade);

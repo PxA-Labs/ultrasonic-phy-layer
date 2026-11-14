@@ -1,127 +1,138 @@
-# Soundwave: Ultrasonic Physical Layer
+# Soundwave: Data over Sound
 
+[![CI](https://github.com/PxA-Labs/ultrasonic-phy-layer/actions/workflows/ci.yml/badge.svg)](https://github.com/PxA-Labs/ultrasonic-phy-layer/actions/workflows/ci.yml)
+[![Build](https://github.com/PxA-Labs/ultrasonic-phy-layer/actions/workflows/build.yml/badge.svg)](https://github.com/PxA-Labs/ultrasonic-phy-layer/actions/workflows/build.yml)
+[![Docs](https://github.com/PxA-Labs/ultrasonic-phy-layer/actions/workflows/docs.yml/badge.svg)](https://github.com/PxA-Labs/ultrasonic-phy-layer/actions/workflows/docs.yml)
+[![CodeQL](https://github.com/PxA-Labs/ultrasonic-phy-layer/actions/workflows/codeql.yml/badge.svg)](https://github.com/PxA-Labs/ultrasonic-phy-layer/actions/workflows/codeql.yml)
+[![codecov](https://codecov.io/gh/PxA-Labs/ultrasonic-phy-layer/branch/main/graph/badge.svg)](https://codecov.io/gh/PxA-Labs/ultrasonic-phy-layer)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Acoustic Band](https://img.shields.io/badge/Acoustic_Band-18kHz--22kHz-orange.svg)](#1-acoustic-channel-profile)
-[![Modulation](https://img.shields.io/badge/Modulation-CSS_%2F_OFDM-brightgreen.svg)](#2-modulation-scheme-comparison)
-[![Phase](https://img.shields.io/badge/Phase-Design_%26_Modeling-blueviolet.svg)](#project-roadmap)
 
-Soundwave is an experimental physical layer (PHY) communication platform designed to transmit digital data between nearby devices using **ultrasonic audio waves**. It maps digital bitstreams into high-frequency acoustic signals (typically above the human hearing threshold but within the frequency response of consumer speakers and microphones) and decodes them on the receiving side.
+Soundwave is an experimental acoustic modem. It sends text and small files between nearby devices as high-frequency sound, using an ordinary speaker and microphone, with no network, Bluetooth or pairing.
 
----
+- **`native/`**: a portable C11 DSP library (`libsoundwave`) with a stable C ABI. It contains CRC-32, Reed-Solomon RS(255,223), chirp (CSS) and OFDM modems, Zadoff-Chu / matched-filter sync, Schmidl-Cox CFO, LS channel estimation with ZF/MMSE equalization, AGC, and miniaudio audio I/O. The same directory holds the `soundwave-cli` tool.
+- **`soundwave_app/`**: a Flutter app for Android, Windows, macOS and Linux. It adds a link layer (fragmentation, file transfer, optional stop-and-wait ARQ), live spectrum / waterfall / constellation views, WAV recording, import and export, onboarding, and theming and accessibility.
 
-## Acoustic Data Insights & Channel Limits
+**Documentation site:** <https://pxa-labs.github.io/ultrasonic-phy-layer/>. It is built from [`docs/`](docs/) and deployed from `main`. It includes the [build guide](docs/getting-started/build.md), [user guide](docs/getting-started/user-guide.md), [architecture](docs/architecture/overview.md), [C API](docs/API_REFERENCE.md), [Dart API](docs/api/dart-api.md) and an in-browser [Signal Lab](docs/lab/index.md).
 
-Acoustic communication channels are constrained by the physical properties of air and sound propagation. Below are key parameters and empirical performance insights.
+## Status
 
-### 1. Acoustic Channel Profile
+Pre-release (app version `1.0.0+1` in `pubspec.yaml`, no tagged release yet).
 
-| Parameter | Value / Range | Description |
-| :--- | :--- | :--- |
-| **Propagation Velocity ($c$)** | $\approx 343 \text{ m/s}$ (at $20^\circ\text{C}$) | Slow speed of sound introduces severe delay spreads (multipath) and significant Doppler scaling. |
-| **Target Band** | $18.0 \text{ kHz}$ to $22.0 \text{ kHz}$ | Ultrasonic band designed to remain inaudible to adults while utilizing standard $44.1 \text{ kHz}$ sampling hardware. |
-| **Available Bandwidth ($B$)** | $4.0 \text{ kHz}$ | Restricts maximum raw data rates compared to RF networks. |
-| **Acoustic Path Loss ($\alpha$)** | $\approx 0.6 \text{ to } 0.9 \text{ dB/meter}$ | Highly dependent on air temperature, humidity, and frequency ($f^2$ relation). |
+| Area | State |
+|---|---|
+| DSP core (CSS, OFDM, sync, CFO, equalization, RS, CRC, AGC) | Implemented. Unit, integration, AWGN and loopback tests, ASan/UBSan, libFuzzer and static analysis run in CI |
+| Flutter app (TX/RX, link layer, file transfer, ARQ, visualizations, WAV tools, onboarding) | Implemented, with widget and unit tests plus real-DSP loopback tests in CI |
+| Platforms | Android (NDK + AAudio/OpenSL ES), Windows (zip, MSIX), macOS (universal DMG), Linux (tar.gz, .deb, AppImage) build in CI. iOS is not set up |
+| Release pipeline | `release.yml` builds, signs when secrets exist, and drafts a GitHub Release on `v*` tags |
+| **Over-the-air performance** | **Not measured yet.** See the [field test plan](docs/testing/FIELD_TEST_PLAN.md) and the [hardware profiling plan](docs/testing/HARDWARE_PROFILING_PLAN.md) |
+| Store publication | Draft [privacy policy](docs/legal/PRIVACY_POLICY.md), [terms](docs/legal/TERMS_OF_SERVICE.md) and [Play listing](docs/store/PLAY_STORE_LISTING.md), pending legal review |
 
-### 2. Modulation Scheme Comparison
+## Signal parameters: what is measured, and what is not
 
-Soundwave supports two main PHY layer modulation formats. The following table provides insights into their performance trade-offs:
+There are **no field measurements yet**. Every number below is labeled with its source:
 
-| Metric / Dimension | Chirp Spread Spectrum (CSS) | Orthogonal Frequency Division Multiplexing (OFDM) |
-| :--- | :--- | :--- |
-| **Throughput / Bit Rate** | Low ($\approx 50 - 200 \text{ bps}$) | High ($\approx 1 - 4 \text{ kbps}$) |
-| **Multipath Fading Resistance** | Excellent (via matched filter processing gain) | Moderate (requires cyclic prefix $T_{cp} > \tau_{max}$) |
-| **Doppler / Motion Tolerance** | Very High (linear frequency shift maps to time delay) | Low (requires precise pilot estimation & equalization) |
-| **Required SNR** | Low (de-spreads signals below the noise floor) | High ($\ge 12 \text{ dB}$ for QPSK) |
-| **Primary Use Case** | Frame synchronization, bootstrap exchange, noisy rooms | Large file/message payload handoffs |
+- **Derived**: computed exactly from the code's formulas at 44.1 kHz. Not measured.
+- **Simulated**: from CI tests with software AWGN.
+- **Target**: a [PRD](docs/PRD.md) goal that has not been verified.
 
-### 3. Estimated Range vs. Attenuation at 20°C & 50% Humidity
+| Quantity | CSS (default SF8, 2 kHz) | OFDM (default N=256, CP=64, QPSK) | Source |
+|---|---|---|---|
+| Occupied band | 18–20 kHz (centre 19 kHz ± 1 kHz) | 18–20 kHz (`carrier_freq` ± `bandwidth`/2; subcarriers at 18.26–19.81 kHz; ≤ −40 dB of the energy below 16 kHz) | Derived (OFDM spectrum: simulated, `test_ofdm_spectrum.c`) |
+| Raw PHY bit rate | 62.6 bit/s (8 bits per 127.7 ms chirp); 19.6–375.9 bit/s over SF 10..6 and 2–4 kHz | 2.2 kbit/s (8 data subcarriers × 2 bits per 7.26 ms symbol); 4.9 kbit/s with the *High Speed* preset (N=2048, 18–21 kHz) | Derived |
+| Airtime, largest single frame (219 B payload) | 33.8 s (5.6 s at SF6, 4 kHz) | 0.94 s (0.54 s *High Speed*) | Derived |
+| BER under AWGN | < 10⁻³ at ≥ 3 dB SNR; ≤ 0.5 % at −7 dB for every SF | < 10⁻² at ≥ 10 dB SNR | Simulated (`native/tests/test_ber.c`, `test_css.c`) |
+| Noiseless loopback EVM | n/a | < 1 % | Simulated (`native/tests/test_constellation.c`) |
+| Error rate in the field | BER < 10⁻⁵ at 10 dB SNR | same | Target, untested |
+| Range | ≥ 5 m at ≤ 80 dB SPL @ 1 m | same | Target, untested |
+| Latency / startup / memory / CPU | < 50 ms / < 2 s / < 120 MB / < 15 % | same | Target, untested |
 
-| Frequency ($f$) | Attenuation Coeff ($\alpha$) | Max Operating Range ($P_{tx} = 80 \text{ dB SPL}$) | Max Operating Range ($P_{tx} = 65 \text{ dB SPL}$) |
-| :--- | :--- | :--- | :--- |
-| **18.0 kHz** | $0.62 \text{ dB/m}$ | Up to $10.5 \text{ meters}$ | Up to $4.2 \text{ meters}$ |
-| **20.0 kHz** | $0.76 \text{ dB/m}$ | Up to $7.8 \text{ meters}$ | Up to $3.1 \text{ meters}$ |
-| **22.0 kHz** | $0.92 \text{ dB/m}$ | Up to $5.4 \text{ meters}$ | Up to $2.2 \text{ meters}$ |
+More configurations and the exact formulas are in [Signal chain & parameters](docs/architecture/signal-chain.md).
 
----
+Earlier versions of this README contained a table of attenuation coefficients and operating ranges. Its source was not documented and it was never measured, so it has been removed. Air absorption at these frequencies is modelled by ISO 9613-1, and range will be reported only from field tests.
 
-## Physical Layer Mathematical Model Summary
+## Repository layout
 
-For the complete, mathematically rigorous equations of the physical layer, refer to the [MATHEMATICAL_MODEL.md](./docs/MATHEMATICAL_MODEL.md) file. Below is a high-level summary of the core equations.
+```
+.
+├── native/                     C11 DSP core (CMake)
+│   ├── include/soundwave_api.h   public C API
+│   ├── include/soundwave/        module headers (types, css, ofdm, sync, rs, crc, agc, audio...)
+│   ├── src/                      api/ css/ ofdm/ sync/ chanest/ equalizer/ rs/ crc/ fec/ packet/ agc/ audio/
+│   ├── tests/                    CTest + Catch2 tests (unit, e2e, BER, memory safety)
+│   ├── Fuzzing/                  libFuzzer harnesses + regression inputs
+│   ├── benchmarks/               micro-benchmarks
+│   ├── tools/soundwave_cli/      soundwave-cli (modulate / demodulate / simulate WAV files)
+│   └── vendor/                   KissFFT, miniaudio (vendored)
+├── soundwave_app/              Flutter app
+│   ├── lib/native/               dart:ffi bindings
+│   ├── lib/engine/               framing, TX/RX engines, link layer, ARQ, AGC wrapper
+│   ├── lib/dsp/                  FFT, spectrum, waterfall, constellation (visualization)
+│   ├── lib/export/               WAV record/import, offline decode, message export, storage
+│   ├── lib/screens/, widgets/, onboarding/, theme/, services/, state/
+│   ├── test/                     unit, widget, a11y and native loopback tests
+│   └── android/ windows/ macos/ linux/  platform runners + packaging scripts
+├── docs/                       documentation site sources (MkDocs)
+├── mkdocs.yml                  site configuration
+└── .github/workflows/          ci, build, release, docs, codeql, benchmark, changelog, labeler, lint-pr
+```
+
+## Build and test
+
+Full instructions are in [docs/getting-started/build.md](docs/getting-started/build.md).
+
+**Native core, tests and CLI** (Linux, macOS, Windows; CMake ≥ 3.20):
+
+```bash
+cd native
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel
+ctest --test-dir build --output-on-failure --build-config Release
+./build/soundwave-cli modulate --mode css --input "Hello" --output hello.wav   # Windows: build\Release\soundwave-cli.exe
+./build/soundwave-cli demodulate --mode css --input hello.wav
+```
+
+**Flutter app** (Flutter 3.47.x stable):
+
+| Platform | Command | How `libsoundwave` is bundled |
+|---|---|---|
+| Linux | `flutter build linux --release` | CMake `ExternalProject` → `bundle/lib/libsoundwave.so` |
+| Windows | `flutter build windows --release` | CMake `ExternalProject` → `soundwave.dll` next to the exe |
+| macOS | `flutter build macos --release && macos/packaging/embed_native.sh` | universal dylib in `Contents/Frameworks` |
+| Android | `flutter build apk --release --split-per-abi` / `flutter build appbundle` | Gradle `externalNativeBuild` (NDK) for arm64-v8a, armeabi-v7a, x86_64 |
+
+**Flutter tests against the real DSP:**
+
+```bash
+cmake -S native -B native/build-ffi -DSW_BUILD_TESTS=OFF && cmake --build native/build-ffi --target soundwave_shared
+cd soundwave_app && SOUNDWAVE_LIB=$PWD/../native/build-ffi/libsoundwave.so flutter test
+```
+
+**Docs site:** `pip install -r docs/requirements.txt && mkdocs serve`.
+
+## Architecture
 
 ```mermaid
 graph TD
-    A[Bitstream] --> B[Reed-Solomon FEC]
-    B --> C[Modulation: CSS/OFDM]
-    C --> D[DAC & Speaker]
-    D -->|Acoustic Channel| E[Mic & ADC]
-    E --> F[Preamble & Sync]
-    F --> G[Equalization & Demod]
-    G --> H[FEC Decode & CRC]
-    H --> I[Recovered Bits]
+    UI[Flutter UI] --> State[AppState]
+    State --> TX[TxEngine<br/>FrameCodec, fragmentation, ARQ]
+    State --> RX[RxEngine<br/>AGC, sync, decode, reassembly]
+    TX -->|dart:ffi| Core[libsoundwave<br/>CRC, RS, CSS, OFDM, sync, CFO, EQ, AGC]
+    RX -->|dart:ffi| Core
+    TX --> Audio[AudioService]
+    RX --> Audio
+    Audio -->|dart:ffi| MA[miniaudio<br/>AAudio, OpenSL ES, WASAPI, CoreAudio, ALSA/Pulse]
+    CLI[soundwave-cli] --> Core
 ```
 
-### 1. Attenuation Model
-Acoustic pressure attenuation increases exponentially over distance $d$ based on Stokes' Law:
-$$A(d, f) = d^{-\gamma} \cdot e^{-\alpha(f) d}$$
+TX and RX sequence diagrams, frame formats and threading are covered in the [architecture overview](docs/architecture/overview.md). The equations are in the [mathematical model](docs/MATHEMATICAL_MODEL.md).
 
-### 2. Linear Frequency Modulated (LFM) Chirp
-CSS symbols are synthesized using LFM chirps:
-$$s(t) = A \cos \left( 2\pi \left( f_0 + \frac{B}{2T} t \right) t + \phi_0 \right)$$
+## Privacy
 
-### 3. OFDM Subcarrier Generation
-High-rate frames synthesize orthogonal subcarriers via the Inverse Discrete Fourier Transform (IDFT):
-$$x[n] = \frac{1}{\sqrt{N}} \sum_{k=0}^{N-1} X_k e^{j \frac{2\pi k n}{N}}$$
+The app has no accounts, servers, analytics or crash reporting, and it does not use the network. Audio is processed on the device. **Transmissions are broadcast as sound and are not encrypted.** See the [draft privacy policy](docs/legal/PRIVACY_POLICY.md).
 
-### 4. Frame Synchronization
-Timing and frequency synchronization are calculated using cross-correlation metrics and Schmidl-Cox autocorrelation:
-$$\Delta \hat{f}_c = \frac{f_s}{2\pi N} \angle \left( \sum_{n=0}^{N-1} y^*[n] y[n + N] \right)$$
+## Contributing, changelog, license
 
----
-
-## Getting Started & Architecture
-
-At this stage, the repository is focused on the project's physical-layer specifications and design parameters. The codebase will be expanded according to the following architecture:
-
-```
-├── LICENSE
-├── CONTRIBUTING.md
-├── README.md
-├── CHANGELOG.md                <-- Auto-generated changelog
-├── cliff.toml                  <-- git-cliff configuration
-├── docs/
-│   ├── MATHEMATICAL_MODEL.md   <-- Mathematical formulations
-│   ├── PRD.md                  <-- Product Requirements Document
-│   ├── TECH_STACK.md           <-- Technology Stack Specification
-│   ├── CI_CD.md                <-- CI/CD Pipeline Specification
-│   └── ROADMAP.md              <-- Implementation Roadmap
-├── .github/
-│   ├── workflows/
-│   │   ├── ci.yml              <-- Quality gate
-│   │   ├── build.yml           <-- Build matrix
-│   │   ├── release.yml         <-- Sign & deploy
-│   │   └── changelog.yml       <-- Auto changelog
-│   └── dependabot.yml          <-- Dependency updates
-├── src/                        <-- (Future implementation)
-│   ├── encoder/                <-- RS coding & CRC insertion
-│   ├── modulator/              <-- CSS & OFDM signal generation
-│   ├── channel/                <-- Acoustic simulation models
-│   └── receiver/               <-- Frame sync, FFT, equalization
-```
-
-## Changelog
-
-See [CHANGELOG.md](./CHANGELOG.md) for a detailed history of all changes.
-
-## Contributing
-
-Please review [CONTRIBUTING.md](./CONTRIBUTING.md) before opening issues or pull requests.
-
-## Core Developers & Maintainers
-
-This project is developed under the **[PxA Labs](https://github.com/PxA-Labs)** organization by:
-- **Archit Mittal**
-- **Purvansh Joshi**
-
-## License
-
-This project is licensed under the Apache License 2.0. See [LICENSE](./LICENSE) for details.
+- [CONTRIBUTING.md](CONTRIBUTING.md) and the [developer guide](docs/DEVELOPER_GUIDE.md)
+- [CHANGELOG.md](CHANGELOG.md) (generated by git-cliff)
+- Developed under [PxA Labs](https://github.com/PxA-Labs) by Archit Mittal and Purvansh Joshi
+- Licensed under the Apache License 2.0, see [LICENSE](LICENSE)
