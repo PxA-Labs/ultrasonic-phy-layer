@@ -10,6 +10,7 @@ on:
     paths:
       - 'soundwave_app/**'
       - '.github/workflows/build.yml'
+      - '.github/scripts/android_signing.sh'
   workflow_dispatch:
 
 permissions:
@@ -32,6 +33,8 @@ jobs:
         working-directory: soundwave_app
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      BUNDLETOOL_VERSION: '1.18.3'
+      BUNDLETOOL_SHA256: 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29'
     steps:
       - uses: actions/checkout@v7
 
@@ -65,14 +68,7 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-          {
-            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
-            echo "keyPassword=$ANDROID_KEY_PASSWORD"
-            echo "keyAlias=$ANDROID_KEY_ALIAS"
-            echo "storeFile=upload-keystore.jks"
-          } > android/key.properties
+        run: ../.github/scripts/android_signing.sh configure .
 
       - name: Signing mode
         if: steps.check.outputs.has_pubspec == 'true' && env.HAS_KEYSTORE != 'true'
@@ -133,21 +129,28 @@ jobs:
           done
           ls -l "$apk_dir" "$(dirname "$aab")"
 
-      - name: Verify signatures
+      - name: Remove signing material
+        if: always() && steps.check.outputs.has_pubspec == 'true'
+        run: ../.github/scripts/android_signing.sh cleanup .
+
+      - name: Fetch bundletool
         if: steps.check.outputs.has_pubspec == 'true'
         run: |
           set -euo pipefail
-          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          for apk in build/app/outputs/flutter-apk/*.apk; do
-            echo "== $apk"
-            # apksigner's exit status is the verification result; the cert
-            # summary is printed for the log only (its wording varies by
-            # build-tools version, so it must not be grepped as a gate).
-            "$bt/apksigner" verify --verbose --print-certs "$apk"
-          done
-          out=$(jarsigner -verify build/app/outputs/bundle/release/app-release.aab)
-          echo "$out" | tail -3
-          grep -q 'jar verified' <<<"$out"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/bundletool.jar" \
+            "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar"
+          echo "${BUNDLETOOL_SHA256}  $RUNNER_TEMP/bundletool.jar" | sha256sum -c -
+
+      # Same checks as release.yml (apksigner, jarsigner, one certificate
+      # across all artifacts, bundletool validate), without requiring a
+      # release key so PRs and forks still build.
+      - name: Verify signatures and bundle
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          ../.github/scripts/android_signing.sh verify \
+            --apk-dir build/app/outputs/flutter-apk \
+            --aab build/app/outputs/bundle/release/app-release.aab \
+            --bundletool "$RUNNER_TEMP/bundletool.jar"
 
       - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'

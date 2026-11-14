@@ -458,6 +458,27 @@ jobs:
           find native/src -name '*.c' -print0 | \
             xargs -0 -n1 -P "$(nproc)" clang-tidy -p native/build-tidy --quiet
 
+  # ---------------------------------------------------------------------------
+  # Release tooling (issue #94): the Android signing helper used by build.yml
+  # and release.yml is exercised against real JKS keystores and signed
+  # bundles (good, debug, unsigned, tampered, pinned-certificate mismatch).
+  # ---------------------------------------------------------------------------
+  release-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: shellcheck
+        run: shellcheck .github/scripts/*.sh
+
+      - name: Android signing helper self-test
+        run: bash .github/scripts/test_android_signing.sh
+
   docs-lint:
     runs-on: ubuntu-latest
     steps:

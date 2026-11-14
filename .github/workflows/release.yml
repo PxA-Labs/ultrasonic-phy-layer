@@ -48,10 +48,26 @@ jobs:
           echo "### Release ${version} (publish=${publish})" >> "$GITHUB_STEP_SUMMARY"
 
   build-android:
+    # Issues #94/#35: per-ABI APKs + AAB, release-signed with the
+    # ANDROID_KEYSTORE_* secrets. A publishing run (tag push / non-dry
+    # dispatch) refuses to continue without them, so a debug-signed build can
+    # never reach the GitHub release or the Play Store. Dry runs fall back to
+    # debug signing so the pipeline stays testable on forks.
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [meta]
     defaults:
       run:
         working-directory: soundwave_app
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      PUBLISH: ${{ needs.meta.outputs.publish }}
+      VERSION: ${{ needs.meta.outputs.version }}
+      # Optional repository variable: pin the upload certificate (SHA-256 as
+      # shown by Play Console / keytool). Publishing fails on a mismatch.
+      EXPECTED_SIGNING_CERT_SHA256: ${{ vars.ANDROID_SIGNING_CERT_SHA256 }}
+      BUNDLETOOL_VERSION: '1.18.3'
+      BUNDLETOOL_SHA256: 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29'
     steps:
       - uses: actions/checkout@v7
 
@@ -60,10 +76,16 @@ jobs:
         run: |
           if [ ! -f pubspec.yaml ]; then
             echo "::notice::No pubspec.yaml found. Skipping Flutter build."
-            echo "has_pubspec=false" >> $GITHUB_OUTPUT
+            echo "has_pubspec=false" >> "$GITHUB_OUTPUT"
           else
-            echo "has_pubspec=true" >> $GITHUB_OUTPUT
+            echo "has_pubspec=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Require release signing when publishing
+        if: steps.check.outputs.has_pubspec == 'true' && env.PUBLISH == 'true' && env.HAS_KEYSTORE != 'true'
+        run: |
+          echo "::error::Publishing a release requires the ANDROID_KEYSTORE_* secrets; refusing to ship debug-signed Android builds."
+          exit 1
 
       - uses: subosito/flutter-action@v2
         if: steps.check.outputs.has_pubspec == 'true'
@@ -76,22 +98,66 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
+          cache: gradle
 
-      - name: Build APK
+      - name: Configure release signing
+        if: steps.check.outputs.has_pubspec == 'true' && env.HAS_KEYSTORE == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ../.github/scripts/android_signing.sh configure .
+
+      - name: Build release APKs (split per ABI)
         if: steps.check.outputs.has_pubspec == 'true'
-        run: flutter build apk --release
+        run: flutter build apk --release --split-per-abi
 
       - name: Build AAB
         if: steps.check.outputs.has_pubspec == 'true'
         run: flutter build appbundle --release
 
+      - name: Remove signing material
+        if: always() && steps.check.outputs.has_pubspec == 'true'
+        run: ../.github/scripts/android_signing.sh cleanup .
+
+      - name: Fetch bundletool
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/bundletool.jar" \
+            "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar"
+          echo "${BUNDLETOOL_SHA256}  $RUNNER_TEMP/bundletool.jar" | sha256sum -c -
+
+      - name: Verify signatures and bundle
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          set -euo pipefail
+          args=(--apk-dir build/app/outputs/flutter-apk
+                --aab build/app/outputs/bundle/release/app-release.aab
+                --bundletool "$RUNNER_TEMP/bundletool.jar")
+          if [ "$PUBLISH" = "true" ]; then args+=(--require-release-key); fi
+          ../.github/scripts/android_signing.sh verify "${args[@]}"
+
+      # Versioned names, like the desktop packages; the AAB keeps one stable
+      # name for deploy-android.
+      - name: Stage release assets
+        if: steps.check.outputs.has_pubspec == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            cp "build/app/outputs/flutter-apk/app-$abi-release.apk" "dist/soundwave-${VERSION}-android-$abi.apk"
+          done
+          cp build/app/outputs/bundle/release/app-release.aab "dist/soundwave-${VERSION}-android.aab"
+          ls -l dist
+
       - uses: actions/upload-artifact@v7
         if: steps.check.outputs.has_pubspec == 'true'
         with:
           name: android-release
-          path: |
-            soundwave_app/build/app/outputs/flutter-apk/app-release.apk
-            soundwave_app/build/app/outputs/bundle/release/app-release.aab
+          path: soundwave_app/dist/
+          if-no-files-found: error
 
   # ---- Desktop (issues #95, #35) ------------------------------------------
   # Signing steps run only when the corresponding secrets exist; otherwise the
@@ -376,7 +442,7 @@ jobs:
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
           packageName: com.pxalabs.soundwave
-          releaseFiles: app-release.aab
+          releaseFiles: soundwave-${{ needs.meta.outputs.version }}-android.aab
           track: internal
           status: completed
 
