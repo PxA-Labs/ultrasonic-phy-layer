@@ -8,6 +8,7 @@
 #include "soundwave/sync.h"
 #include "soundwave/common.h"
 #include <string.h>
+#include <stdint.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -141,13 +142,17 @@ int ofdm_locate_preamble(const float* samples, size_t len, int N, int cp,
     if (len < 2 * L) return 0;
 
     int found = 0;
+    size_t n_pos = len - 2 * L + 1; // candidate starts m: [m, m + 2L) in range
     kiss_fft_cpx* X = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
     kiss_fft_cpx* Y = (kiss_fft_cpx*)calloc((size_t)N, sizeof(kiss_fft_cpx));
     float* tmpl = (float*)calloc(L, sizeof(float));
     float* R = (float*)malloc((len - L + 1) * sizeof(float));
-    if (!X || !Y || !tmpl || !R || ofdm_preamble_spectrum(lay, N, cp, X) != SW_OK) goto done;
+    double* cum = (double*)malloc((len + 1) * sizeof(double));
+    if (!X || !Y || !tmpl || !R || !cum || ofdm_preamble_spectrum(lay, N, cp, X) != SW_OK)
+        goto done;
 
-    // 1. Schmidl-Cox repetition metric (sync_frame.c).
+    // 1. Schmidl-Cox repetition metric (sync_frame.c): presence gate and
+    // fallback position.
     sync_config_t sc;
     memset(&sc, 0, sizeof sc);
     sc.mode = 1;
@@ -157,22 +162,21 @@ int ofdm_locate_preamble(const float* samples, size_t len, int N, int cp,
     sc.matched_filter_len = (int)L;
     size_t sc_start = 0;
     float sc_snr = 0.0f;
-    double sc_score = -1.0;
-    if (sync_detect_frame(samples, len, &sc, &sc_start, &sc_snr)) {
-        sc_start = refine_with(samples, len, sc_start, N, cp, lay, X, Y);
-        sc_score = preamble_score(samples, len, sc_start, N, cp, lay, X, Y);
-        *frame_start = sc_start;
+    int sc_ok = sync_detect_frame(samples, len, &sc, &sc_start, &sc_snr);
+    if (!sc_ok && !allow_fallback) goto done;
+    if (sc_ok) {
+        *frame_start = refine_with(samples, len, sc_start, N, cp, lay, X, Y);
         *snr = sc_snr;
         found = 1;
-        if (sc_score >= OFDM_PREAMBLE_MIN_SCORE) goto done;
-    } else if (!allow_fallback) {
-        goto done;
     }
 
-    // 2. Any repetition passes Schmidl-Cox -- two identical data symbols, a
-    // periodic interferer -- so a candidate that does not look like the known
-    // preamble is re-checked with a matched filter on the known waveform
-    // (both copies), and the better-matching candidate wins.
+    // 2. Normalised matched filter on the known two-copy preamble:
+    //    rho(m) = (R[m] + R[m + L]) / sqrt(2 E_t E_y(m)),
+    // R = correlation with one preamble copy, E_t its energy, E_y the
+    // energy of y[m .. m + 2L). Unlike the repetition metric it ignores two
+    // identical data symbols and is level-independent. The earliest strong
+    // peak wins (a buffer may hold several frames; the first is wanted), and
+    // a candidate must also pass the phase-slope preamble check.
     {
         ofdm_config_t oc;
         memset(&oc, 0, sizeof oc);
@@ -180,24 +184,60 @@ int ofdm_locate_preamble(const float* samples, size_t len, int N, int cp,
         oc.cp_length = cp;
         ofdm_modulate_symbol(&oc, X, tmpl);
         if (sync_xcorr_fft(samples, len, tmpl, L, R) != 0) goto done;
-        size_t n_r = len - L + 1;
-        double best = -INFINITY;
-        size_t best_m = 0;
-        for (size_t m = 0; m + L < n_r; m++) {
-            double v = (double)R[m] + (double)R[m + L];
-            if (v > best) {
-                best = v;
-                best_m = m;
+        double et = 0.0;
+        for (size_t n = 0; n < L; n++) et += (double)tmpl[n] * tmpl[n];
+        cum[0] = 0.0;
+        for (size_t n = 0; n < len; n++) cum[n + 1] = cum[n] + (double)samples[n] * samples[n];
+        double ey_max = 0.0;
+        for (size_t m = 0; m < n_pos; m++) {
+            double ey = cum[m + 2 * L] - cum[m];
+            if (ey > ey_max) ey_max = ey;
+        }
+        if (!(et > 0.0) || !(ey_max > 0.0) || !isfinite(ey_max)) goto done;
+        const double ey_floor = 1e-4 * ey_max; // -40 dB: silence cannot win
+        // rho is stored in R[m] (R[m + L] is read before R[m + L] is
+        // overwritten: m only grows).
+        double rho_max = 0.0;
+        size_t rho_arg = 0;
+        for (size_t m = 0; m < n_pos; m++) {
+            double ey = cum[m + 2 * L] - cum[m];
+            double rho = ey > ey_floor ? ((double)R[m] + (double)R[m + L]) / sqrt(2.0 * et * ey)
+                                       : 0.0;
+            if (!isfinite(rho)) rho = 0.0;
+            R[m] = (float)rho;
+            if (rho > rho_max) {
+                rho_max = rho;
+                rho_arg = m;
             }
         }
-        if (!(best > 0.0)) goto done;
-        size_t mf_start = refine_with(samples, len, best_m, N, cp, lay, X, Y);
-        double mf_score = preamble_score(samples, len, mf_start, N, cp, lay, X, Y);
-        if (!found || mf_score > sc_score) {
-            *frame_start = mf_start;
-            // Same SNR proxy as the Schmidl-Cox path: 10 log10(rho / (1 - rho)).
-            double rho = mf_score < 0.999999 ? mf_score : 0.999999;
-            *snr = (float)(10.0 * log10(rho / (1.0 - rho) + 1e-12));
+        double tau = 0.75 * rho_max;
+        if (tau < 0.3) tau = 0.3;
+        size_t pick = SIZE_MAX;
+        double pick_rho = 0.0;
+        int tries = 0;
+        for (size_t m = 0; m < n_pos && tries < 8; m++) {
+            if (R[m] < tau) continue;
+            size_t end = m + L / 2 < n_pos ? m + L / 2 : n_pos;
+            size_t best = m;
+            for (size_t j = m; j < end; j++)
+                if (R[j] > R[best]) best = j;
+            tries++;
+            size_t s = refine_with(samples, len, best, N, cp, lay, X, Y);
+            if (preamble_score(samples, len, s, N, cp, lay, X, Y) >= OFDM_PREAMBLE_MIN_SCORE) {
+                pick = s;
+                pick_rho = R[best];
+                break;
+            }
+            m = end; // continue after this peak
+        }
+        if (pick == SIZE_MAX && !found && rho_max > 0.0) {
+            pick = refine_with(samples, len, rho_arg, N, cp, lay, X, Y);
+            pick_rho = rho_max;
+        }
+        if (pick != SIZE_MAX) {
+            *frame_start = pick;
+            double r = pick_rho < 0.999 ? pick_rho : 0.999;
+            if (!found) *snr = (float)(10.0 * log10(r * r / (1.0 - r * r) + 1e-12));
             found = 1;
         }
     }
@@ -207,6 +247,7 @@ done:
     free(Y);
     free(tmpl);
     free(R);
+    free(cum);
     return found;
 }
 

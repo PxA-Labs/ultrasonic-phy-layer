@@ -301,12 +301,19 @@ int main(int argc, char** argv) {
             return 1;
         }
 
-        // Demodulate
+        // Demodulate from the detected frame start, as the app's RxEngine does
+        // (the CSS demodulator expects the preamble at the buffer start).
+        const float* frame_samples = samples;
+        size_t frame_count = num_samples;
+        if (debug_sync == SW_OK && debug_start < num_samples) {
+            frame_samples = samples + debug_start;
+            frame_count = num_samples - debug_start;
+        }
         int ret;
         if (cfg.modulation == 0) {
-            ret = sw_css_demodulate(samples, num_samples, cfg, bits, &bit_len);
+            ret = sw_css_demodulate(frame_samples, frame_count, cfg, bits, &bit_len);
         } else {
-            ret = sw_ofdm_demodulate(samples, num_samples, cfg, bits, &bit_len);
+            ret = sw_ofdm_demodulate(frame_samples, frame_count, cfg, bits, &bit_len);
         }
 
         free(samples);

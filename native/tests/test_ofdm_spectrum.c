@@ -245,8 +245,7 @@ static void test_repetitive_payloads_decode(void) {
             int rc = sw_ofdm_demodulate(rx, total, cfg, out, &bits);
             CHECK(rc == SW_OK && bits >= 64 * 8);
             int ok = rc == SW_OK && memcmp(out, p[i], 64) == 0;
-            if (!ok) fprintf(stderr, "payload %d cp=%d: start %zu, rc %d
-", i, cps[c], start, rc);
+            if (!ok) fprintf(stderr, "payload %d cp=%d: start %zu, rc %d\n", i, cps[c], start, rc);
             CHECK(ok);
             free(tx);
             free(rx);

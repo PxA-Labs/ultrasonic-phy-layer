@@ -374,8 +374,6 @@ class _OfdmSettingsCard extends StatelessWidget {
           children: [
             Text('OFDM Modulation Config',
                 style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            _OfdmBandInfo(config: state.configMap),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
               isExpanded: true,
@@ -440,6 +438,8 @@ class _OfdmSettingsCard extends StatelessWidget {
                   .toList(),
               onChanged: (v) => state.setNumPilots(v ?? 8),
             ),
+            const SizedBox(height: 8),
+            _OfdmBandInfo(config: state.configMap),
             const SizedBox(height: 16),
             const Text('OFDM Channel Equalization Mode'),
             const SizedBox(height: 8),

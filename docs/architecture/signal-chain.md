@@ -34,32 +34,41 @@ Note that the 17–18 kHz part of the default band is audible to many people.
 
 ## OFDM mode
 
-**Implementation (derived from code).** `sw_ofdm_modulate` builds a **real-valued baseband** OFDM signal with an $N$-point IFFT and Hermitian symmetry. The `carrier_freq` and `bandwidth` fields are **not used** by the OFDM modulator: the band is fixed by $N$ and the sample rate.
+**Implementation (derived from code).** `sw_ofdm_modulate` builds a **real-valued** OFDM signal with an $N$-point IFFT and Hermitian symmetry. Data and pilot subcarriers are placed **only inside the configured band** $[f_c - B/2,\ f_c + B/2]$ (`carrier_freq` ± `bandwidth`/2; default 19 kHz ± 1 kHz = **18–20 kHz**). See [Mathematical model §2.2.3](../MATHEMATICAL_MODEL.md#223-ultrasonic-band-plan).
 
 - Subcarrier spacing: $\Delta f = f_s / N$.
-- Active bins $k = N/8 + 1 \ldots N/2 - 1$. DC, a guard of $N/8$ bins and the Nyquist bin stay empty.
-- Every 8th active bin (starting with the first) is a pilot. The rest carry BPSK (1 bit) or QPSK (2 bits).
-- Preamble: two identical Zadoff-Chu OFDM symbols (root 1) on all active bins. They are used for timing, CFO (Schmidl-Cox), the channel estimate and the noise estimate (see [Mathematical model](../MATHEMATICAL_MODEL.md#4-demodulation--channel-equalization)).
-- Each symbol is followed by a cyclic prefix of `cp_length` samples (C default $N/8$ when 0; the app and CLI default is 64).
+- Active bins $k_{lo} = \lceil (f_c - B/2) N / f_s \rceil + 1$ to $k_{hi} = \lfloor (f_c + B/2) N / f_s \rfloor - 1$: one empty guard bin inside each band edge. DC, the audible range, the Nyquist bin and their mirrors stay empty on TX and RX.
+- Rejected configurations (`SW_ERR_BAD_PARAM`): band reaching DC, band edge closer than $\Delta f$ to Nyquist, fewer than 4 active bins.
+- Every 8th active bin (starting with the first) is a pilot (+1, −1, …). The rest carry BPSK (1 bit) or QPSK (2 bits). Data bits are whitened with PRBS15 so repeated payload bytes never produce identical symbols. Pilots track the common phase of each data symbol.
+- Preamble: two identical Zadoff-Chu OFDM symbols (root 1) on the active bins, joined phase-continuously. They are used for timing (Schmidl-Cox, then phase-slope fine timing), CFO, the channel estimate and the noise estimate.
+- Each symbol has a cyclic prefix of `cp_length` samples (C default $N/8$ when 0; the app and CLI default is 64). Its first $\lfloor N_{cp}/2\rfloor$ samples carry a raised-cosine cross-fade with the previous symbol; the frame ends with a $\lfloor N_{cp}/2\rfloor$-sample fade-out.
 
-| $N$ / CP | $\Delta f$ | Active / pilot / data bins | Occupied band | Symbol (incl. CP) | Raw rate BPSK / QPSK | Max app frame (255 B, QPSK) |
+| $N$ / CP, band | $\Delta f$ | Active / pilot / data bins | Subcarrier centres | Symbol (incl. CP) | Raw rate BPSK / QPSK | Max app frame (255 B, QPSK) |
 |---|---|---|---|---|---|---|
-| 256 / 64 (default) | 172.3 Hz | 95 / 12 / 83 | 5.7–21.9 kHz | 320 samples (7.26 ms) | 11.4 / 22.9 kbit/s | 109 ms |
-| 512 / 64 | 86.1 Hz | 191 / 24 / 167 | 5.6–22.0 kHz | 576 (13.06 ms) | 12.8 / 25.6 kbit/s | 118 ms |
-| 1024 / 128 | 43.1 Hz | 383 / 48 / 335 | 5.6–22.0 kHz | 1152 (26.12 ms) | 12.8 / 25.6 kbit/s | 157 ms |
-| 2048 / 128 (*High Speed* preset) | 21.5 Hz | 767 / 96 / 671 | 5.5–22.0 kHz | 2176 (49.34 ms) | 13.6 / 27.2 kbit/s | 197 ms |
+| 256 / 64, 18–20 kHz (default) | 172.3 Hz | 10 / 2 / 8 | 18.26–19.81 kHz | 320 samples (7.26 ms) | 1.10 / 2.21 kbit/s | 944 ms |
+| 256 / 32, 18–20 kHz | 172.3 Hz | 10 / 2 / 8 | 18.26–19.81 kHz | 288 (6.53 ms) | 1.23 / 2.45 kbit/s | 849 ms |
+| 512 / 64, 18–20 kHz | 86.1 Hz | 22 / 3 / 19 | 18.09–19.90 kHz | 576 (13.06 ms) | 1.45 / 2.91 kbit/s | 732 ms |
+| 1024 / 128, 18–20 kHz | 43.1 Hz | 45 / 6 / 39 | 18.04–19.94 kHz | 1152 (26.12 ms) | 1.49 / 2.99 kbit/s | 759 ms |
+| 2048 / 128, 18–20 kHz | 21.5 Hz | 91 / 12 / 79 | 18.02–19.96 kHz | 2176 (49.34 ms) | 1.60 / 3.20 kbit/s | 742 ms |
+| 2048 / 128, 18–21 kHz (*High Speed* preset) | 21.5 Hz | 138 / 18 / 120 | 18.02–20.97 kHz | 2176 (49.34 ms) | 2.43 / 4.86 kbit/s | 544 ms |
 
-All values are at $f_s$ = 44.1 kHz. Raw rates are PHY symbol rates before CRC, RS parity and preamble overhead.
+All values are **computed** from the code at $f_s$ = 44.1 kHz (not measured). Raw rates are data bits per symbol over the symbol time, before CRC, RS parity and preamble overhead. The rate scales with the band: about $2B \cdot \tfrac{7}{8} \cdot \tfrac{N}{N+N_{cp}}$ bit/s for QPSK, minus the guard bins. The app's settings screen shows the same computed band and rate for the current configuration.
 
-!!! warning "OFDM is not ultrasonic on this code base"
-    With this subcarrier placement, OFDM energy covers roughly 5.5–22 kHz, which is well inside the audible range. The raw rates above also assume an ideal channel. Typical consumer speakers and microphones roll off strongly above about 18 kHz, so the upper subcarriers may not survive a real acoustic channel at all. Moving OFDM into a narrow high band (for example by restricting active bins to the 18–21 kHz region) would cut the raw rate in proportion to the bins kept. This page documents the current behavior and does not propose a design.
+**Transmit spectrum (simulated, `native/tests/test_ofdm_spectrum.c`).** Periodogram of a 46-byte frame (CRC + 10-byte payload + RS parity), QPSK. The test requires ≥ 98.5 % of the energy inside the configured band and ≤ −40 dB below 16 kHz. The ~1 % outside the band is the main lobe of the outermost subcarriers, within a few hundred hertz of the band edges.
+
+SPECTRUM_TABLE
+
+Before this change the OFDM modulator ignored `carrier_freq` and `bandwidth` and spread energy over 5.7–21.9 kHz (N = 256): only about 11–15 % of the energy fell in 18–20 kHz and about −2 dB (≈ 60 %) was below 16 kHz (pure-Python model of the old modulator, same frame).
+
+!!! warning "Not measured over the air"
+    The band plan and spectrum are exact properties of the transmitted samples. Whether a given speaker and microphone pass 18–20 kHz, and what SNR they achieve there, has not been measured; see the [field test plan](../testing/FIELD_TEST_PLAN.md). Many devices roll off above 18–20 kHz, which is why the default band stops at 20 kHz.
 
 ## Receiver chain (both modes)
 
 1. **AGC** (optional, app default on): target RMS 0.25, attack 1 ms, release 100 ms, gain range −20 to +32 dB ([math §6](../MATHEMATICAL_MODEL.md#6-automatic-gain-control-agc)).
-2. **Frame detection** (`sw_detect_frame`): CSS uses a matched filter on the 8-up/2-down preamble pattern. OFDM uses the repeated ZC preamble.
+2. **Frame detection** (`sw_detect_frame`): CSS uses a matched filter on the 8-up/2-down preamble pattern. OFDM uses the Schmidl-Cox metric on the repeated ZC preamble, refines it from the preamble's phase slope, and checks it against the known preamble (matched-filter fallback).
 3. **CFO**: Schmidl-Cox on the two repeated preamble symbols (OFDM), computed on the analytic signal.
-4. **OFDM only**: the FFT window backs off $\lfloor N_{cp}/4\rfloor$ samples into the CP. Then a least-squares channel estimate from the preamble, a noise-variance estimate, and ZF or MMSE equalization.
+4. **OFDM only**: the FFT window backs off $\lfloor N_{cp}/4\rfloor$ samples into the CP (after the transmit cross-fade). Then a least-squares channel estimate from the preamble, a noise-variance estimate, per-symbol pilot phase correction, ZF or MMSE equalization, and de-whitening.
 5. **Demapping** to bits, then in the app `FrameCodec.decode`: RS(255,223) decoding (up to 16 byte errors) and CRC-32 verification.
 
 ## What has been verified, and how
