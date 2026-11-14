@@ -161,7 +161,9 @@ static int sliding_max(const float* a, size_t n, size_t W, float* out) {
     for (size_t i = L; i-- > 0;)
         b[i] = (i == L - 1 || (i + 1) % w == 0) ? p[i] : (p[i] > b[i + 1] ? p[i] : b[i + 1]);
     for (size_t m = 0; m < n; m++) {
-        float x = b[m], y = f[m + w - 1];
+        size_t j = m + w - 1; // < L because L = n + w - 1
+        if (j >= L) break;    // (kept explicit for static analysis)
+        float x = b[m], y = f[j];
         out[m] = x > y ? x : y;
     }
     free(p); free(f); free(b);
