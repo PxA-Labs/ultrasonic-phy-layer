@@ -71,7 +71,9 @@ static void fuzz_roundtrip(fz_reader* r) {
     size_t nbits = 1 + fz_u8(r) % MAX_RT_BITS;
     uint8_t bits[MAX_RT_BITS / 8];
     memset(bits, 0, sizeof bits);
-    for (size_t i = 0; i < (nbits + 7) / 8; i++) bits[i] = fz_u8(r);
+    size_t nbytes = (nbits + 7) / 8;
+    if (nbytes > sizeof bits) nbytes = sizeof bits;
+    for (size_t i = 0; i < nbytes; i++) bits[i] = fz_u8(r);
     size_t lead = fz_u16(r) % (2 * (size_t)g.N);
     size_t frame = css_frame_samples(&g, nbits);
     FZ_CHECK(frame > 0);

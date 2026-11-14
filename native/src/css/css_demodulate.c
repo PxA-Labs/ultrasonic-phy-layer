@@ -204,7 +204,7 @@ static float clamp_rho(double v) {
 static int css_sync_bb(const kiss_fft_cpx* z, size_t len, const css_geometry_t* g,
                        float threshold, css_sync_result_t* res) {
     const size_t N = (size_t)g->N, D = (size_t)g->D;
-    if (len < CSS_PREAMBLE_SYMBOLS * N) return 0;
+    if (N == 0 || D == 0 || len / CSS_PREAMBLE_SYMBOLS < N) return 0;
     const size_t count = len - N + 1;                       // window positions
     const size_t nm = len - CSS_PREAMBLE_SYMBOLS * N + 1;   // preamble starts
     const size_t W = 2 * D;                                 // +/- 2 chips (2 bins of offset)
@@ -253,7 +253,14 @@ static int css_sync_bb(const kiss_fft_cpx* z, size_t len, const css_geometry_t* 
     // rho = |<z, c>|^2 / (N * Ebar) <= 1 when the slots carry equal energy.
     for (size_t m = 0; m < nm; m++) {
         double su = 0.0;
-        double ebar = (e[m + CSS_PREAMBLE_SYMBOLS * N] - e[m]) / CSS_PREAMBLE_SYMBOLS;
+        // m + 10N <= len and m + 9N < count by construction of nm; the
+        // explicit check keeps that visible to static analysis.
+        const size_t last = m + CSS_PREAMBLE_SYMBOLS * N;
+        if (last > len || last - N >= count) {
+            U[m] = Dn[m] = 0.0f;
+            continue;
+        }
+        double ebar = (e[last] - e[m]) / CSS_PREAMBLE_SYMBOLS;
         if (!(ebar > gate)) {
             U[m] = Dn[m] = 0.0f;
             continue;
